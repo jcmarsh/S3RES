@@ -82,9 +82,23 @@ int main(int argc, char** argv) {
 
   int countdown = 20;
 
+  // Signal stuff
+  struct sigaction new_sa;
+  struct sigaction old_sa;
+
   FD_ZERO(&read_fds);
   tv.tv_sec = SEC;
   tv.tv_usec = USEC;
+
+  // Setup to ignore SIGUSR1
+  // Set to isgnore SIGUSR1 (used to start ptrace)
+  sigfillset(&new_sa.sa_mask);
+  new_sa.sa_handler = SIG_IGN;
+  new_sa.sa_flags = 0;
+
+  if (sigaction(SIGUSR1, &new_sa, &old_sa) == 0) {
+    sigaction(SIGINT, &new_sa, 0);
+  }
 
   //
   srand(time(NULL));
@@ -115,7 +129,6 @@ int main(int argc, char** argv) {
     replicas[index].priority = -1;
     replicas[index].last_result = 0;
   }
-    
     
   // Fork three children
   for (index = 0; index < CHILD_NUM; index++) {
@@ -159,9 +172,9 @@ int main(int argc, char** argv) {
       }
 
       // Insert an error?
-      // Always insert an error for the first one
+      // Always insert an error for the third process
       if (insert_error) {
-	kill(replicas[2].pid, SIGCONT);
+	kill(replicas[2].pid, SIGUSR1);
 	//insert_error = 0;
       }
 
@@ -172,17 +185,16 @@ int main(int argc, char** argv) {
 	//	printf("EXITED %d\n", currentPID);
       }
       if (WIFSIGNALED(status)) {
-	//	printf("SIGNALED %d\n", currentPID);
+	printf("SIGNALED %d\n", currentPID);
       }
       if (WIFSTOPPED(status)) {
+	//	printf("In Signal-Delivery-Stop: %d\n", currentPID);
 	signal = WSTOPSIG(status);
 	//	printf("STOPPED %d\n", currentPID);
 	//	printf("\tSignal: %d\n", WSTOPSIG(status));
 	switch (signal) {
-	case SIGCONT:
+	case SIGUSR1:
 	  // Hopefully was the signal we sent... so insert an error
-	  // NEED TO CHECK THIS. I think it is the source of the Input/Output error on setregs
-	  // I don't think I can count on this. Should send an alarm? or maybe a user defined signal.
 	  if (insert_error == 0) {
 	    // Do nothing, error already has been inserted
 	  } else {
@@ -200,6 +212,10 @@ int main(int argc, char** argv) {
 	    }
 	  }
 	  ptrace(PTRACE_CONT, currentPID, NULL, NULL);
+	  break;
+	case SIGCONT:
+	  // Should likely do something with this signal, no? Pass on at least?
+	  printf("Caught a continue.\n");
 	  break;
 	case SIGILL:
 	  // Illegal Instruction: Kill process. #4
@@ -219,6 +235,8 @@ int main(int argc, char** argv) {
 	  outcome = 'C'; // C for CRASH
 	  finished_count++;
 	  break;
+	case SIGCHLD:
+	  // Child Stoped or terminated: ignore. #17
 
 	default:
 	  printf("Unhandled signal: %d\n", signal);
