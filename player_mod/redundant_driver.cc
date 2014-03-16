@@ -20,7 +20,7 @@
 
 // Aught to have a useful header from PINT work
 #include <stdlib.h>
-#include <libplayercore/device.h>
+#include <libplayercore/device.h> // Devices are a driver / interface pair
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
@@ -32,25 +32,25 @@
 #include <time.h>
 #include <netinet/in.h>
 
-
-#include <libplayerinterface/interface_util.h>
+#include <libplayerinterface/interface_util.h> // Not used... I think.
 #include <libplayercommon/playercommon.h>
 
-#include <libplayercore/playertime.h>
+#include <libplayercore/playertime.h> // Not used... I think. Well, could be in an inherited class, right?
 #include <libplayercore/driver.h>
 #include <libplayercore/devicetable.h>
 #include <libplayercore/configfile.h>
 #include <libplayercore/globals.h>
-#include <libplayercore/filewatcher.h>
+#include <libplayercore/filewatcher.h> // Not needed? Or replace with the pipe / fd stuff already have
 #include <libplayercore/property.h>
 
 // Default constructor for single-interface drivers.  Specify the
 // interface code and buffer sizes.
 RedundantDriver::RedundantDriver(ConfigFile *cf, int section, bool overwrite_cmds, size_t queue_maxlen, int interf) :
-  Driver(cf, section, overwrite_cmds, queue_maxlen, interf),
-  ThreadState(PLAYER_THREAD_STATE_STOPPED)
+  Driver(cf, section, overwrite_cmds, queue_maxlen, interf), // 
+  ThreadState(PLAYER_THREAD_STATE_STOPPED) //
 {
-  memset (&driverthread, 0, sizeof (driverthread));
+  // Likely won't use driver thread... since will need three blah blah blah
+  //  memset (&driverthread, 0, sizeof (driverthread));
 }
 
 // this is the other constructor, used by multi-interface drivers.

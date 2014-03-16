@@ -17,5 +17,9 @@
 *.out
 *.app
 
+# My additions below
+# Emacs backup files
+*~
+
 # Build directory
 build/
