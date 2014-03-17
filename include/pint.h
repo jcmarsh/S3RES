@@ -5,11 +5,14 @@
  */
 
 //#include <sys/ptrace.h>
+#include <wait.h>
 #include <fcntl.h> // needed to deal with pipes
-#include <sys/user.h> // has pid_t
 #include <signal.h>
 
 #include <stdio.h>
+
+#include <sys/user.h>
+#include <sys/ptrace.h>
 
 typedef enum {
   RUNNING,
@@ -48,3 +51,26 @@ void replicaCrash(struct replica_group* rg, pid_t pid);
  * return 0 if the parent, - if error, the write_out fd if child
  */
 int launchChildren(struct replica_group* rg);
+
+/***********************************************/
+
+/*
+ * Operations dealing with system registers.
+ * Should be able to handle x86 and x86_64 for now.
+ *
+ * March 17th, 2014 James Marshall
+ */
+
+// Modify the register structure to have one (uniformily distributed) bit flip.
+/*
+ * returns 1 if an error is 
+ */
+void injectRegError(pid_t pid);
+
+/**********************************************/
+
+int setupSignal(int signal_ignored);
+
+int handleProcess(struct replica_group* rg, pid_t pid, int status, int insert_error);
+
+void printResults(struct replica* replicas, int num);

@@ -17,9 +17,9 @@ int setupSignal(int signal_ignored) {
   return 0;
 }
 
-int handleProcess(pid_t pid, int status) {
+int handleProcess(struct replica_group *rg, pid_t pid, int status, int insert_error) {
   int signal = -1;
-  struct user_regs_struct copy_regs;
+  int error_inserted = 0;
 
   if (WIFEXITED(status)) {
 
@@ -37,18 +37,9 @@ int handleProcess(pid_t pid, int status) {
       if (insert_error == 0) {
 	// Do nothing, error already has been inserted
       } else {
-	insert_error = 0;
-	    
-	if (ptrace(PTRACE_GETREGS, pid, NULL, &copy_regs) < 0) {
-	  perror("GETREGS error.");
-	}
-
 	// Inject an error: for now a bit flip in a register
-	injectRegError(&copy_regs);
-
-	if(ptrace(PTRACE_SETREGS, pid, NULL, &copy_regs) < 0) {
-	  perror("SETREGS error:");
-	}
+	injectRegError(pid);
+	error_inserted = 1;
       }
       ptrace(PTRACE_CONT, pid, NULL, NULL);
       break;
@@ -58,15 +49,15 @@ int handleProcess(pid_t pid, int status) {
       break;
     case SIGILL:
       // Illegal Instruction: Kill process. #4
-      replicaCrash(pid);
+      replicaCrash(rg, pid);
       break;
     case SIGBUS:
       // Bus error (bad memory access): Kill process. #7
-      replicaCrash(pid);
+      replicaCrash(rg, pid);
       break;
     case SIGSEGV:
       // Invalid memory reference: Kill process. #11
-      replicaCrash(pid);
+      replicaCrash(rg, pid);
       break;
     case SIGCHLD:
       // Child Stoped or terminated: ignore. #17
@@ -76,6 +67,8 @@ int handleProcess(pid_t pid, int status) {
       break;
     }
   }
+  // TODO: return? something special if error inserted? Error?
+  return error_inserted;
 }
 
 void printResults(struct replica* replicas, int num) {

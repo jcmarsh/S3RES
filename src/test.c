@@ -2,9 +2,9 @@
  * Should actually test the libraries I am making.
  */
 
-#include "utility.h"
-#include "register_util.h"
-#include "replicas.h"
+#include "pint.h"
+#include <string.h>
+#include <sys/wait.h>
 
 #define CHILD_NUM 3
 #define BUFF_SIZE 100
@@ -23,45 +23,44 @@ unsigned long fib(int n) {
   }
 }
 
-// Global state
-int isChild = 0;
+// Global Data
 int write_out;
+
+struct replica_group repGroup;
 struct replica replicas[CHILD_NUM];
-int nfds = 0; // I hate that this is global.
-fd_set read_fds;
 int insert_error = 1;
-
-// Consider adding a buffer for each replica
-
+struct timeval tv;
+ 
 // Inititalization
+void init() {
+  initReplicas(&repGroup, replicas, CHILD_NUM);
+  setupSignal(SIGUSR1);
+
+
+  // select timeout
+  tv.tv_sec = SEC;
+  tv.tv_usec = USEC;
+
+  srand(time(NULL));
+
+}
 
 int main(int argc, char** argv) {
+  
   pid_t currentPID = 0;
   int index = 0;
   int status = -1;
   char buffer[BUFF_SIZE] = {0};
 
   // select stuff
-  struct timeval tv;
   int retval;
 
   int countdown = 20;
   int still_running = 0;
 
-  setupSignal(SIGUSR1);
+  write_out = launchChildren(&repGroup);
 
-  // select timeout
-  FD_ZERO(&read_fds);
-  tv.tv_sec = SEC;
-  tv.tv_usec = USEC;
-
-  //
-  srand(time(NULL));
-
-  // Init replicas and fork children
-  initReplicas(replicas, CHILD_NUM);
-
-  if (isChild) {
+ if (write_out != 0) {
     ptrace(PTRACE_TRACEME, 0, NULL, NULL);
 
     snprintf(buffer, BUFF_SIZE, "%lu", fib(starting_n));
@@ -99,11 +98,13 @@ int main(int argc, char** argv) {
 	// no pending process
       } else {
 	// Handle pending process
-	handleProcess(currentPID, status);
+	if (handleProcess(&repGroup, currentPID, status, insert_error) == 1) {
+	  insert_error = 0;
+	}
       }
 
       // Select over pipes from replicas
-      retval = select(nfds, &read_fds, NULL, NULL, &tv);
+      retval = select(repGroup.nfds, &(repGroup.read_fds), NULL, NULL, &tv);
 
       tv.tv_sec = SEC;
       tv.tv_usec = USEC;
