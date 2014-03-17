@@ -58,6 +58,8 @@ int main(int argc, char** argv) {
   int countdown = 20;
   int still_running = 0;
 
+  init();
+
   write_out = launchChildren(&repGroup);
 
  if (write_out != 0) {

@@ -3,7 +3,7 @@
 
 void injectRegError(pid_t pid) //struct user_regs_struct * regs)
 {
-  struct user_regs_struct* copy_regs;
+  struct user_regs_struct copy_regs;
   // Create a new bitmask with 1 bit set true... xor 
   // Ought to be a long, no?
   unsigned long error_mask = 1; // Shift right random number of times (between 0 and WORDSIZE)
@@ -29,10 +29,12 @@ void injectRegError(pid_t pid) //struct user_regs_struct * regs)
   printf("reg_pick: %d\tbit_pick: %d\n", reg_pick, bit_pick);
 
   //  printf("hmmm: %lu\n", *((unsigned long *)regs + reg_pick));
-  printf("Old value: %lX\tNew value: %lX\n", *((unsigned long *)copy_regs + reg_pick), *((unsigned long *)copy_regs + reg_pick) ^ (error_mask << bit_pick));
+  printf("Old value: %lX\tNew value: %lX\n", *((unsigned long *)&copy_regs + reg_pick), *((unsigned long *)&copy_regs + reg_pick) ^ (error_mask << bit_pick));
   
-  *((unsigned long *)copy_regs + reg_pick) = *((unsigned long *)copy_regs + reg_pick) ^ (error_mask << bit_pick);
+  *((unsigned long *)&copy_regs + reg_pick) = *((unsigned long *)&copy_regs + reg_pick) ^ (error_mask << bit_pick);
 
+  //  printf("Old value: %lX\tNew value: %lX\n", *((unsigned long *)regs + reg_pick), *((unsigned long *)regs + reg_pick) ^ (error_mask << bit_pick));
+  //  *((unsigned long *)regs + reg_pick) = *((unsigned long *)regs + reg_pick) ^ (error_mask << bit_pick);
 
   if(ptrace(PTRACE_SETREGS, pid, NULL, &copy_regs) < 0) {
     perror("SETREGS error:");
