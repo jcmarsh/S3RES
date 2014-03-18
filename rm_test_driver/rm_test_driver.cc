@@ -431,11 +431,6 @@ void RMTestDriver::DoOneUpdate() {
   int countdown = 20;
   int still_running = 0;
   
-  // I don't think these are necessary.
-  // I mean, it is copy on write, right?
-  //  double odom_pose_copy[CHILD_NUM][3];
-  //  double laser_ranges_copy[CHILD_NUM][laser_count];
-
   double result_vel;
   double result_rot_vel;
 
@@ -448,21 +443,6 @@ void RMTestDriver::DoOneUpdate() {
   if (!this->active_goal) {
     return;
   }
-
-  // Copy Odom
-  //  for (index = 0; index < CHILD_NUM; index++) {
-  //    for (jndex = 0; jndex < 3; jndex++) {
-  //      odom_pose_copy[CHILD_NUM][jndex] = odom_pose[jndex];
-  //    }
-  //  }
-
-  // TODO: Is this even neccssary
-  // Copy Lasers
-  //  for (index = 0; index < CHILD_NUM; index++) {
-  //    for (jndex = 0; jndex < laser_count; jndex++) {
-  //      laser_ranges_copy[CHILD_NUM][jndex] = laser_ranges[jndex];
-  //    }
-  //  }
 
   // We have a goal, calculate move redundantly
   write_out = launchChildren(&repGroup);

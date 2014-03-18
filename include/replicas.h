@@ -24,7 +24,7 @@ struct replica {
   int pipefd[2]; // pipe to communicate with controller
   // Possibly put a pointer to entry function
   replica_status status;
-  unsigned long last_result;
+  //  unsigned long last_result; // TODO: Usefull comment.
 };  
 
 struct replica_group {

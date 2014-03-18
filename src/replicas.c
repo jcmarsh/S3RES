@@ -31,7 +31,7 @@ int initReplicas(struct replica_group* rg, struct replica* reps, int num) {
 
     rg->replicas[index].pid = -1;
     rg->replicas[index].priority = -1;
-    rg->replicas[index].last_result = 0;
+    //    rg->replicas[index].last_result = NULL;
     rg->replicas[index].status = RUNNING;
   }
 

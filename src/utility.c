@@ -71,6 +71,10 @@ int handleProcess(struct replica_group *rg, pid_t pid, int status, int insert_er
   return error_inserted;
 }
 
+/*
+ * Keeping for reference. Not sure how I want to deal with yet.
+ */
+/*
 void printResults(struct replica* replicas, int num) {
   int index;
   long prev_result = replicas[0].last_result;
@@ -98,3 +102,4 @@ void printResults(struct replica* replicas, int num) {
 
   printf("RESULT: %c\n", outcome);
 }
+ */
