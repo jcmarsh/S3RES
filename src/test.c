@@ -25,7 +25,6 @@ unsigned long fib(int n) {
 
 // Global Data
 int write_out;
-
 struct replica_group repGroup;
 struct replica replicas[CHILD_NUM];
 int insert_error = 1;
@@ -42,11 +41,9 @@ void init() {
   tv.tv_usec = USEC;
 
   srand(time(NULL));
-
 }
 
 int main(int argc, char** argv) {
-  
   pid_t currentPID = 0;
   int index = 0;
   int status = -1;

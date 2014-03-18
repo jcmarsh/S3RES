@@ -8,7 +8,7 @@ CFLAGS=-Wall -g
 default: test
 
 test: pint
-	$(CC) $(FLAGS) -o $(BUILD)/test $(SRC)/test.c $(INC) -L$(LIB)/ -lpint
+	$(CC) $(FLAGS) -o $(BUILD)/test $(SRC)/test.c $(INC) -lpint
 
 install: pint
 	cp $(LIB)/libpint.so /usr/local/lib/libpint.so

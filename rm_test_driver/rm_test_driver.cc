@@ -13,6 +13,13 @@
 
 #include <libplayercore/playercore.h>
 
+#include <pint.h>
+
+#define CHILD_NUM 3
+//#define BUFF_SIZE 100
+#define SEC 0
+#define USEC 500000
+
 ////////////////////////////////////////////////////////////////////////////////
 // The class for the driver
 class RMTestDriver : public ThreadedDriver
@@ -87,6 +94,12 @@ private:
   double goal_x, goal_y, goal_t;
   int cmd_state, cmd_type;
 
+  // Data for redundancy stuff
+  int write_out;
+  struct replica_group repGroup;
+  struct replica replicas[CHILD_NUM];
+  int insert_error = 1;
+  struct timeval tv;
 };
 
 // A factory creation function, declared outside of the class so that it
@@ -198,6 +211,15 @@ int RMTestDriver::MainSetup()
     return -1;
 
   // Init redundancy
+  initReplicas(&repGroup, replicas, CHILD_NUM);
+  setupSignal(SIGUSR1);
+
+
+  // select timeout
+  tv.tv_sec = SEC;
+  tv.tv_usec = USEC;
+
+  srand(time(NULL));
 
   puts("Redundant Manager Test driver ready");
 
@@ -331,20 +353,9 @@ void RMTestDriver::Main()
   }
 }
 
-// TODO.... eh....
-void RMTestDriver::DoOneUpdate() {
+void calculateCommand(double* ret_vel, double* ret_rot_vel) {
   double dist, theta, delta_x, delta_y, v, tao, obs_x, obs_y, vel, rot_vel;
   int total_factors, i;
-
-  if (this->InQueue->Empty()) {
-    return;
-  }
-
-  this->ProcessMessages();
-
-  if (!this->active_goal) {
-    return;
-  }
 
   // Head towards the goal! odom_pose: 0-x, 1-y, 2-theta
   dist = sqrt(pow(goal_x - odom_pose[0], 2)  + pow(goal_y - odom_pose[1], 2));
@@ -356,10 +367,10 @@ void RMTestDriver::DoOneUpdate() {
     delta_x = 0;
     delta_y = 0;
   } else if (goal_radius <= dist and dist <= goal_extent + goal_radius) {
-      v = goal_scale * (dist - goal_radius);
-      delta_x = v * cos(theta);
-      delta_y = v * sin(theta);
-      total_factors += 1;
+    v = goal_scale * (dist - goal_radius);
+    delta_x = v * cos(theta);
+    delta_y = v * sin(theta);
+    total_factors += 1;
   } else {
     v = goal_scale; //* goal_extent;
     delta_x = v * cos(theta);
@@ -396,9 +407,136 @@ void RMTestDriver::DoOneUpdate() {
     rot_vel = vel_scale * rot_vel;
 
     // TODO: Should turn to the desired theta, goal_t
-    this->PutCommand(vel, rot_vel);
+    *ret_vel = vel;
+    *ret_rot_vel = rot_vel;
+    //    this->PutCommand(vel, rot_vel);
   } else { // within distance epsilon. Give it up, man.
-    this->PutCommand(0,0);
+    *ret_vel = 0;
+    *ret_rot_vel = 0;
+    //    this->PutCommand(0,0);
+  }
+
+}
+
+// TODO.... eh....
+void RMTestDriver::DoOneUpdate() {
+  pid_t currentPID = 0;
+  int index = 0, jndex = 0;
+  int status = -1;
+  char buffer[BUFF_SIZE] = {0};
+
+  // select stuff
+  int retval;
+
+  int countdown = 20;
+  int still_running = 0;
+  
+  // I don't think these are necessary.
+  // I mean, it is copy on write, right?
+  //  double odom_pose_copy[CHILD_NUM][3];
+  //  double laser_ranges_copy[CHILD_NUM][laser_count];
+
+  double result_vel;
+  double result_rot_vel;
+
+  if (this->InQueue->Empty()) {
+    return;
+  }
+
+  this->ProcessMessages();
+
+  if (!this->active_goal) {
+    return;
+  }
+
+  // Copy Odom
+  //  for (index = 0; index < CHILD_NUM; index++) {
+  //    for (jndex = 0; jndex < 3; jndex++) {
+  //      odom_pose_copy[CHILD_NUM][jndex] = odom_pose[jndex];
+  //    }
+  //  }
+
+  // TODO: Is this even neccssary
+  // Copy Lasers
+  //  for (index = 0; index < CHILD_NUM; index++) {
+  //    for (jndex = 0; jndex < laser_count; jndex++) {
+  //      laser_ranges_copy[CHILD_NUM][jndex] = laser_ranges[jndex];
+  //    }
+  //  }
+
+  // We have a goal, calculate move redundantly
+  write_out = launchChildren(&repGroup);
+
+  if (write_out != 0) {
+    ptrace(PTRACE_TRACEME, 0, NULL, NULL);
+
+    calculateCommand(&result_vel, &result_rot_vel);
+    
+    snprintf(buffer, BUFF_SIZE, "%f %f", result_vel, result_rot_vel);
+    write(write_out, buffer, BUFF_SIZE);
+  } else { // Main control / voting loop
+    while(1) {
+      // check if any replicas are still running
+      still_running = 0;
+      for (index = 0; index < CHILD_NUM; index++) {
+	if (replicas[index].status == RUNNING) {
+	  still_running++;
+	}
+      }
+      if (still_running == 0) {
+	// All replicas are finished (or crashed)
+	break;
+      }
+
+      countdown--;
+      if (countdown < 0) {
+	// Time's up
+	break;
+      }
+
+      // Insert an error?
+      // Always insert an error for the third process
+      if (insert_error) {
+	kill(replicas[2].pid, SIGUSR1);
+	//insert_error = 0;
+      }
+
+      // Check for stopped processes
+      currentPID = waitpid(-1, &status, WNOHANG);
+      if (currentPID == 0) {
+	// no pending process
+      } else {
+	// Handle pending process
+	if (handleProcess(&repGroup, currentPID, status, insert_error) == 1) {
+	  insert_error = 0;
+	}
+      }
+
+      // Select over pipes from replicas
+      retval = select(repGroup.nfds, &(repGroup.read_fds), NULL, NULL, &tv);
+
+      tv.tv_sec = SEC;
+      tv.tv_usec = USEC;
+
+      if (retval == -1) {
+	perror("select()");
+      } else {
+	// Data to read! Loop through and print
+	for (index = 0; index < CHILD_NUM; index++) {
+	  retval = read(replicas[index].pipefd[0], buffer, BUFF_SIZE);
+	  if (retval > 0) {
+	    // This won't work... need to read back two doubles.
+	    replicas[index].last_result = atol(buffer);
+	    replicas[index].status = FINISHED;
+	    memset(buffer, 0, BUFF_SIZE);
+	  }
+	}
+      }
+    }
+    
+    // All done!
+    printResults(replicas, CHILD_NUM);
+    // TODO: Any cleanup?
   }
 }
 
