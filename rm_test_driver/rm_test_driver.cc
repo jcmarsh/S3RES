@@ -16,7 +16,7 @@
 #include "pint.h"
 
 #define CHILD_NUM 3
-//#define BUFF_SIZE 100
+#define BUFF_SIZE 100
 #define SEC 0
 #define USEC 500000
 
@@ -94,11 +94,14 @@ private:
   double goal_x, goal_y, goal_t;
   int cmd_state, cmd_type;
 
+  // Calculate Art Pot
+  void calculateCommand(double* ret_vel, double* ret_rot_vel);
+
   // Data for redundancy stuff
   int write_out;
   struct replica_group repGroup;
   struct replica replicas[CHILD_NUM];
-  int insert_error = 1;
+  int insert_error;
   struct timeval tv;
 };
 
@@ -198,7 +201,7 @@ RMTestDriver::RMTestDriver(ConfigFile* cf, int section)
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
 int RMTestDriver::MainSetup()
 {   
-  puts("Redundant Manager Test driver initialising");
+  puts("Redundant Manager Test driver initialising in MainSetup");
   this->active_goal = false;
   this->goal_x = this->goal_y = this->goal_t = 0;
 
@@ -214,12 +217,13 @@ int RMTestDriver::MainSetup()
   initReplicas(&repGroup, replicas, CHILD_NUM);
   setupSignal(SIGUSR1);
 
-
   // select timeout
   tv.tv_sec = SEC;
   tv.tv_usec = USEC;
 
   srand(time(NULL));
+
+  insert_error = 1;
 
   puts("Redundant Manager Test driver ready");
 
@@ -246,6 +250,7 @@ int RMTestDriver::ProcessMessage(QueuePointer & resp_queue,
                                   player_msghdr * hdr,
                                   void * data)
 {
+  puts("RMTestDriver ProcessMessage");
   if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 			   PLAYER_POSITION2D_DATA_STATE, this->odom_addr)) {
     assert(hdr->size == sizeof(player_position2d_data_t));
@@ -344,6 +349,7 @@ void RMTestDriver::Main()
   for(;;)
   {
     // test if we are supposed to cancel
+    puts("RMTestDriver MainLoop");
     this->Wait();
     pthread_testcancel();
     this->DoOneUpdate();
@@ -353,13 +359,14 @@ void RMTestDriver::Main()
   }
 }
 
-void calculateCommand(double* ret_vel, double* ret_rot_vel) {
+void RMTestDriver::calculateCommand(double* ret_vel, double* ret_rot_vel) {
   double dist, theta, delta_x, delta_y, v, tao, obs_x, obs_y, vel, rot_vel;
   int total_factors, i;
 
+  puts("RMTestDriver calculateCommand");
   // Head towards the goal! odom_pose: 0-x, 1-y, 2-theta
   dist = sqrt(pow(goal_x - odom_pose[0], 2)  + pow(goal_y - odom_pose[1], 2));
-  theta = atan2(goal_y - odom_pose[1], goal_x - odom_pose[0]) - odom_pose[2];
+  theta = atan2(goal_y - odom_pose[1], this->goal_x - odom_pose[0]) - odom_pose[2];
 
   total_factors = 0;
   if (dist < goal_radius) {
@@ -453,7 +460,7 @@ void RMTestDriver::DoOneUpdate() {
 
     calculateCommand(&result_vel, &result_rot_vel);
     
-    snprintf(buffer, BUFF_SIZE, "%f %f", result_vel, result_rot_vel);
+    snprintf(buffer, BUFF_SIZE, "%lf %lf", result_vel, result_rot_vel);
     write(write_out, buffer, BUFF_SIZE);
   } else { // Main control / voting loop
     while(1) {
@@ -507,7 +514,7 @@ void RMTestDriver::DoOneUpdate() {
 	  retval = read(replicas[index].pipefd[0], buffer, BUFF_SIZE);
 	  if (retval > 0) {
 	    // This won't work... need to read back two doubles.
-	    sscanf(buffer, "%f %f", &results[index][0], &results[index][1]);
+	    sscanf(buffer, "%lf %lf", &results[index][0], &results[index][1]);
 	    replicas[index].status = FINISHED;
 	    memset(buffer, 0, BUFF_SIZE);
 	  }
@@ -516,7 +523,7 @@ void RMTestDriver::DoOneUpdate() {
     }
     
     // All done!
-    printResults(replicas, CHILD_NUM, results, 2);
+    printResultsDoubles(replicas, CHILD_NUM, results);
     // TODO: Any cleanup?
   }
 }
