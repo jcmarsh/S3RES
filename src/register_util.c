@@ -23,7 +23,15 @@ void injectRegError(pid_t pid) //struct user_regs_struct * regs)
 
   // This does not give a unifrom distribution... close enough?
   // Check out http://en.wikipedia.org/wiki/Mersenne_twister
-  reg_pick = rand() % reg_num;
+
+  /* FOR x86_64
+   * Segment registers are only 16 bits.
+   * 4 of the 6 segment register can not be changed (ds, es, fs, and gs)
+   * fs_base and gs_base are 47 bits
+   * eflags is 18 bits.
+   */
+
+  reg_pick = rand() % (reg_num -4); // For now skip the last 4 regs in x86_64
   bit_pick = rand() % __WORDSIZE;
   
   printf("reg_pick: %d\tbit_pick: %d\n", reg_pick, bit_pick);
