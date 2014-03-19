@@ -4,6 +4,10 @@
  *
  * March 17th, 2014 James Marshall
  */
+
+#ifndef __REG_GUARD
+#define __REG_GUARD
+
 #include <sys/user.h>
 #include <sys/ptrace.h>
 
@@ -15,3 +19,5 @@
  * returns 1 if an error is 
  */
 void injectRegError(pid_t pid);
+
+#endif // __REG_GUARD

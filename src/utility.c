@@ -72,20 +72,20 @@ int handleProcess(struct replica_group *rg, pid_t pid, int status, int insert_er
 }
 
 /*
- * Keeping for reference. Not sure how I want to deal with yet.
+ * Doesn't seem to be the right way to go about it,
+ * but I'm not sure how I want to deal with yet.
  */
-/*
-void printResults(struct replica* replicas, int num) {
+void printResults(struct replica* replicas, unsigned long* results, int num) {
   int index;
-  long prev_result = replicas[0].last_result;
+  unsigned long prev_result = results[0];
   char outcome = 'B'; // B for Benign
 
   for (index = 0; index < num; index++) {
-    printf("\tResult %d: %lu\n", index, replicas[index].last_result);
-    if (prev_result != replicas[index].last_result) {
+    printf("\tResult %d: %lu\n", index, results[index]);
+    if (prev_result != results[index]) {
       outcome = 'S'; // S for SILENT DATA CORRUPTION!
     }
-    prev_result = replicas[index].last_result;
+    prev_result = results[index];
   }
 
   // Check for Crashes and Timeouts
@@ -102,4 +102,3 @@ void printResults(struct replica* replicas, int num) {
 
   printf("RESULT: %c\n", outcome);
 }
- */

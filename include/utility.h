@@ -6,4 +6,4 @@ int setupSignal(int signal_ignored);
 
 int handleProcess(struct replica_group* rg, pid_t pid, int status, int insert_error);
 
-void printResults(struct replica* replicas, int num);
+void printResults(struct replica* replicas, unsigned long* results, int num);

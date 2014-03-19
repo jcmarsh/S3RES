@@ -114,7 +114,7 @@ int main(int argc, char** argv) {
 	for (index = 0; index < CHILD_NUM; index++) {
 	  retval = read(replicas[index].pipefd[0], buffer, BUFF_SIZE);
 	  if (retval > 0) {
-	    results[index]/// AHHHH = atol(buffer);
+	    results[index] = atol(buffer);
 	    replicas[index].status = FINISHED;
 	    memset(buffer, 0, BUFF_SIZE);
 	  }
@@ -123,37 +123,9 @@ int main(int argc, char** argv) {
     }
 
     // All done!
-    printResults(replicas, CHILD_NUM);
+    printResults(replicas, results, CHILD_NUM);
   }
 
   return 0;
-}
-
-void printResults(struct replica* replicas, int num) {
-  int index;
-  long prev_result = replicas[0].last_result;
-  char outcome = 'B'; // B for Benign
-
-  for (index = 0; index < num; index++) {
-    printf("\tResult %d: %lu\n", index, replicas[index].last_result);
-    if (prev_result != replicas[index].last_result) {
-      outcome = 'S'; // S for SILENT DATA CORRUPTION!
-    }
-    prev_result = replicas[index].last_result;
-  }
-
-  // Check for Crashes and Timeouts
-  for (index = 0; index < num; index++) {
-    switch (replicas[index].status) {
-    case RUNNING:
-      outcome = 'T';
-      break;
-    case CRASHED:
-      outcome = 'C';
-      break;
-    }
-  }
-
-  printf("RESULT: %c\n", outcome);
 }
 
