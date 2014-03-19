@@ -123,7 +123,7 @@ int main(int argc, char** argv) {
     }
 
     // All done!
-    printResults(replicas, results, CHILD_NUM);
+    printResultsULong(replicas, CHILD_NUM, results);
   }
 
   return 0;

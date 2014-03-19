@@ -71,16 +71,56 @@ int handleProcess(struct replica_group *rg, pid_t pid, int status, int insert_er
   return error_inserted;
 }
 
+// Can not seem to have an arbitrary length for the second array dimension
+void printResultsDoubles(struct replica* replicas, int child_num, double results[][2]) { //, int arg_num) {
+  int index, andex;
+  int arg_num = 2;
+  char outcome = 'B';
+  double prev_result[arg_num];
+
+  for (andex = 0; andex < arg_num; andex++) {
+    prev_result[andex] = results[0][andex];
+  }
+
+  // Compare all results to find data corruption
+  for (index = 0; index < child_num; index++) {
+    printf("\tRestuls %d:", index);
+    for (andex = 0; andex < arg_num; andex++) {
+      printf("\t%f", results[index][andex]);
+      if (prev_result[andex] != results[index][andex]) {
+	outcome = 'S';
+      }
+      prev_result[andex] = results[index][andex];
+    }
+    printf("\n");
+  }
+
+  // TODO: Can likely split out. Would be good to separate replica status from output handling
+  // Check for Crashes and Timeouts
+  for (index = 0; index < child_num; index++) {
+    switch (replicas[index].status) {
+    case RUNNING:
+      outcome = 'T';
+      break;
+    case CRASHED:
+      outcome = 'C';
+      break;
+    }
+  }
+
+  printf("RESULT: %c\n", outcome);
+}
+
 /*
  * Doesn't seem to be the right way to go about it,
  * but I'm not sure how I want to deal with yet.
  */
-void printResults(struct replica* replicas, unsigned long* results, int num) {
+void printResultsULong(struct replica* replicas, int child_num, unsigned long* results) {
   int index;
   unsigned long prev_result = results[0];
   char outcome = 'B'; // B for Benign
 
-  for (index = 0; index < num; index++) {
+  for (index = 0; index < child_num; index++) {
     printf("\tResult %d: %lu\n", index, results[index]);
     if (prev_result != results[index]) {
       outcome = 'S'; // S for SILENT DATA CORRUPTION!
@@ -89,7 +129,7 @@ void printResults(struct replica* replicas, unsigned long* results, int num) {
   }
 
   // Check for Crashes and Timeouts
-  for (index = 0; index < num; index++) {
+  for (index = 0; index < child_num; index++) {
     switch (replicas[index].status) {
     case RUNNING:
       outcome = 'T';

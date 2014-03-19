@@ -13,7 +13,7 @@
 
 #include <libplayercore/playercore.h>
 
-#include <pint.h>
+#include "pint.h"
 
 #define CHILD_NUM 3
 //#define BUFF_SIZE 100
@@ -433,6 +433,7 @@ void RMTestDriver::DoOneUpdate() {
   
   double result_vel;
   double result_rot_vel;
+  double results[CHILD_NUM][2];
 
   if (this->InQueue->Empty()) {
     return;
@@ -506,7 +507,7 @@ void RMTestDriver::DoOneUpdate() {
 	  retval = read(replicas[index].pipefd[0], buffer, BUFF_SIZE);
 	  if (retval > 0) {
 	    // This won't work... need to read back two doubles.
-	    replicas[index].last_result = atol(buffer);
+	    sscanf(buffer, "%f %f", &results[index][0], &results[index][1]);
 	    replicas[index].status = FINISHED;
 	    memset(buffer, 0, BUFF_SIZE);
 	  }
@@ -515,7 +516,7 @@ void RMTestDriver::DoOneUpdate() {
     }
     
     // All done!
-    printResults(replicas, CHILD_NUM);
+    printResults(replicas, CHILD_NUM, results, 2);
     // TODO: Any cleanup?
   }
 }
