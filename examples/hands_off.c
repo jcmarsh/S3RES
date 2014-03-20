@@ -32,9 +32,18 @@ void init() {
 
 int main(int argc, char** argv) {
   pid_t currentPID = 0;
-  int index, status, retval, signal;
+  int index, status, signal;
   struct user_regs_struct copy_regs;
-  
+  int entry = 1; // syscall enter (vs return)
+  int open_called = 0; // open syscall
+
+  // New file stuff
+  int new_fd;
+  int new_flags = O_CREAT | O_WRONLY;
+  mode_t new_mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+  char *new_filename = "./diff_out.txt";
+
+
   init();
 
   //  write_out = launchChildren(&repGroup); // launch a program instead
@@ -76,19 +85,44 @@ int main(int argc, char** argv) {
 	  perror("GETREGS error.");
 	}
 	
-	// syscall open
-	//	if (copy_regs.rax == 5) {
-	  printf("SYSCALL PID: %d\n\t", currentPID);
-	  PRINT_REG(rax, (&copy_regs)); // eax
-	  printf("\t");
-	  PRINT_REG(rdi, (&copy_regs)); // ebx
-	  printf("\t");
-	  PRINT_REG(rsi, (&copy_regs)); // ecx
-	  printf("\t");
-	  PRINT_REG(rdx, (&copy_regs)); // edx
-	  //printRegs(&copy_regs);
-	  printf("\n");
-	  //	}
+	if (entry) { // Entering a syscall
+	  //	  if (copy_regs.rax == 85) { // Creat  syscall
+	    open_called = 1;
+
+	    printf("SYSCALL ENTRY PID: %d\n\t", currentPID);
+	    PRINT_REG(rax, (&copy_regs)); // eax
+	    printf("\t");
+	    PRINT_REG(rdi, (&copy_regs)); // ebx
+	    printf("\t");
+	    PRINT_REG(rsi, (&copy_regs)); // ecx
+	    printf("\t");
+	    PRINT_REG(rdx, (&copy_regs)); // edx
+	    //printRegs(&copy_regs);
+	    printf("\n");
+
+	    //	  }
+	    entry = 0;
+	} else {
+	  //  if (open_called) { // previous syscall was open, open new file and return that fd instead
+	    //	    new_fd = open(new_filename, new_flags, new_mode);
+	    printf("SYSCALL RETURN PID: %d\n\t", currentPID);
+	    PRINT_REG(rax, (&copy_regs)); // eax
+	    printf("not unsigned rax: %d\n", copy_regs.rax);
+	    printf("\t");
+	    PRINT_REG(rdi, (&copy_regs)); // ebx
+	    printf("\t");
+	    PRINT_REG(rsi, (&copy_regs)); // ecx
+	    printf("\t");
+	    PRINT_REG(rdx, (&copy_regs)); // edx
+	    //printRegs(&copy_regs);
+	    printf("\n");
+
+	    open_called = 0;
+	    // }
+	    //*/
+	  entry = 1;
+	}
+	
 	break;
       }
     }

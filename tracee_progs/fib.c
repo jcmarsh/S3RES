@@ -37,6 +37,16 @@ int main(int argc, char** argv) {
 
   // open file to write to
   wo_fd = open(wo_filename, wo_flags, wo_mode);
+  if (wo_fd < 0) {
+    perror("opening file problem");
+  }
+  printf("fd is: %d", wo_fd);
+
+  // DELETE THIS
+  //  wo_fd = open("another.txt", wo_flags, wo_mode);
+  //  printf("fd is: %d", wo_fd);
+  //  wo_fd = open("thisisannoying.txt", wo_flags, wo_mode);
+  //  printf("fd is: %d", wo_fd);
 
   // while a number is left
   while (count < COUNT) {
