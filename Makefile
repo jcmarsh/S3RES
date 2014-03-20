@@ -1,14 +1,19 @@
 SRC=./src
+EXAMPLE=./examples
 INC=-I./include
 BUILD=./build
 LIB=./lib
 CC=gcc
 CFLAGS=-Wall -g
 
-default: test
+default: examples tracee
 
-test: pint
-	$(CC) $(FLAGS) -o $(BUILD)/test $(SRC)/test.c $(INC) -lpint
+tracee:
+	$(CC) $(FLAGS) -o $(BUILD)/fib ./tracee_progs/fib.c
+
+examples: pint
+	$(CC) $(FLAGS) -o $(BUILD)/test $(EXAMPLE)/test.c $(INC) -lpint
+	$(CC) $(FLAGS) -o $(BUILD)/hands $(EXAMPLE)/hands_off.c $(INC) -lpint
 
 install: pint
 	cp $(LIB)/libpint.so /usr/local/lib/libpint.so
