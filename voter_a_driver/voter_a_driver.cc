@@ -54,20 +54,27 @@ private:
   void ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_pos_t &);
 
   // Devices provided
-  player_devaddr_t smrtln_id;
-  bool smart;
   player_devaddr_t position_id;
   player_devaddr_t planner_id;
   bool planner;
   player_planner_data_t planner_data;
   // Redundant devices provided
-  player_dev_addr_t out_laser_2;
-  player_dev_addr_t out_position2d_2;
+  player_devaddr_t out_laser_2;
+  player_devaddr_t out_position2d_2;
+  player_devaddr_t out_laser_3;
+  player_devaddr_t out_position2d_3;
+  player_devaddr_t out_laser_4;
+  player_devaddr_t out_position2d_4;
+
 
   // Required devices (odometry and laser)
   // data back from redundant devices
   player_devaddr_t in_position2d_5;
   player_devaddr_t in_planner_5;
+  player_devaddr_t in_position2d_6;
+  player_devaddr_t in_planner_6;
+  player_devaddr_t in_position2d_7;
+  player_devaddr_t in_planner_7;
 
   // Odometry Device info
   Device *odom;
@@ -118,17 +125,6 @@ void VoterADriver_Register(DriverTable* table)
 VoterADriver::VoterADriver(ConfigFile* cf, int section)
   : ThreadedDriver(cf, section)
 {
-  // Check for smart local navigator (we provide) // WAT?
-  memset(&(this->smrtln_id), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->smrtln_id), section, "provides",
-			 PLAYER_SMRTLN_CODE, -1, NULL) == 0) {
-    smart = true;
-    if (this->AddInterface(this->smrtln_id) != 0) {
-      this->SetError(-1);
-      return;
-    }
-  }
-
   // Check for planner (we provide)
   memset(&(this->planner_id), 0, sizeof(player_devaddr_t));
   memset(&(this->planner_data), 0, sizeof(player_planner_data_t));
@@ -290,12 +286,6 @@ int VoterADriver::ProcessMessage(QueuePointer & resp_queue,
     this->Publish(resp_queue, rephdr, repdata);
     delete msg;
     return(0);
-  } else if (Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD, PLAYER_SMRTLN_CMD_SET_PARAM, device_addr)) {
-    printf ("SmrtLNDriver: Received PARAM command: %d-%f\n", reinterpret_cast<player_smrtln_param_cmd*> (data)->param_index, reinterpret_cast<player_smrtln_param_cmd_t*> (data)->param_value);
-    return 0;
-  } else if (Message::MatchMessage (hdr, PLAYER_MSGTYPE_CMD, PLAYER_SMRTLN_CMD_SUPPRESS_SENSOR, device_addr)) {
-    printf ("SmrtLNDriver: Received SENSOR command: %d-%d\n", reinterpret_cast<player_smrtln_supsensor_cmd_t*> (data)->sensor_index, reinterpret_cast<player_smrtln_supsensor_cmd_t*> (data)->state);
-    return 0;
   } else {
     return -1;
   }
