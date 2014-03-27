@@ -43,7 +43,10 @@ private:
   int ShutdownLaser();
   void ProcessLaser(player_laser_data_t &);
 
-  // Underlying planners and position2d from art_pots
+  // Set up the required position2ds
+  
+
+  // Underlying position2d from art_pots
   
   void DoOneUpdate();
 
@@ -55,9 +58,6 @@ private:
 
   // Devices provided
   player_devaddr_t position_id;
-  player_devaddr_t planner_id;
-  bool planner;
-  player_planner_data_t planner_data;
   // Redundant devices provided
   player_devaddr_t out_laser_2;
   player_devaddr_t out_position2d_2;
@@ -69,12 +69,13 @@ private:
 
   // Required devices (odometry and laser)
   // data back from redundant devices
+  // Do these need device pointers?
+  Device *in_cmd_5;
   player_devaddr_t in_position2d_5;
-  player_devaddr_t in_planner_5;
+  Device *in_cmd_6;
   player_devaddr_t in_position2d_6;
-  player_devaddr_t in_planner_6;
+  Device *in_cmd_7;
   player_devaddr_t in_position2d_7;
-  player_devaddr_t in_planner_7;
 
   // Odometry Device info
   Device *odom;
@@ -125,24 +126,61 @@ void VoterADriver_Register(DriverTable* table)
 VoterADriver::VoterADriver(ConfigFile* cf, int section)
   : ThreadedDriver(cf, section)
 {
-  // Check for planner (we provide)
-  memset(&(this->planner_id), 0, sizeof(player_devaddr_t));
-  memset(&(this->planner_data), 0, sizeof(player_planner_data_t));
-  if (cf->ReadDeviceAddr(&(this->planner_id), section, "provides",
-			 PLAYER_PLANNER_CODE, -1, NULL) == 0) {
-    planner = true;
-    if (this->AddInterface(this->planner_id) != 0) {
-      this->SetError(-1);
-      return;
-    }
-    // Init planner data ?
-  }
-  
   // Check for position2d (we provide)
   memset(&(this->position_id), 0, sizeof(player_devaddr_t));
   if (cf->ReadDeviceAddr(&(this->position_id), section, "provides",
-			 PLAYER_POSITION2D_CODE, -1, NULL) == 0) {
+			 PLAYER_POSITION2D_CODE, -1, "actual") == 0) {
     if (this->AddInterface(this->position_id) != 0) {
+      this->SetError(-1);
+      return;
+    }
+  }
+
+  // Check for 3 lasers provided
+  memset(&(this->out_laser_2), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->out_laser_2), section, "provides",
+			 PLAYER_LASER_CODE, -1, "rep_1") == 0) {
+    if (this->AddInterface(this->out_laser_2) != 0) {
+      this->SetError(-1);
+    }
+  }
+  memset(&(this->out_laser_3), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->out_laser_3), section, "provides",
+			 PLAYER_LASER_CODE, -1, "rep_2") == 0) {
+    if (this->AddInterface(this->out_laser_3) != 0) {
+      this->SetError(-1);
+    }
+  }
+  memset(&(this->out_laser_4), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->out_laser_4), section, "provides",
+			 PLAYER_LASER_CODE, -1, "rep_3") == 0) {
+    if (this->AddInterface(this->out_laser_4) != 0) {
+      this->SetError(-1);
+    }
+  }
+
+  // Check for 3 position2d provided
+  memset(&(this->out_position2d_2), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->out_position2d_2), section, "provides",
+			 PLAYER_POSITION2D_CODE, -1, "rep_1") == 0) {
+    if (this->AddInterface(this->out_position2d_2) != 0) {
+      puts("Yup... looks like this be the place of the error.");
+      this->SetError(-1);
+      return;
+    }
+  }
+  memset(&(this->out_position2d_3), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->out_position2d_3), section, "provides",
+			 PLAYER_POSITION2D_CODE, -1, "rep_2") == 0) {
+    if (this->AddInterface(this->out_position2d_3) != 0) {
+      this->SetError(-1);
+      return;
+    }
+  }
+  memset(&(this->out_position2d_4), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->out_position2d_4), section, "provides",
+			 PLAYER_POSITION2D_CODE, -1, "rep_3") == 0) {
+    if (this->AddInterface(this->out_position2d_4) != 0) {
       this->SetError(-1);
       return;
     }
@@ -152,17 +190,44 @@ VoterADriver::VoterADriver(ConfigFile* cf, int section)
   this->odom = NULL;
   // TODO: No memset for the odom? -jcm
   if (cf->ReadDeviceAddr(&(this->odom_addr), section, "requires",
-			 PLAYER_POSITION2D_CODE, -1, NULL) != 0) {
+			 PLAYER_POSITION2D_CODE, -1, "actual") != 0) {
     PLAYER_ERROR("Could not find required position2d device!");
     this->SetError(-1);
     return;
   }
 
+  // LASER!
   this->laser = NULL;
   memset(&(this->laser_addr), 0, sizeof(player_devaddr_t));
   if (cf->ReadDeviceAddr(&(this->laser_addr), section, "requires",
-			 PLAYER_LASER_CODE, -1, NULL) != 0) {
+			 PLAYER_LASER_CODE, -1, "actual") != 0) {
     PLAYER_ERROR("Could not find required laser device!");
+    this->SetError(-1);
+    return;
+  }
+
+  // The three commands from the redundant art pots.
+  this->in_cmd_5 = NULL;
+  memset(&(this->in_position2d_5), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->in_position2d_5), section, "requires",
+			 PLAYER_POSITION2D_CODE, -1, "rep_1") != 0) {
+    PLAYER_ERROR("Could not find required Position2d_5 device!");
+    this->SetError(-1);
+    return;
+  }
+  this->in_cmd_6 = NULL;
+  memset(&(this->in_position2d_6), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->in_position2d_6), section, "requires",
+			 PLAYER_POSITION2D_CODE, -1, "rep_2") != 0) {
+    PLAYER_ERROR("Could not find required Position2d_6 device!");
+    this->SetError(-1);
+    return;
+  }
+  this->in_cmd_7 = NULL;
+  memset(&(this->in_position2d_7), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->in_position2d_7), section, "requires",
+			 PLAYER_POSITION2D_CODE, -1, "rep_3") != 0) {
+    PLAYER_ERROR("Could not find required Position2d_7 device!");
     this->SetError(-1);
     return;
   }
@@ -185,6 +250,8 @@ int VoterADriver::MainSetup()
   // Initialize the laser
   if (this->laser_addr.interf && this->SetupLaser() != 0)
     return -1;
+
+  // TODO: Initialize the position devices from the redundant art pots.
 
   puts("Voter A driver ready");
 
@@ -213,29 +280,12 @@ int VoterADriver::ProcessMessage(QueuePointer & resp_queue,
   if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 			   PLAYER_POSITION2D_DATA_STATE, this->odom_addr)) {
     assert(hdr->size == sizeof(player_position2d_data_t));
+    // TODO: Need to figure which device it is from
     ProcessOdom(hdr, *reinterpret_cast<player_position2d_data_t *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 				  PLAYER_LASER_DATA_SCAN, this->laser_addr)) {
     ProcessLaser(*reinterpret_cast<player_laser_data_t *> (data));
-    return 0;
-  } else if (Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
-				   PLAYER_PLANNER_CMD_GOAL,
-				   this->planner_id)) {
-    // Message on the planner interface
-    // Emulate a message on the position2d interface
-
-    player_position2d_cmd_pos_t cmd_pos;
-    player_planner_cmd_t *cmd_planner = (player_planner_cmd_t *) data;
-
-    memset(&cmd_pos, 0, sizeof(cmd_pos));
-    cmd_pos.pos.px = cmd_planner->goal.px;
-    cmd_pos.pos.py = cmd_planner->goal.py;
-    cmd_pos.pos.pa = cmd_planner->goal.pa;
-    cmd_pos.state = 1;
-
-    /* Process position2d command */
-    ProcessCommand(hdr, cmd_pos);
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
 				  PLAYER_POSITION2D_CMD_POS,
@@ -255,14 +305,6 @@ int VoterADriver::ProcessMessage(QueuePointer & resp_queue,
     this->active_goal = false;
 
     return 0;
-  } else if (Message::MatchMessage(hdr, PLAYER_MSGTYPE_REQ, 
-				   PLAYER_PLANNER_REQ_ENABLE,
-				   this->planner_id)) {
-    player_planner_enable_req_t *cmd_enable = (player_planner_enable_req_t *) data;
-    this->cmd_state = cmd_enable->state;
-    this->Publish(this->planner_id, resp_queue, 
-		  PLAYER_MSGTYPE_RESP_ACK, PLAYER_PLANNER_REQ_ENABLE);
-    return 0;				   
   } else if (Message::MatchMessage(hdr, PLAYER_MSGTYPE_REQ, -1, this->position_id)) {
     // Pass the request on to the underlying position device and wait for
     // the reply.
@@ -345,9 +387,7 @@ int VoterADriver::ShutdownOdom()
 {
 
   // Stop the robot before unsubscribing
-  this->speed = 0;
-  this->turnrate = 0;
-  this->PutCommand( speed, turnrate );
+  this->PutCommand(0, 0);
 
   this->odom->Unsubscribe(this->InQueue);
   return 0;
@@ -420,18 +460,6 @@ void VoterADriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &d
   player_msghdr_t newhdr = *hdr;
   newhdr.addr = this->position_id;
   this->Publish(&newhdr, (void*)&data);
-
- if(this->planner)
- {
-   this->planner_data.pos.px = data.pos.px;
-   this->planner_data.pos.py = data.pos.py;
-   this->planner_data.pos.pa = data.pos.pa;
-
-   this->Publish(this->planner_id,
-                 PLAYER_MSGTYPE_DATA,
-                 PLAYER_PLANNER_DATA_STATE,
-                 (void*)&this->planner_data,sizeof(this->planner_data), NULL);
- }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -488,20 +516,6 @@ void VoterADriver::ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_po
     this->goal_x = cmd.pos.px;
     this->goal_y = cmd.pos.py;
     this->goal_t = cmd.pos.pa;
-
-    if(this->planner)
-    {
-       this->planner_data.goal.px = cmd.pos.px;
-       this->planner_data.goal.py = cmd.pos.py;
-       this->planner_data.goal.pa = cmd.pos.pa;
-       this->planner_data.done = 0;
-
-       this->planner_data.valid = 1;
-            /* Not necessarily. But VFH will try anything once */
-
-       this->planner_data.waypoint_idx = -1; /* Not supported */
-       this->planner_data.waypoints_count = -1; /* Not supported */
-    }
   }
 }
 
