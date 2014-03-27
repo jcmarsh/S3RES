@@ -55,9 +55,6 @@ private:
 
   // Devices provided
   player_devaddr_t position_id;
-  player_devaddr_t planner_id;
-  bool planner;
-  player_planner_data_t planner_data;
 
   // Required devices (odometry and laser)
   // Odometry Device info
@@ -111,19 +108,6 @@ void ArtPotDriver_Register(DriverTable* table)
 ArtPotDriver::ArtPotDriver(ConfigFile* cf, int section)
   : ThreadedDriver(cf, section)
 {
-  // Check for planner (we provide)
-  memset(&(this->planner_id), 0, sizeof(player_devaddr_t));
-  memset(&(this->planner_data), 0, sizeof(player_planner_data_t));
-  if (cf->ReadDeviceAddr(&(this->planner_id), section, "provides",
-			 PLAYER_PLANNER_CODE, -1, NULL) == 0) {
-    planner = true;
-    if (this->AddInterface(this->planner_id) != 0) {
-      this->SetError(-1);
-      return;
-    }
-    // Init planner data ?
-  }
-  
   // Check for position2d (we provide)
   memset(&(this->position_id), 0, sizeof(player_devaddr_t));
   if (cf->ReadDeviceAddr(&(this->position_id), section, "provides",
@@ -214,24 +198,6 @@ int ArtPotDriver::ProcessMessage(QueuePointer & resp_queue,
 				  PLAYER_LASER_DATA_SCAN, this->laser_addr)) {
     ProcessLaser(*reinterpret_cast<player_laser_data_t *> (data));
     return 0;
-  } else if (Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
-				   PLAYER_PLANNER_CMD_GOAL,
-				   this->planner_id)) {
-    // Message on the planner interface
-    // Emulate a message on the position2d interface
-
-    player_position2d_cmd_pos_t cmd_pos;
-    player_planner_cmd_t *cmd_planner = (player_planner_cmd_t *) data;
-
-    memset(&cmd_pos, 0, sizeof(cmd_pos));
-    cmd_pos.pos.px = cmd_planner->goal.px;
-    cmd_pos.pos.py = cmd_planner->goal.py;
-    cmd_pos.pos.pa = cmd_planner->goal.pa;
-    cmd_pos.state = 1;
-
-    /* Process position2d command */
-    ProcessCommand(hdr, cmd_pos);
-    return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
 				  PLAYER_POSITION2D_CMD_POS,
 				  this->position_id)) {
@@ -250,14 +216,6 @@ int ArtPotDriver::ProcessMessage(QueuePointer & resp_queue,
     this->active_goal = false;
 
     return 0;
-  } else if (Message::MatchMessage(hdr, PLAYER_MSGTYPE_REQ, 
-				   PLAYER_PLANNER_REQ_ENABLE,
-				   this->planner_id)) {
-    player_planner_enable_req_t *cmd_enable = (player_planner_enable_req_t *) data;
-    this->cmd_state = cmd_enable->state;
-    this->Publish(this->planner_id, resp_queue, 
-		  PLAYER_MSGTYPE_RESP_ACK, PLAYER_PLANNER_REQ_ENABLE);
-    return 0;				   
   } else if (Message::MatchMessage(hdr, PLAYER_MSGTYPE_REQ, -1, this->position_id)) {
     // Pass the request on to the underlying position device and wait for
     // the reply.
@@ -471,18 +429,6 @@ void ArtPotDriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &d
   player_msghdr_t newhdr = *hdr;
   newhdr.addr = this->position_id;
   this->Publish(&newhdr, (void*)&data);
-
- if(this->planner)
- {
-   this->planner_data.pos.px = data.pos.px;
-   this->planner_data.pos.py = data.pos.py;
-   this->planner_data.pos.pa = data.pos.pa;
-
-   this->Publish(this->planner_id,
-                 PLAYER_MSGTYPE_DATA,
-                 PLAYER_PLANNER_DATA_STATE,
-                 (void*)&this->planner_data,sizeof(this->planner_data), NULL);
- }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -539,20 +485,6 @@ void ArtPotDriver::ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_po
     this->goal_x = cmd.pos.px;
     this->goal_y = cmd.pos.py;
     this->goal_t = cmd.pos.pa;
-
-    if(this->planner)
-    {
-       this->planner_data.goal.px = cmd.pos.px;
-       this->planner_data.goal.py = cmd.pos.py;
-       this->planner_data.goal.pa = cmd.pos.pa;
-       this->planner_data.done = 0;
-
-       this->planner_data.valid = 1;
-            /* Not necessarily. But VFH will try anything once */
-
-       this->planner_data.waypoint_idx = -1; /* Not supported */
-       this->planner_data.waypoints_count = -1; /* Not supported */
-    }
   }
 }
 
