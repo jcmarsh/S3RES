@@ -44,7 +44,7 @@ private:
   void ProcessLaser(player_laser_data_t &);
 
   // Set up the required position2ds
-  void ProcessVelCmdFromRep(player_msghdr_t hdr, player_position2d_cmd_vel_t &cmd, int replica_number);
+  void ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_cmd_vel_t &cmd, int replica_number);
 
   // Underlying position2d from art_pots
   
@@ -88,14 +88,11 @@ private:
   // Laser Device info
   Device *laser;
   player_devaddr_t laser_addr;
-  int laser_count;
-  double laser_ranges[361];
 
   // Control velocity
   double con_vel[3];
 
   // Should have your art_pot specific code here...
-  bool active_goal;
   double goal_x, goal_y, goal_t;
   int cmd_state, cmd_type;
 };
@@ -240,7 +237,6 @@ VoterADriver::VoterADriver(ConfigFile* cf, int section)
 int VoterADriver::MainSetup()
 {   
   puts("Voter A driver initialising in MainSetup");
-  this->active_goal = false;
   this->goal_x = this->goal_y = this->goal_t = 0;
 
   // Initialize the position device we are reading from
@@ -280,18 +276,21 @@ int VoterADriver::ProcessMessage(QueuePointer & resp_queue,
   if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 			   PLAYER_POSITION2D_DATA_STATE, this->odom_addr)) {
     // Message from underlying position device; update state
+    puts("Update Odometry state");
     assert(hdr->size == sizeof(player_position2d_data_t));
     ProcessOdom(hdr, *reinterpret_cast<player_position2d_data_t *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 				  PLAYER_LASER_DATA_SCAN, this->laser_addr)) {
     // Laser scan update; update scan data
+    puts("Update Laser scan state");
     ProcessLaser(*reinterpret_cast<player_laser_data_t *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
 				  PLAYER_POSITION2D_CMD_POS,
 				  this->position_id)) {
     // Set a new goal position for the control to try to achieve.
+    puts("Recieve a new command");
     assert(hdr->size == sizeof(player_position2d_cmd_pos_t));
     ProcessCommand(hdr, *reinterpret_cast<player_position2d_cmd_pos_t *> (data));
     return 0;
@@ -299,6 +298,7 @@ int VoterADriver::ProcessMessage(QueuePointer & resp_queue,
                                 PLAYER_POSITION2D_CMD_VEL,
                                 this->position_id)) {
     // Simply pass the velocity command through to the underlying position device
+    puts("Command - Velocity received");
     // TODO: Consider removing this pass-through
     assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
     // make a copy of the header and change the address
@@ -306,13 +306,14 @@ int VoterADriver::ProcessMessage(QueuePointer & resp_queue,
     newhdr.addr = this->odom_addr;
     this->odom->PutMsg(this->InQueue, &newhdr, (void*)data);
     this->cmd_type = 0;
-    this->active_goal = false;
 
     return 0;
   } else if (Message::MatchMessage(hdr, PLAYER_MSGTYPE_REQ, -1, this->position_id)) {
     // Pass the request on to the underlying position device and wait for
     // the reply.
     Message* msg;
+
+    puts("Odom configuration command");
 
     if(!(msg = this->odom->Request(this->InQueue,
                                    hdr->type,
@@ -353,10 +354,7 @@ int VoterADriver::ProcessMessage(QueuePointer & resp_queue,
     assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
     ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 3);
     return 0;
-  }
-
-
-else {
+  } else {
     // Message not dealt with with
     return -1;
   }
@@ -368,18 +366,12 @@ else {
 // Main function for device thread
 void VoterADriver::Main() 
 {
-  // TODO... eh...
-  // The main loop; interact with the device here
   for(;;)
   {
     // test if we are supposed to cancel
-    puts("VoterADriver MainLoop");
     this->Wait();
     pthread_testcancel();
     this->DoOneUpdate();
-    // Sleep (you might, for example, block on a read() instead)
-    //usleep(100000);
-
   }
 }
 
@@ -389,10 +381,6 @@ void VoterADriver::DoOneUpdate() {
   }
 
   this->ProcessMessages();
-
-  if (!this->active_goal) {
-    return;
-  }
 }
 
 
@@ -465,8 +453,6 @@ int VoterADriver::SetupLaser()
     return -1;
   }
 
-  this->laser_count = 0;
-  //this->laser_ranges = NULL;
   return 0;
 }
 
@@ -474,7 +460,6 @@ int VoterADriver::SetupLaser()
 // Process new odometry data
 void VoterADriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &data)
 {
-
   // Cache the new odometric pose, velocity, and stall info
   // NOTE: this->odom_pose is in (mm,mm,deg), as doubles
   this->odom_pose[0] = data.pos.px; // * 1e3;
@@ -495,18 +480,26 @@ void VoterADriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &d
 // Process laser data
 void VoterADriver::ProcessLaser(player_laser_data_t &data)
 {
-  int i;
-  
-  laser_count = data.ranges_count;
-  for (i = 0; i < data.ranges_count; i++) {
-    laser_ranges[i] = data.ranges[i];
-  }
+  this->Publish(this->out_laser_2,
+		PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
+		(void*)&data, 0, NULL, true);
+  this->Publish(this->out_laser_3,
+		PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
+		(void*)&data, 0, NULL, true);
+  this->Publish(this->out_laser_4,
+		PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
+		(void*)&data, 0, NULL, true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process velocity command from replica
 void VoterADriver::ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_cmd_vel_t &cmd, int replica_number) {
   // TODO: Implement
+  // Can use PutCommand (below)
+  if (replica_number == 1) {
+    printf("We're driving this now: %f, %f\n", cmd.vel.px, cmd.vel.pa);
+    this->PutCommand(cmd.vel.px, cmd.vel.pa);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -542,15 +535,15 @@ void VoterADriver::PutCommand(double cmd_speed, double cmd_turnrate)
 // Check for new commands from the server
 void VoterADriver::ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_pos_t &cmd)
 {
-  this->cmd_type = 1;
-  this->cmd_state = cmd.state;
-
-  if((cmd.pos.px != this->goal_x) || (cmd.pos.py != this->goal_y) || (cmd.pos.pa != this->goal_t))
-  {
-    this->active_goal = true;
-    this->goal_x = cmd.pos.px;
-    this->goal_y = cmd.pos.py;
-    this->goal_t = cmd.pos.pa;
-  }
+  printf("Sending command pose: (%f, %f):%f\n", cmd.pos.px, cmd.pos.py, cmd.pos.pa);
+  this->Publish(this->out_position2d_2,
+		PLAYER_MSGTYPE_CMD, PLAYER_POSITION2D_CMD_POS,
+		(void*)&cmd, 0, NULL, true);
+  this->Publish(this->out_position2d_3,
+		PLAYER_MSGTYPE_CMD, PLAYER_POSITION2D_CMD_POS,
+		(void*)&cmd, 0, NULL, true);
+  this->Publish(this->out_position2d_4,
+		PLAYER_MSGTYPE_CMD, PLAYER_POSITION2D_CMD_POS,
+		(void*)&cmd, 0, NULL, true);
 }
 

@@ -189,6 +189,7 @@ int ArtPotDriver::ProcessMessage(QueuePointer & resp_queue,
                                   player_msghdr * hdr,
                                   void * data)
 {
+  puts("ArtPot: process message");
   if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 			   PLAYER_POSITION2D_DATA_STATE, this->odom_addr)) {
     assert(hdr->size == sizeof(player_position2d_data_t));
@@ -201,6 +202,7 @@ int ArtPotDriver::ProcessMessage(QueuePointer & resp_queue,
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
 				  PLAYER_POSITION2D_CMD_POS,
 				  this->position_id)) {
+    puts("ArtPot: recieve new position command");
     assert(hdr->size == sizeof(player_position2d_cmd_pos_t));
     ProcessCommand(hdr, *reinterpret_cast<player_position2d_cmd_pos_t *> (data));
     return 0;
@@ -250,16 +252,15 @@ int ArtPotDriver::ProcessMessage(QueuePointer & resp_queue,
 // Main function for device thread
 void ArtPotDriver::Main() 
 {
+  puts("ArtPot Main Function.");
   // The main loop; interact with the device here
   for(;;)
   {
+    puts("ArtPot Main Function.");
     // test if we are supposed to cancel
     this->Wait();
     pthread_testcancel();
     this->DoOneUpdate();
-    // Sleep (you might, for example, block on a read() instead)
-    //usleep(100000);
-
   }
 }
 
