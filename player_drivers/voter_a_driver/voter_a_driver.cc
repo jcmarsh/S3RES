@@ -44,7 +44,7 @@ private:
   void ProcessLaser(player_laser_data_t &);
 
   // Set up the required position2ds
-  
+  void ProcessVelCmdFromRep(player_msghdr_t hdr, player_position2d_cmd_vel_t &cmd, int replica_number);
 
   // Underlying position2d from art_pots
   
@@ -279,23 +279,27 @@ int VoterADriver::ProcessMessage(QueuePointer & resp_queue,
   puts("VoterADriver ProcessMessage");
   if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 			   PLAYER_POSITION2D_DATA_STATE, this->odom_addr)) {
+    // Message from underlying position device; update state
     assert(hdr->size == sizeof(player_position2d_data_t));
-    // TODO: Need to figure which device it is from
     ProcessOdom(hdr, *reinterpret_cast<player_position2d_data_t *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 				  PLAYER_LASER_DATA_SCAN, this->laser_addr)) {
+    // Laser scan update; update scan data
     ProcessLaser(*reinterpret_cast<player_laser_data_t *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
 				  PLAYER_POSITION2D_CMD_POS,
 				  this->position_id)) {
+    // Set a new goal position for the control to try to achieve.
     assert(hdr->size == sizeof(player_position2d_cmd_pos_t));
     ProcessCommand(hdr, *reinterpret_cast<player_position2d_cmd_pos_t *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
                                 PLAYER_POSITION2D_CMD_VEL,
                                 this->position_id)) {
+    // Simply pass the velocity command through to the underlying position device
+    // TODO: Consider removing this pass-through
     assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
     // make a copy of the header and change the address
     player_msghdr_t newhdr = *hdr;
@@ -320,7 +324,7 @@ int VoterADriver::ProcessMessage(QueuePointer & resp_queue,
                    hdr->subtype);
       return(-1);
     } 
-
+    
     player_msghdr_t* rephdr = msg->GetHeader();
     void* repdata = msg->GetPayload();
     // Copy in our address and forward the response
@@ -328,7 +332,32 @@ int VoterADriver::ProcessMessage(QueuePointer & resp_queue,
     this->Publish(resp_queue, rephdr, repdata);
     delete msg;
     return(0);
-  } else {
+  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
+				  PLAYER_POSITION2D_CMD_VEL,
+				  this->in_position2d_5)) {
+    // New command velocity from replica 1
+    assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
+    ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 1);
+    return 0;
+  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
+				  PLAYER_POSITION2D_CMD_VEL,
+				  this->in_position2d_6)) {
+    // New command velocity from replica 2
+    assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
+    ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 2);
+    return 0;
+  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
+				  PLAYER_POSITION2D_CMD_VEL,
+				  this->in_position2d_7)) {
+    // New command velocity from replica 3
+    assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
+    ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 3);
+    return 0;
+  }
+
+
+else {
+    // Message not dealt with with
     return -1;
   }
 }
@@ -472,6 +501,12 @@ void VoterADriver::ProcessLaser(player_laser_data_t &data)
   for (i = 0; i < data.ranges_count; i++) {
     laser_ranges[i] = data.ranges[i];
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Process velocity command from replica
+void VoterADriver::ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_cmd_vel_t &cmd, int replica_number) {
+  // TODO: Implement
 }
 
 ////////////////////////////////////////////////////////////////////////////////
