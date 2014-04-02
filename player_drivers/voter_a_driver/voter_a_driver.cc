@@ -59,23 +59,20 @@ private:
   // Devices provided
   player_devaddr_t position_id;
   // Redundant devices provided
-  player_devaddr_t out_laser_2;
-  player_devaddr_t out_position2d_2;
-  player_devaddr_t out_laser_3;
-  player_devaddr_t out_position2d_3;
-  player_devaddr_t out_laser_4;
-  player_devaddr_t out_position2d_4;
+  player_devaddr_t replicated_laser_2;
+  player_devaddr_t cmd_from_rep_position2d_2;
+  player_devaddr_t replicated_laser_3;
+  player_devaddr_t cmd_from_rep_position2d_3;
+  player_devaddr_t replicated_laser_4;
+  player_devaddr_t cmd_from_rep_position2d_4;
 
 
   // Required devices (odometry and laser)
   // data back from redundant devices
   // Do these need device pointers?
-  Device *in_cmd_5;
-  player_devaddr_t in_position2d_5;
-  Device *in_cmd_6;
-  player_devaddr_t in_position2d_6;
-  Device *in_cmd_7;
-  player_devaddr_t in_position2d_7;
+  player_devaddr_t cmd_to_rep_position2d_5;
+  player_devaddr_t cmd_to_rep_position2d_6;
+  player_devaddr_t cmd_to_rep_position2d_7;
 
   // Odometry Device info
   Device *odom;
@@ -134,50 +131,50 @@ VoterADriver::VoterADriver(ConfigFile* cf, int section)
   }
 
   // Check for 3 lasers provided
-  memset(&(this->out_laser_2), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->out_laser_2), section, "provides",
+  memset(&(this->replicated_laser_2), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->replicated_laser_2), section, "provides",
 			 PLAYER_LASER_CODE, -1, "rep_1") == 0) {
-    if (this->AddInterface(this->out_laser_2) != 0) {
+    if (this->AddInterface(this->replicated_laser_2) != 0) {
       this->SetError(-1);
     }
   }
-  memset(&(this->out_laser_3), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->out_laser_3), section, "provides",
+  memset(&(this->replicated_laser_3), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->replicated_laser_3), section, "provides",
 			 PLAYER_LASER_CODE, -1, "rep_2") == 0) {
-    if (this->AddInterface(this->out_laser_3) != 0) {
+    if (this->AddInterface(this->replicated_laser_3) != 0) {
       this->SetError(-1);
     }
   }
-  memset(&(this->out_laser_4), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->out_laser_4), section, "provides",
+  memset(&(this->replicated_laser_4), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->replicated_laser_4), section, "provides",
 			 PLAYER_LASER_CODE, -1, "rep_3") == 0) {
-    if (this->AddInterface(this->out_laser_4) != 0) {
+    if (this->AddInterface(this->replicated_laser_4) != 0) {
       this->SetError(-1);
     }
   }
 
   // Check for 3 position2d provided
-  memset(&(this->out_position2d_2), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->out_position2d_2), section, "provides",
+  memset(&(this->cmd_from_rep_position2d_2), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->cmd_from_rep_position2d_2), section, "provides",
 			 PLAYER_POSITION2D_CODE, -1, "rep_1") == 0) {
-    if (this->AddInterface(this->out_position2d_2) != 0) {
+    if (this->AddInterface(this->cmd_from_rep_position2d_2) != 0) {
       puts("Yup... looks like this be the place of the error.");
       this->SetError(-1);
       return;
     }
   }
-  memset(&(this->out_position2d_3), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->out_position2d_3), section, "provides",
+  memset(&(this->cmd_from_rep_position2d_3), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->cmd_from_rep_position2d_3), section, "provides",
 			 PLAYER_POSITION2D_CODE, -1, "rep_2") == 0) {
-    if (this->AddInterface(this->out_position2d_3) != 0) {
+    if (this->AddInterface(this->cmd_from_rep_position2d_3) != 0) {
       this->SetError(-1);
       return;
     }
   }
-  memset(&(this->out_position2d_4), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->out_position2d_4), section, "provides",
+  memset(&(this->cmd_from_rep_position2d_4), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->cmd_from_rep_position2d_4), section, "provides",
 			 PLAYER_POSITION2D_CODE, -1, "rep_3") == 0) {
-    if (this->AddInterface(this->out_position2d_4) != 0) {
+    if (this->AddInterface(this->cmd_from_rep_position2d_4) != 0) {
       this->SetError(-1);
       return;
     }
@@ -204,25 +201,22 @@ VoterADriver::VoterADriver(ConfigFile* cf, int section)
   }
 
   // The three commands from the redundant art pots.
-  this->in_cmd_5 = NULL;
-  memset(&(this->in_position2d_5), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->in_position2d_5), section, "requires",
+  memset(&(this->cmd_to_rep_position2d_5), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->cmd_to_rep_position2d_5), section, "requires",
 			 PLAYER_POSITION2D_CODE, -1, "rep_1") != 0) {
     PLAYER_ERROR("Could not find required Position2d_5 device!");
     this->SetError(-1);
     return;
   }
-  this->in_cmd_6 = NULL;
-  memset(&(this->in_position2d_6), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->in_position2d_6), section, "requires",
+  memset(&(this->cmd_to_rep_position2d_6), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->cmd_to_rep_position2d_6), section, "requires",
 			 PLAYER_POSITION2D_CODE, -1, "rep_2") != 0) {
     PLAYER_ERROR("Could not find required Position2d_6 device!");
     this->SetError(-1);
     return;
   }
-  this->in_cmd_7 = NULL;
-  memset(&(this->in_position2d_7), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->in_position2d_7), section, "requires",
+  memset(&(this->cmd_to_rep_position2d_7), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->cmd_to_rep_position2d_7), section, "requires",
 			 PLAYER_POSITION2D_CODE, -1, "rep_3") != 0) {
     PLAYER_ERROR("Could not find required Position2d_7 device!");
     this->SetError(-1);
@@ -335,21 +329,21 @@ int VoterADriver::ProcessMessage(QueuePointer & resp_queue,
     return(0);
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 				  PLAYER_POSITION2D_CMD_VEL,
-				  this->in_position2d_5)) {
+				  this->cmd_from_rep_position2d_2)) {
     // New command velocity from replica 1
     assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
     ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 1);
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 				  PLAYER_POSITION2D_CMD_VEL,
-				  this->in_position2d_6)) {
+				  this->cmd_from_rep_position2d_3)) {
     // New command velocity from replica 2
     assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
     ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 2);
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 				  PLAYER_POSITION2D_CMD_VEL,
-				  this->in_position2d_7)) {
+				  this->cmd_from_rep_position2d_4)) {
     // New command velocity from replica 3
     assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
     ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 3);
@@ -480,13 +474,13 @@ void VoterADriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &d
 // Process laser data
 void VoterADriver::ProcessLaser(player_laser_data_t &data)
 {
-  this->Publish(this->out_laser_2,
+  this->Publish(this->replicated_laser_2,
 		PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
 		(void*)&data, 0, NULL, true);
-  this->Publish(this->out_laser_3,
+  this->Publish(this->replicated_laser_3,
 		PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
 		(void*)&data, 0, NULL, true);
-  this->Publish(this->out_laser_4,
+  this->Publish(this->replicated_laser_4,
 		PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
 		(void*)&data, 0, NULL, true);
 }
@@ -536,13 +530,13 @@ void VoterADriver::PutCommand(double cmd_speed, double cmd_turnrate)
 void VoterADriver::ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_pos_t &cmd)
 {
   printf("Sending command pose: (%f, %f):%f\n", cmd.pos.px, cmd.pos.py, cmd.pos.pa);
-  this->Publish(this->out_position2d_2,
+  this->Publish(this->cmd_to_rep_position2d_5,
 		PLAYER_MSGTYPE_CMD, PLAYER_POSITION2D_CMD_POS,
 		(void*)&cmd, 0, NULL, true);
-  this->Publish(this->out_position2d_3,
+  this->Publish(this->cmd_to_rep_position2d_6,
 		PLAYER_MSGTYPE_CMD, PLAYER_POSITION2D_CMD_POS,
 		(void*)&cmd, 0, NULL, true);
-  this->Publish(this->out_position2d_4,
+  this->Publish(this->cmd_to_rep_position2d_7,
 		PLAYER_MSGTYPE_CMD, PLAYER_POSITION2D_CMD_POS,
 		(void*)&cmd, 0, NULL, true);
 }
