@@ -192,11 +192,13 @@ int ArtPotDriver::ProcessMessage(QueuePointer & resp_queue,
   puts("ArtPot: process message");
   if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 			   PLAYER_POSITION2D_DATA_STATE, this->odom_addr)) {
+    puts("ArtPot: recieve new odom data");
     assert(hdr->size == sizeof(player_position2d_data_t));
     ProcessOdom(hdr, *reinterpret_cast<player_position2d_data_t *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 				  PLAYER_LASER_DATA_SCAN, this->laser_addr)) {
+    puts("ArtPot: recieve new laser data");
     ProcessLaser(*reinterpret_cast<player_laser_data_t *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
@@ -209,6 +211,7 @@ int ArtPotDriver::ProcessMessage(QueuePointer & resp_queue,
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
                                 PLAYER_POSITION2D_CMD_VEL,
                                 this->position_id)) {
+    puts("ArtPot: recieve new velocity command");
     assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
     // make a copy of the header and change the address
     player_msghdr_t newhdr = *hdr;
@@ -222,6 +225,8 @@ int ArtPotDriver::ProcessMessage(QueuePointer & resp_queue,
     // Pass the request on to the underlying position device and wait for
     // the reply.
     Message* msg;
+
+    puts("ArtPot: request to the odom (over the position cmd)");
 
     if(!(msg = this->odom->Request(this->InQueue,
                                    hdr->type,
@@ -242,6 +247,7 @@ int ArtPotDriver::ProcessMessage(QueuePointer & resp_queue,
     delete msg;
     return(0);
   } else {
+    puts("ArtPot: This driver can't even handle me right now.");
     return -1;
   }
 }
@@ -252,11 +258,9 @@ int ArtPotDriver::ProcessMessage(QueuePointer & resp_queue,
 // Main function for device thread
 void ArtPotDriver::Main() 
 {
-  puts("ArtPot Main Function.");
   // The main loop; interact with the device here
   for(;;)
   {
-    puts("ArtPot Main Function.");
     // test if we are supposed to cancel
     this->Wait();
     pthread_testcancel();

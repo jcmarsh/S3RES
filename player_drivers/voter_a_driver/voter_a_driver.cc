@@ -43,6 +43,10 @@ private:
   int ShutdownLaser();
   void ProcessLaser(player_laser_data_t &);
 
+  // Set up the Art Pot position devices
+  int SetupArtPotCmds();
+  int ShutdownArtPotCmds();
+
   // Set up the required position2ds
   void ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_cmd_vel_t &cmd, int replica_number);
 
@@ -68,10 +72,12 @@ private:
 
 
   // Required devices (odometry and laser)
-  // data back from redundant devices
-  // Do these need device pointers?
+  // commands to redundant devices
+  Device *to_rep_5;
   player_devaddr_t cmd_to_rep_position2d_5;
+  Device *to_rep_6;
   player_devaddr_t cmd_to_rep_position2d_6;
+  Device *to_rep_7;
   player_devaddr_t cmd_to_rep_position2d_7;
 
   // Odometry Device info
@@ -153,12 +159,11 @@ VoterADriver::VoterADriver(ConfigFile* cf, int section)
     }
   }
 
-  // Check for 3 position2d provided
+  // Check for 3 position2d for commands from the replicas
   memset(&(this->cmd_from_rep_position2d_2), 0, sizeof(player_devaddr_t));
   if (cf->ReadDeviceAddr(&(this->cmd_from_rep_position2d_2), section, "provides",
 			 PLAYER_POSITION2D_CODE, -1, "rep_1") == 0) {
     if (this->AddInterface(this->cmd_from_rep_position2d_2) != 0) {
-      puts("Yup... looks like this be the place of the error.");
       this->SetError(-1);
       return;
     }
@@ -200,7 +205,8 @@ VoterADriver::VoterADriver(ConfigFile* cf, int section)
     return;
   }
 
-  // The three commands from the redundant art pots.
+  // The three commands to the redundant art pots.
+  this->to_rep_5 = NULL;
   memset(&(this->cmd_to_rep_position2d_5), 0, sizeof(player_devaddr_t));
   if (cf->ReadDeviceAddr(&(this->cmd_to_rep_position2d_5), section, "requires",
 			 PLAYER_POSITION2D_CODE, -1, "rep_1") != 0) {
@@ -208,6 +214,7 @@ VoterADriver::VoterADriver(ConfigFile* cf, int section)
     this->SetError(-1);
     return;
   }
+  this->to_rep_6 = NULL;
   memset(&(this->cmd_to_rep_position2d_6), 0, sizeof(player_devaddr_t));
   if (cf->ReadDeviceAddr(&(this->cmd_to_rep_position2d_6), section, "requires",
 			 PLAYER_POSITION2D_CODE, -1, "rep_2") != 0) {
@@ -215,6 +222,7 @@ VoterADriver::VoterADriver(ConfigFile* cf, int section)
     this->SetError(-1);
     return;
   }
+  this->to_rep_7 = NULL;
   memset(&(this->cmd_to_rep_position2d_7), 0, sizeof(player_devaddr_t));
   if (cf->ReadDeviceAddr(&(this->cmd_to_rep_position2d_7), section, "requires",
 			 PLAYER_POSITION2D_CODE, -1, "rep_3") != 0) {
@@ -234,14 +242,19 @@ int VoterADriver::MainSetup()
   this->goal_x = this->goal_y = this->goal_t = 0;
 
   // Initialize the position device we are reading from
-  if (this->SetupOdom() != 0)
+  if (this->SetupOdom() != 0) {
     return -1;
+  }
 
   // Initialize the laser
-  if (this->laser_addr.interf && this->SetupLaser() != 0)
+  if (this->laser_addr.interf && this->SetupLaser() != 0) {
     return -1;
+  }
 
-  // TODO: Initialize the position devices from the redundant art pots.
+  // Initialize the position devices from the redundant art pots (for sending commands to).
+  if (this->SetupArtPotCmds() != 0) {
+    return -1;
+  }
 
   puts("Voter A driver ready");
 
@@ -257,6 +270,9 @@ void VoterADriver::MainQuit()
   if(this->laser)
     this->ShutdownLaser();
 
+  ShutdownOdom();
+  ShutdownArtPotCmds();
+
   puts("Voter A driver has been shutdown");
 }
 
@@ -266,18 +282,15 @@ int VoterADriver::ProcessMessage(QueuePointer & resp_queue,
                                   player_msghdr * hdr,
                                   void * data)
 {
-  puts("VoterADriver ProcessMessage");
   if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 			   PLAYER_POSITION2D_DATA_STATE, this->odom_addr)) {
     // Message from underlying position device; update state
-    puts("Update Odometry state");
     assert(hdr->size == sizeof(player_position2d_data_t));
     ProcessOdom(hdr, *reinterpret_cast<player_position2d_data_t *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 				  PLAYER_LASER_DATA_SCAN, this->laser_addr)) {
     // Laser scan update; update scan data
-    puts("Update Laser scan state");
     ProcessLaser(*reinterpret_cast<player_laser_data_t *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
@@ -327,21 +340,21 @@ int VoterADriver::ProcessMessage(QueuePointer & resp_queue,
     this->Publish(resp_queue, rephdr, repdata);
     delete msg;
     return(0);
-  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
+  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
 				  PLAYER_POSITION2D_CMD_VEL,
 				  this->cmd_from_rep_position2d_2)) {
     // New command velocity from replica 1
     assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
     ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 1);
     return 0;
-  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
+  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
 				  PLAYER_POSITION2D_CMD_VEL,
 				  this->cmd_from_rep_position2d_3)) {
     // New command velocity from replica 2
     assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
     ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 2);
     return 0;
-  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
+  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
 				  PLAYER_POSITION2D_CMD_VEL,
 				  this->cmd_from_rep_position2d_4)) {
     // New command velocity from replica 3
@@ -349,6 +362,7 @@ int VoterADriver::ProcessMessage(QueuePointer & resp_queue,
     ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 3);
     return 0;
   } else {
+    puts("I don't know what to do with that.");
     // Message not dealt with with
     return -1;
   }
@@ -405,6 +419,13 @@ int VoterADriver::ShutdownOdom()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Shut down the position devices from the replicas
+int VoterADriver::ShutdownArtPotCmds() {
+  this->to_rep_5->Unsubscribe(this->InQueue);
+  return 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Shut down the laser
 int VoterADriver::ShutdownLaser()
 {
@@ -431,6 +452,22 @@ int VoterADriver::SetupOdom()
   this->odom_vel[0] = this->odom_vel[1] = this->odom_vel[2] = 0.0;
   this->cmd_state = 1;
 
+  return 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Set up the position devices from the Art Pots.
+int VoterADriver::SetupArtPotCmds() {
+  if (!(this->to_rep_5 = deviceTable->GetDevice(this->cmd_to_rep_position2d_5))) {
+    PLAYER_ERROR("unable to locate suitable replica position device");
+    return -1;
+  }
+  if (this->to_rep_5->Subscribe(this->InQueue) != 0) {
+    PLAYER_ERROR("unable to subscribe to replica position device");
+    return -1;
+  }
+
+  // TODO: the other two!
   return 0;
 }
 
@@ -474,6 +511,7 @@ void VoterADriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &d
 // Process laser data
 void VoterADriver::ProcessLaser(player_laser_data_t &data)
 {
+  /*
   this->Publish(this->replicated_laser_2,
 		PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
 		(void*)&data, 0, NULL, true);
@@ -483,6 +521,7 @@ void VoterADriver::ProcessLaser(player_laser_data_t &data)
   this->Publish(this->replicated_laser_4,
 		PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
 		(void*)&data, 0, NULL, true);
+  */
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -530,6 +569,10 @@ void VoterADriver::PutCommand(double cmd_speed, double cmd_turnrate)
 void VoterADriver::ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_pos_t &cmd)
 {
   printf("Sending command pose: (%f, %f):%f\n", cmd.pos.px, cmd.pos.py, cmd.pos.pa);
+  this->to_rep_5->PutMsg(this->InQueue,
+			 PLAYER_MSGTYPE_CMD, PLAYER_POSITION2D_CMD_POS,
+			 (void*)&cmd, sizeof(cmd), NULL);
+  /*
   this->Publish(this->cmd_to_rep_position2d_5,
 		PLAYER_MSGTYPE_CMD, PLAYER_POSITION2D_CMD_POS,
 		(void*)&cmd, 0, NULL, true);
@@ -539,5 +582,6 @@ void VoterADriver::ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_po
   this->Publish(this->cmd_to_rep_position2d_7,
 		PLAYER_MSGTYPE_CMD, PLAYER_POSITION2D_CMD_POS,
 		(void*)&cmd, 0, NULL, true);
+  */
 }
 
