@@ -189,29 +189,29 @@ int ArtPotDriver::ProcessMessage(QueuePointer & resp_queue,
                                   player_msghdr * hdr,
                                   void * data)
 {
-  puts("ArtPot: process message");
+  //  puts("ArtPot: process message");
   if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 			   PLAYER_POSITION2D_DATA_STATE, this->odom_addr)) {
-    puts("ArtPot: recieve new odom data");
+    //    puts("ArtPot: recieve new odom data");
     assert(hdr->size == sizeof(player_position2d_data_t));
     ProcessOdom(hdr, *reinterpret_cast<player_position2d_data_t *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 				  PLAYER_LASER_DATA_SCAN, this->laser_addr)) {
-    puts("ArtPot: recieve new laser data");
+    //    puts("ArtPot: recieve new laser data");
     ProcessLaser(*reinterpret_cast<player_laser_data_t *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
 				  PLAYER_POSITION2D_CMD_POS,
 				  this->position_id)) {
-    puts("ArtPot: recieve new position command");
+    //    puts("ArtPot: recieve new position command");
     assert(hdr->size == sizeof(player_position2d_cmd_pos_t));
     ProcessCommand(hdr, *reinterpret_cast<player_position2d_cmd_pos_t *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
                                 PLAYER_POSITION2D_CMD_VEL,
                                 this->position_id)) {
-    puts("ArtPot: recieve new velocity command");
+    //    puts("ArtPot: recieve new velocity command");
     assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
     // make a copy of the header and change the address
     player_msghdr_t newhdr = *hdr;
@@ -226,7 +226,7 @@ int ArtPotDriver::ProcessMessage(QueuePointer & resp_queue,
     // the reply.
     Message* msg;
 
-    puts("ArtPot: request to the odom (over the position cmd)");
+    //    puts("ArtPot: request to the odom (over the position cmd)");
 
     if(!(msg = this->odom->Request(this->InQueue,
                                    hdr->type,
@@ -453,7 +453,7 @@ void ArtPotDriver::ProcessLaser(player_laser_data_t &data)
 void ArtPotDriver::PutCommand(double cmd_speed, double cmd_turnrate)
 {
   player_position2d_cmd_vel_t cmd;
-
+  
   this->con_vel[0] = cmd_speed;
   this->con_vel[1] = 0;
   this->con_vel[2] = cmd_turnrate;
