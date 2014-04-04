@@ -74,7 +74,7 @@ private:
   // Required devices (odometry and laser)
   // commands to redundant devices
   Device *to_rep_5;
-  player_devaddr_t cmd_to_rep_position2d_5; // Add data from (but we ignore).
+  player_devaddr_t cmd_to_rep_position2d_5; // And data from (but we ignore).
   Device *to_rep_6;
   player_devaddr_t cmd_to_rep_position2d_6;
   Device *to_rep_7;
@@ -251,6 +251,9 @@ int VoterADriver::MainSetup()
   if (this->SetupArtPotCmds() != 0) {
     return -1;
   }
+
+  // Let's try to launch the replicas
+
 
   puts("Voter A driver ready");
 
