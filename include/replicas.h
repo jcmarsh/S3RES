@@ -17,7 +17,7 @@ typedef enum {
   RUNNING,
   CRASHED,
   FINISHED
-} replica_status;
+} replica_status; 
 
  // Represents one redundant execution, implemented as a thread
 struct replica {
@@ -35,6 +35,18 @@ struct replica_group {
   int nfds; // Highest value fd in the read pipes
   fd_set read_fds;
 }; 
+
+// replicas with no fds
+struct replica_l {
+  pid_t pid;
+  int priority;
+  replica_status status;
+};
+
+struct replica_group_l {
+  struct replica_l* replicas;
+  int num;
+};
 
 /*
  *
