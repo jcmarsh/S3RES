@@ -1,7 +1,7 @@
 /*
- * First go at a Voter driver. 
+ * Second try at a Voter driver. 
  *
- * Designed to handle three artificial potential drivers.
+ * Designed to handle local navigation using three Art Pot controllers
  * 
  * Similar to (and based off of) the Player provided vfh driver
  * shared object.
@@ -15,12 +15,12 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 // The class for the driver
-class VoterADriver : public ThreadedDriver
+class VoterBDriver : public ThreadedDriver
 {
 public:
     
   // Constructor; need that
-  VoterADriver(ConfigFile* cf, int section);
+  VoterBDriver(ConfigFile* cf, int section);
 
   // This method will be invoked on each incoming message
   virtual int ProcessMessage(QueuePointer &resp_queue, 
@@ -65,21 +65,16 @@ private:
   // Redundant devices provided
   player_devaddr_t replicated_laser_2;
   player_devaddr_t data_to_cmd_from_rep_position2d_2;
+  player_devaddr_t cmd_to_rep_planner_2;
   player_devaddr_t replicated_laser_3;
   player_devaddr_t data_to_cmd_from_rep_position2d_3;
+  player_devaddr_t cmd_to_rep_planner_3;
   player_devaddr_t replicated_laser_4;
   player_devaddr_t data_to_cmd_from_rep_position2d_4;
+  player_devaddr_t cmd_to_rep_planner_4;
 
 
   // Required devices (odometry and laser)
-  // commands to redundant devices
-  Device *to_rep_5;
-  player_devaddr_t cmd_to_rep_position2d_5; // And data from (but we ignore).
-  Device *to_rep_6;
-  player_devaddr_t cmd_to_rep_position2d_6;
-  Device *to_rep_7;
-  player_devaddr_t cmd_to_rep_position2d_7;
-
   // Odometry Device info
   Device *odom;
   player_devaddr_t odom_addr;
@@ -101,25 +96,25 @@ private:
 // declare it static in the class).  In this function, we create and return
 // (as a generic Driver*) a pointer to a new instance of this driver.
 Driver* 
-VoterADriver_Init(ConfigFile* cf, int section)
+VoterBDriver_Init(ConfigFile* cf, int section)
 {
   // Create and return a new instance of this driver
-  return((Driver*)(new VoterADriver(cf, section)));
+  return((Driver*)(new VoterBDriver(cf, section)));
 }
 
 // A driver registration function, again declared outside of the class so
 // that it can be invoked without object context.  In this function, we add
 // the driver into the given driver table, indicating which interface the
 // driver can support and how to create a driver instance.
-void VoterADriver_Register(DriverTable* table)
+void VoterBDriver_Register(DriverTable* table)
 {
-  table->AddDriver("voteradriver", VoterADriver_Init);
+  table->AddDriver("voterbdriver", VoterBDriver_Init);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constructor.  Retrieve options from the configuration file and do any
 // pre-Setup() setup.
-VoterADriver::VoterADriver(ConfigFile* cf, int section)
+VoterBDriver::VoterBDriver(ConfigFile* cf, int section)
   : ThreadedDriver(cf, section)
 {
   // Check for position2d (we provide)
@@ -181,6 +176,32 @@ VoterADriver::VoterADriver(ConfigFile* cf, int section)
     }
   }
 
+  // Check for 3 planner for commands to the replicas
+  memset(&(this->cmd_to_rep_planner_2), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->cmd_to_rep_planner_2), section, "provides",
+			 PLAYER_PLANNER_CODE, -1, "rep_1") == 0) {
+    if (this->AddInterface(this->cmd_to_rep_planner_2) != 0) {
+      this->SetError(-1);
+      return;
+    }
+  }
+  memset(&(this->cmd_to_rep_planner_3), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->cmd_to_rep_planner_3), section, "provides",
+			 PLAYER_PLANNER_CODE, -1, "rep_2") == 0) {
+    if (this->AddInterface(this->cmd_to_rep_planner_3) != 0) {
+      this->SetError(-1);
+      return;
+    }
+  }
+  memset(&(this->cmd_to_rep_planner_4), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->cmd_to_rep_planner_4), section, "provides",
+			 PLAYER_PLANNER_CODE, -1, "rep_3") == 0) {
+    if (this->AddInterface(this->cmd_to_rep_planner_4) != 0) {
+      this->SetError(-1);
+      return;
+    }
+  }
+
   // Check for position2d (we require)
   this->odom = NULL;
   // TODO: No memset for the odom? -jcm
@@ -201,40 +222,14 @@ VoterADriver::VoterADriver(ConfigFile* cf, int section)
     return;
   }
 
-  // The three commands to the redundant art pots.
-  this->to_rep_5 = NULL;
-  memset(&(this->cmd_to_rep_position2d_5), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->cmd_to_rep_position2d_5), section, "requires",
-			 PLAYER_POSITION2D_CODE, -1, "rep_1") != 0) {
-    PLAYER_ERROR("Could not find required Position2d_5 device!");
-    this->SetError(-1);
-    return;
-  }
-  this->to_rep_6 = NULL;
-  memset(&(this->cmd_to_rep_position2d_6), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->cmd_to_rep_position2d_6), section, "requires",
-			 PLAYER_POSITION2D_CODE, -1, "rep_2") != 0) {
-    PLAYER_ERROR("Could not find required Position2d_6 device!");
-    this->SetError(-1);
-    return;
-  }
-  this->to_rep_7 = NULL;
-  memset(&(this->cmd_to_rep_position2d_7), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->cmd_to_rep_position2d_7), section, "requires",
-			 PLAYER_POSITION2D_CODE, -1, "rep_3") != 0) {
-    PLAYER_ERROR("Could not find required Position2d_7 device!");
-    this->SetError(-1);
-    return;
-  }
-
   return;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
-int VoterADriver::MainSetup()
+int VoterBDriver::MainSetup()
 {   
-  puts("Voter A driver initialising in MainSetup");
+  puts("Voter B driver initialising in MainSetup");
   this->goal_x = this->goal_y = this->goal_t = 0;
 
   // Initialize the position device we are reading from
@@ -247,37 +242,31 @@ int VoterADriver::MainSetup()
     return -1;
   }
 
-  // Initialize the position devices from the redundant art pots (for sending commands to).
-  if (this->SetupArtPotCmds() != 0) {
-    return -1;
-  }
-
   // Let's try to launch the replicas
 
 
-  puts("Voter A driver ready");
+  puts("Voter B driver ready");
 
   return(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Shutdown the device
-void VoterADriver::MainQuit()
+void VoterBDriver::MainQuit()
 {
-  puts("Shutting Voter A driver down");
+  puts("Shutting Voter B driver down");
 
   if(this->laser)
     this->ShutdownLaser();
 
   ShutdownOdom();
-  ShutdownArtPotCmds();
 
-  puts("Voter A driver has been shutdown");
+  puts("Voter B driver has been shutdown");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Incoming message!
-int VoterADriver::ProcessMessage(QueuePointer & resp_queue, 
+int VoterBDriver::ProcessMessage(QueuePointer & resp_queue, 
                                   player_msghdr * hdr,
                                   void * data)
 {
@@ -296,7 +285,6 @@ int VoterADriver::ProcessMessage(QueuePointer & resp_queue,
 				  PLAYER_POSITION2D_CMD_POS,
 				  this->position_id)) {
     // Set a new goal position for the control to try to achieve.
-    //    puts("Recieve a new command");
     assert(hdr->size == sizeof(player_position2d_cmd_pos_t));
     ProcessCommand(hdr, *reinterpret_cast<player_position2d_cmd_pos_t *> (data));
     return 0;
@@ -360,21 +348,6 @@ int VoterADriver::ProcessMessage(QueuePointer & resp_queue,
     assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
     ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 3);
     return 0;
-  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
-				  PLAYER_POSITION2D_DATA_STATE,
-				  this->cmd_to_rep_position2d_5)) {
-    // ignore odom position updates from replicas
-    return 0;
-  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
-				  PLAYER_POSITION2D_DATA_STATE,
-				  this->cmd_to_rep_position2d_6)) {
-    // ignore odom position updates from replicas
-    return 0;
-  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
-				  PLAYER_POSITION2D_DATA_STATE,
-				  this->cmd_to_rep_position2d_7)) {
-    // ignore odom position updates from replicas
-    return 0;
   } else {
     puts("I don't know what to do with that.");
     // Message not dealt with with
@@ -386,7 +359,7 @@ int VoterADriver::ProcessMessage(QueuePointer & resp_queue,
 
 ////////////////////////////////////////////////////////////////////////////////
 // Main function for device thread
-void VoterADriver::Main() 
+void VoterBDriver::Main() 
 {
   for(;;)
   {
@@ -397,7 +370,7 @@ void VoterADriver::Main()
   }
 }
 
-void VoterADriver::DoOneUpdate() {
+void VoterBDriver::DoOneUpdate() {
   if (this->InQueue->Empty()) {
     return;
   }
@@ -414,7 +387,7 @@ extern "C" {
   int player_driver_init(DriverTable* table)
   {
     puts("Voter A driver initializing");
-    VoterADriver_Register(table);
+    VoterBDriver_Register(table);
     puts("Voter A driver done");
     return(0);
   }
@@ -422,7 +395,7 @@ extern "C" {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Shutdown the underlying odom device.
-int VoterADriver::ShutdownOdom()
+int VoterBDriver::ShutdownOdom()
 {
 
   // Stop the robot before unsubscribing
@@ -433,18 +406,8 @@ int VoterADriver::ShutdownOdom()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Shut down the position devices from the replicas
-int VoterADriver::ShutdownArtPotCmds() {
-  this->to_rep_5->Unsubscribe(this->InQueue);
-  this->to_rep_6->Unsubscribe(this->InQueue);
-  this->to_rep_7->Unsubscribe(this->InQueue);
-
-  return 0;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // Shut down the laser
-int VoterADriver::ShutdownLaser()
+int VoterBDriver::ShutdownLaser()
 {
   this->laser->Unsubscribe(this->InQueue);
   return 0;
@@ -452,7 +415,7 @@ int VoterADriver::ShutdownLaser()
 
 ////////////////////////////////////////////////////////////////////////////////
 // Set up the underlying odom device.
-int VoterADriver::SetupOdom()
+int VoterBDriver::SetupOdom()
 {
   if(!(this->odom = deviceTable->GetDevice(this->odom_addr)))
   {
@@ -471,41 +434,8 @@ int VoterADriver::SetupOdom()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Set up the position devices from the Art Pots.
-int VoterADriver::SetupArtPotCmds() {
-  if (!(this->to_rep_5 = deviceTable->GetDevice(this->cmd_to_rep_position2d_5))) {
-    PLAYER_ERROR("unable to locate suitable replica position device");
-    return -1;
-  }
-  if (this->to_rep_5->Subscribe(this->InQueue) != 0) {
-    PLAYER_ERROR("unable to subscribe to replica position device");
-    return -1;
-  }
-
-  if (!(this->to_rep_6 = deviceTable->GetDevice(this->cmd_to_rep_position2d_6))) {
-    PLAYER_ERROR("unable to locate suitable replica position device");
-    return -1;
-  }
-  if (this->to_rep_6->Subscribe(this->InQueue) != 0) {
-    PLAYER_ERROR("unable to subscribe to replica position device");
-    return -1;
-  }
-
-  if (!(this->to_rep_7 = deviceTable->GetDevice(this->cmd_to_rep_position2d_7))) {
-    PLAYER_ERROR("unable to locate suitable replica position device");
-    return -1;
-  }
-  if (this->to_rep_7->Subscribe(this->InQueue) != 0) {
-    PLAYER_ERROR("unable to subscribe to replica position device");
-    return -1;
-  }
-
-  return 0;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // Set up the laser
-int VoterADriver::SetupLaser()
+int VoterBDriver::SetupLaser()
 {
   if(!(this->laser = deviceTable->GetDevice(this->laser_addr))) {
     PLAYER_ERROR("unable to locate suitable laser device");
@@ -521,7 +451,7 @@ int VoterADriver::SetupLaser()
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process new odometry data
-void VoterADriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &data)
+void VoterBDriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &data)
 {
   // Also change this info out for use by others
   player_msghdr_t newhdr = *hdr;
@@ -542,7 +472,7 @@ void VoterADriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &d
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process laser data
-void VoterADriver::ProcessLaser(player_laser_data_t &data)
+void VoterBDriver::ProcessLaser(player_laser_data_t &data)
 {
   this->Publish(this->replicated_laser_2,
 		PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
@@ -557,7 +487,7 @@ void VoterADriver::ProcessLaser(player_laser_data_t &data)
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process velocity command from replica
-void VoterADriver::ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_cmd_vel_t &cmd, int replica_number) {
+void VoterBDriver::ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_cmd_vel_t &cmd, int replica_number) {
   // TODO: Implement
   // Can use PutCommand (below)
   printf("Replica report: (%d): \t%f\t%f\n", replica_number, cmd.vel.px, cmd.vel.pa);
@@ -568,7 +498,7 @@ void VoterADriver::ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_
 
 ////////////////////////////////////////////////////////////////////////////////
 // Send commands to underlying position device
-void VoterADriver::PutCommand(double cmd_speed, double cmd_turnrate)
+void VoterBDriver::PutCommand(double cmd_speed, double cmd_turnrate)
 {
   player_position2d_cmd_vel_t cmd;
 
@@ -597,17 +527,24 @@ void VoterADriver::PutCommand(double cmd_speed, double cmd_turnrate)
 
 ////////////////////////////////////////////////////////////////////////////////
 // Check for new commands from the server
-void VoterADriver::ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_pos_t &cmd)
+void VoterBDriver::ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_pos_t &cmd)
 {
   //  printf("Sending command pose: (%f, %f):%f\n", cmd.pos.px, cmd.pos.py, cmd.pos.pa);
-  this->to_rep_5->PutMsg(this->InQueue,
-			 PLAYER_MSGTYPE_CMD, PLAYER_POSITION2D_CMD_POS,
-			 (void*)&cmd, sizeof(cmd), NULL);
-  this->to_rep_6->PutMsg(this->InQueue,
-			 PLAYER_MSGTYPE_CMD, PLAYER_POSITION2D_CMD_POS,
-			 (void*)&cmd, sizeof(cmd), NULL);
-  this->to_rep_7->PutMsg(this->InQueue,
-			 PLAYER_MSGTYPE_CMD, PLAYER_POSITION2D_CMD_POS,
-			 (void*)&cmd, sizeof(cmd), NULL);
+  player_planner_cmd_t cmd_planner;
+
+  memset(&cmd_planner, 0, sizeof(cmd_planner));
+  cmd_planner.goal.px = cmd.pos.px;
+  cmd_planner.goal.py = cmd.pos.py;
+  cmd_planner.goal.pa = cmd.pos.pa;
+
+  this->Publish(this->cmd_to_rep_planner_2,
+		PLAYER_MSGTYPE_CMD, PLAYER_PLANNER_CMD_GOAL,
+		(void*)&cmd_planner, 0, NULL, true);
+  this->Publish(this->cmd_to_rep_planner_3,
+		PLAYER_MSGTYPE_CMD, PLAYER_PLANNER_CMD_GOAL,
+		(void*)&cmd_planner, 0, NULL, true);
+  this->Publish(this->cmd_to_rep_planner_4,
+		PLAYER_MSGTYPE_CMD, PLAYER_PLANNER_CMD_GOAL,
+		(void*)&cmd_planner, 0, NULL, true);
 }
 

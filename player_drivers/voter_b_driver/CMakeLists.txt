@@ -1,0 +1,11 @@
+CMAKE_MINIMUM_REQUIRED (VERSION 2.4 FATAL_ERROR)
+PROJECT (voter_b_driver)
+
+# Include this CMake module to get most of the settings needed to build
+SET (CMAKE_MODULE_PATH "/usr/local/share/cmake/Modules")
+INCLUDE (UsePlayerPlugin)
+
+PLAYER_ADD_PLUGIN_DRIVER (voter_b_driver SOURCES voter_b_driver.cc)
+
+INSTALL(FILES ./build/libvoter_b_driver.so
+  DESTINATION ./lib/)

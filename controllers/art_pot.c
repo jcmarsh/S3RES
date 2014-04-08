@@ -7,8 +7,9 @@
 int main(int argc, const char **argv) {
   int i;
   playerc_client_t *client;
-  playerc_position2d_t *position2d;
-  playerc_laser_t *laser;
+  playerc_position2d_t *position2d; // Check position, send velocity commands
+  playerc_planner_t *planner; // Check for new position goals
+  playerc_laser_t *laser; // laser sensor readings
 
   if (argc < 4) {
     puts("Usage: art_pot_launch <ip_address> <port> <position2d id>");
@@ -28,6 +29,11 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
+  planner = playerc_planner_create(client, atoi(argv[3]));
+  if (playerc_planner_subscribe(planner, PLAYER_OPEN_MODE)) {
+    return -1;
+  }
+
   laser = playerc_laser_create(client, atoi(argv[3]));
   if (playerc_laser_subscribe(laser, PLAYER_OPEN_MODE)) {
     return -1;
@@ -41,6 +47,8 @@ int main(int argc, const char **argv) {
   // Shutdown
   playerc_laser_unsubscribe(laser);
   playerc_laser_destroy(laser);
+  playerc_planner_unsubscribe(planner);
+  playerc_planner_destroy(planner);
   playerc_position2d_unsubscribe(position2d);
   playerc_position2d_destroy(position2d);
   playerc_client_disconnect(client);
