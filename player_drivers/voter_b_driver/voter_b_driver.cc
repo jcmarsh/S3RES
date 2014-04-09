@@ -87,7 +87,7 @@ private:
   double con_vel[3];
 
   // Should have your art_pot specific code here...
-  double goal_x, goal_y, goal_t;
+  double goal_x, goal_y, goal_a;
   int cmd_state, cmd_type;
 };
 
@@ -230,7 +230,7 @@ VoterBDriver::VoterBDriver(ConfigFile* cf, int section)
 int VoterBDriver::MainSetup()
 {   
   puts("Voter B driver initialising in MainSetup");
-  this->goal_x = this->goal_y = this->goal_t = 0;
+  this->goal_x = this->goal_y = this->goal_a = 0;
 
   // Initialize the position device we are reading from
   if (this->SetupOdom() != 0) {
@@ -326,6 +326,68 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
     rephdr->addr = this->position_id;
     this->Publish(resp_queue, rephdr, repdata);
     delete msg;
+    return(0);
+  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_REQ,
+			       PLAYER_PLANNER_REQ_GET_WAYPOINTS,
+			       this->cmd_to_rep_planner_2)) {
+    puts("Waypoints requested");
+    // TODO: No checks are made that all replicas get the same waypoints...
+    //   WILL cause problems if interleaved with a command update.
+    // controller (1st replica) is requesting waypoints
+    // For now only one waypoint at a time (it's Art Pot, so fine.)
+    player_planner_waypoints_req_t reply;
+
+    reply.waypoints_count = 1;
+    reply.waypoints = (player_pose2d_t*)malloc(sizeof(reply.waypoints[0]));
+    reply.waypoints[0].px = goal_x;
+    reply.waypoints[0].py = goal_y;
+    reply.waypoints[0].pa = goal_a;
+
+    this->Publish(this->cmd_to_rep_planner_2, resp_queue,
+		  PLAYER_MSGTYPE_RESP_ACK,
+		  PLAYER_PLANNER_REQ_GET_WAYPOINTS,
+		  (void*)&reply);
+    free(reply.waypoints);
+    return(0);
+  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_REQ,
+			       PLAYER_PLANNER_REQ_GET_WAYPOINTS,
+			       this->cmd_to_rep_planner_3)) {
+    puts("Waypoints requested");
+    // controller (2nd replica) is requesting waypoints
+    // For now only one waypoint at a time (it's Art Pot, so fine.)
+    player_planner_waypoints_req_t reply;
+
+    reply.waypoints_count = 1;
+    reply.waypoints = (player_pose2d_t*)malloc(sizeof(reply.waypoints[0]));
+    reply.waypoints[0].px = goal_x;
+    reply.waypoints[0].py = goal_y;
+    reply.waypoints[0].pa = goal_a;
+
+    this->Publish(this->cmd_to_rep_planner_3, resp_queue,
+		  PLAYER_MSGTYPE_RESP_ACK,
+		  PLAYER_PLANNER_REQ_GET_WAYPOINTS,
+		  (void*)&reply);
+    free(reply.waypoints);
+    return(0);
+  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_REQ,
+			       PLAYER_PLANNER_REQ_GET_WAYPOINTS,
+			       this->cmd_to_rep_planner_4)) {
+    puts("Waypoints requested");
+    // controller (3rd replica) is requesting waypoints
+    // For now only one waypoint at a time (it's Art Pot, so fine.)
+    player_planner_waypoints_req_t reply;
+
+    reply.waypoints_count = 1;
+    reply.waypoints = (player_pose2d_t*)malloc(sizeof(reply.waypoints[0]));
+    reply.waypoints[0].px = goal_x;
+    reply.waypoints[0].py = goal_y;
+    reply.waypoints[0].pa = goal_a;
+
+    this->Publish(this->cmd_to_rep_planner_4, resp_queue,
+		  PLAYER_MSGTYPE_RESP_ACK,
+		  PLAYER_PLANNER_REQ_GET_WAYPOINTS,
+		  (void*)&reply);
+    free(reply.waypoints);
     return(0);
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
 				  PLAYER_POSITION2D_CMD_VEL,
@@ -529,22 +591,8 @@ void VoterBDriver::PutCommand(double cmd_speed, double cmd_turnrate)
 // Check for new commands from the server
 void VoterBDriver::ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_pos_t &cmd)
 {
-  //  printf("Sending command pose: (%f, %f):%f\n", cmd.pos.px, cmd.pos.py, cmd.pos.pa);
-  player_planner_cmd_t cmd_planner;
-
-  memset(&cmd_planner, 0, sizeof(cmd_planner));
-  cmd_planner.goal.px = cmd.pos.px;
-  cmd_planner.goal.py = cmd.pos.py;
-  cmd_planner.goal.pa = cmd.pos.pa;
-
-  this->Publish(this->cmd_to_rep_planner_2,
-		PLAYER_MSGTYPE_CMD, PLAYER_PLANNER_CMD_GOAL,
-		(void*)&cmd_planner, 0, NULL, true);
-  this->Publish(this->cmd_to_rep_planner_3,
-		PLAYER_MSGTYPE_CMD, PLAYER_PLANNER_CMD_GOAL,
-		(void*)&cmd_planner, 0, NULL, true);
-  this->Publish(this->cmd_to_rep_planner_4,
-		PLAYER_MSGTYPE_CMD, PLAYER_PLANNER_CMD_GOAL,
-		(void*)&cmd_planner, 0, NULL, true);
+  goal_x = cmd.pos.px;
+  goal_y = cmd.pos.py;
+  goal_a = cmd.pos.pa;
 }
 

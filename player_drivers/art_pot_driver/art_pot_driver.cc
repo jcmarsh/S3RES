@@ -75,10 +75,9 @@ private:
   double con_vel[3];
 
   // Should have your art_pot specific code here...
-  int speed, turnrate;
   bool active_goal;
   double goal_x, goal_y, goal_t;
-  int cmd_state, cmd_type;
+  int cmd_state;
 
 };
 
@@ -217,7 +216,6 @@ int ArtPotDriver::ProcessMessage(QueuePointer & resp_queue,
     player_msghdr_t newhdr = *hdr;
     newhdr.addr = this->odom_addr;
     this->odom->PutMsg(this->InQueue, &newhdr, (void*)data);
-    this->cmd_type = 0;
     this->active_goal = false;
 
     return 0;
@@ -359,9 +357,7 @@ int ArtPotDriver::ShutdownOdom()
 {
 
   // Stop the robot before unsubscribing
-  this->speed = 0;
-  this->turnrate = 0;
-  this->PutCommand( speed, turnrate );
+  this->PutCommand(0, 0);
 
   this->odom->Unsubscribe(this->InQueue);
   return 0;
@@ -481,7 +477,6 @@ void ArtPotDriver::PutCommand(double cmd_speed, double cmd_turnrate)
 // Check for new commands from the server
 void ArtPotDriver::ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_pos_t &cmd)
 {
-  this->cmd_type = 1;
   this->cmd_state = cmd.state;
 
   if((cmd.pos.px != this->goal_x) || (cmd.pos.py != this->goal_y) || (cmd.pos.pa != this->goal_t))

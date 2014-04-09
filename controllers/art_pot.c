@@ -3,17 +3,35 @@
  */
 
 #include <libplayerc/playerc.h>
+#include <stdbool.h>
 
-int main(int argc, const char **argv) {
-  int i;
-  playerc_client_t *client;
-  playerc_position2d_t *position2d; // Check position, send velocity commands
-  playerc_planner_t *planner; // Check for new position goals
-  playerc_laser_t *laser; // laser sensor readings
+// Configuration parameters
+#define VEL_SCALE 1
+#define DIST_EPSILON .1
+#define GOAL_RADIUS 0
+#define GOAL_EXTENT 1
+#define GOAL_SCALE 1
+#define OBSTACLE_RADIUS 0
+#define OBSTACLE_EXTENT 1
+#define OBSTACLE_SCALE .3
+
+// player interfaces
+playerc_client_t *client;
+playerc_position2d_t *position2d; // Check position, send velocity command
+playerc_planner_t *planner; // Check for new position goals
+playerc_laser_t *laser; // laser sensor readings
+
+// Controller state
+bool active_goal;
+double goal_x, goal_y, goal_t;
+int cmd_state;
+
+int setupArtPot(int argc, const char **argv) {
+ int i;
 
   if (argc < 4) {
     puts("Usage: art_pot_launch <ip_address> <port> <position2d id>");
-    return 0;
+    return -1;
   }
 
   // Create client and connect
@@ -39,12 +57,9 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
-  while(1) { // while something else.
-    // Controllers control.
+}
 
-  }
-
-  // Shutdown
+void shutdownArtPot() {
   playerc_laser_unsubscribe(laser);
   playerc_laser_destroy(laser);
   playerc_planner_unsubscribe(planner);
@@ -53,6 +68,39 @@ int main(int argc, const char **argv) {
   playerc_position2d_destroy(position2d);
   playerc_client_disconnect(client);
   playerc_client_destroy(client);
+}
+
+int main(int argc, const char **argv) {
+  void * update_id;
+
+  if (setupArtPot(argc, argv) < 0) {
+    puts("ERROR: failure in setup function.");
+    return -1;
+  }
+
+  // should loop until waypoints are received
+  playerc_planner_get_waypoints(planner);
+
+  while(1) { // while something else.
+    update_id = playerc_client_read(client);
+
+    // figure out type of update from read
+    if (update_id == client->id) {         // client update?
+      puts("CLIENT UPDATED");
+    } else if (update_id == planner->info.id) { // planner? shouldn't be updating here.
+      puts("PLANNER UPDATED");
+    } else if (update_id == laser->info.id) {   // laser readings update
+      puts("LASER UPDATED");
+    } else {
+      puts("UNHANDLED");
+      printf("\t update_id: %p\n", update_id);
+    }
+
+    // calculate new command
+    // publish command
+  }
+
+  shutdownArtPot();
 
   return 0;
 }
