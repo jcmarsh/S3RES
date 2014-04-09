@@ -88,12 +88,8 @@ private:
   Device *laser;
   player_devaddr_t laser_addr;
 
-  // Control velocity
-  double con_vel[3];
-
   // Should have your art_pot specific code here...
   double goal_x, goal_y, goal_t;
-  int cmd_state, cmd_type;
 };
 
 // A factory creation function, declared outside of the class so that it
@@ -311,7 +307,6 @@ int VoterADriver::ProcessMessage(QueuePointer & resp_queue,
     player_msghdr_t newhdr = *hdr;
     newhdr.addr = this->odom_addr;
     this->odom->PutMsg(this->InQueue, &newhdr, (void*)data);
-    this->cmd_type = 0;
 
     return 0;
   } else if (Message::MatchMessage(hdr, PLAYER_MSGTYPE_REQ, -1, this->position_id)) {
@@ -465,8 +460,6 @@ int VoterADriver::SetupOdom()
     return -1;
   }
 
-  this->cmd_state = 1;
-
   return 0;
 }
 
@@ -572,22 +565,11 @@ void VoterADriver::PutCommand(double cmd_speed, double cmd_turnrate)
 {
   player_position2d_cmd_vel_t cmd;
 
-  this->con_vel[0] = cmd_speed;
-  this->con_vel[1] = 0;
-  this->con_vel[2] = cmd_turnrate;
-
   memset(&cmd, 0, sizeof(cmd));
 
-  // Stop the robot if the motor state is set to disabled
-  if (this->cmd_state == 0) {
-    cmd.vel.px = 0;
-    cmd.vel.py = 0;
-    cmd.vel.pa = 0;
-  } else { // Position mode
-    cmd.vel.px = this->con_vel[0];
-    cmd.vel.py = this->con_vel[1];
-    cmd.vel.pa = this->con_vel[2];
-  }
+  cmd.vel.px = cmd_speed;
+  cmd.vel.py = 0;
+  cmd.vel.pa = cmd_turnrate;
 
   this->odom->PutMsg(this->InQueue,
 		     PLAYER_MSGTYPE_CMD,

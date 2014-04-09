@@ -3,6 +3,7 @@
  */
 
 #include <libplayerc/playerc.h>
+#include <math.h>
 #include <stdbool.h>
 
 // Configuration parameters
@@ -11,20 +12,19 @@
 #define GOAL_RADIUS 0
 #define GOAL_EXTENT 1
 #define GOAL_SCALE 1
-#define OBSTACLE_RADIUS 0
-#define OBSTACLE_EXTENT 1
-#define OBSTACLE_SCALE .3
+#define OBST_RADIUS 0
+#define OBST_EXTENT 1
+#define OBST_SCALE .3
 
 // player interfaces
 playerc_client_t *client;
-playerc_position2d_t *position2d; // Check position, send velocity command
+playerc_position2d_t *pos2d; // Check position, send velocity command
 playerc_planner_t *planner; // Check for new position goals
 playerc_laser_t *laser; // laser sensor readings
 
 // Controller state
 bool active_goal;
-double goal_x, goal_y, goal_t;
-int cmd_state;
+double goal_x, goal_y, goal_a;
 
 int setupArtPot(int argc, const char **argv) {
  int i;
@@ -39,11 +39,13 @@ int setupArtPot(int argc, const char **argv) {
   if (0 != playerc_client_connect(client)) {
     return -1;
   }
+
+  playerc_client_datamode(client, PLAYERC_DATAMODE_PUSH);
   
   // TODO: I can't imagine it is acceptable to use atoi() unchecked.
   // Subscribe to a redundant driver so that it will run!
-  position2d = playerc_position2d_create(client, atoi(argv[3]));
-  if (playerc_position2d_subscribe(position2d, PLAYER_OPEN_MODE)) {
+  pos2d = playerc_position2d_create(client, atoi(argv[3]));
+  if (playerc_position2d_subscribe(pos2d, PLAYER_OPEN_MODE)) {
     return -1;
   }
 
@@ -64,10 +66,70 @@ void shutdownArtPot() {
   playerc_laser_destroy(laser);
   playerc_planner_unsubscribe(planner);
   playerc_planner_destroy(planner);
-  playerc_position2d_unsubscribe(position2d);
-  playerc_position2d_destroy(position2d);
+  playerc_position2d_unsubscribe(pos2d);
+  playerc_position2d_destroy(pos2d);
   playerc_client_disconnect(client);
   playerc_client_destroy(client);
+}
+
+void command() {
+  double dist, theta, delta_x, delta_y, v, tao, obs_x, obs_y, vel, rot_vel;
+  int total_factors, i;
+
+  // Head towards the goal! odom_pose: 0-x, 1-y, 2-theta
+  dist = sqrt(pow(goal_x - pos2d->px, 2)  + pow(goal_y - pos2d->py, 2));
+  theta = atan2(goal_y - pos2d->py, goal_x - pos2d->px) - pos2d->pa;
+
+  total_factors = 0;
+  if (dist < GOAL_RADIUS) {
+    v = 0;
+    delta_x = 0;
+    delta_y = 0;
+  } else if (GOAL_RADIUS <= dist && dist <= GOAL_EXTENT + GOAL_RADIUS) {
+      v = GOAL_SCALE * (dist - GOAL_RADIUS);
+      delta_x = v * cos(theta);
+      delta_y = v * sin(theta);
+      total_factors += 1;
+  } else {
+    v = GOAL_SCALE; //* goal_extent;
+    delta_x = v * cos(theta);
+    delta_y = v * sin(theta);
+    total_factors += 1;
+  }
+  
+  // TODO: Could I use goal_radius for the dist_epsilon
+  // TODO: Now will not react to obstacles while at a waypoint. Even moving ones.
+  if (dist > DIST_EPSILON) {
+    // Makes the assumption that scans are evenly spaced around the robot.
+    for (i = 0; i < laser->scan_count; i++) {
+      // figure out location of the obstacle...
+      tao = (2 * M_PI * i) / laser->scan_count;
+      obs_x = laser->ranges[i] * cos(tao);
+      obs_y = laser->ranges[i] * sin(tao);
+      // obs.x and obs.y are relative to the robot, and I'm okay with that.
+      dist = sqrt(pow(obs_x, 2) + pow(obs_y, 2));
+      theta = atan2(obs_y, obs_x);
+    
+      if (dist <= OBST_EXTENT + OBST_RADIUS) {
+	delta_x += -OBST_SCALE * (OBST_EXTENT + OBST_RADIUS - dist) * cos(theta);
+	delta_y += -OBST_SCALE * (OBST_EXTENT + OBST_RADIUS - dist) * sin(theta);
+	total_factors += 1;
+      }
+    }
+
+    delta_x = delta_x / total_factors;
+    delta_y = delta_y / total_factors;
+  
+    vel = sqrt(pow(delta_x, 2) + pow(delta_y, 2));
+    rot_vel = atan2(delta_y, delta_x);
+    vel = VEL_SCALE * vel * (abs(M_PI - rot_vel) / M_PI);
+    rot_vel = VEL_SCALE * rot_vel;
+
+    // TODO: Should turn to the desired theta, goal_t
+    playerc_position2d_set_cmd_vel(pos2d, vel, 0, rot_vel, 1);
+  } else { // within distance epsilon. Give it up, man.
+    playerc_position2d_set_cmd_vel(pos2d, 0, 0, 0, 1);
+  }
 }
 
 int main(int argc, const char **argv) {
@@ -78,30 +140,34 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
-  // should loop until waypoints are received
+  // should loop until waypoints are received? Or does this block?
   playerc_planner_get_waypoints(planner);
+  goal_x = planner->waypoints[0][0];
+  goal_y = planner->waypoints[0][1];
+  goal_a = planner->waypoints[0][2];
 
   while(1) { // while something else.
     update_id = playerc_client_read(client);
 
     // figure out type of update from read
     if (update_id == client->id) {         // client update?
-      puts("CLIENT UPDATED");
+      //      puts("CLIENT UPDATED");
     } else if (update_id == planner->info.id) { // planner? shouldn't be updating here.
-      puts("PLANNER UPDATED");
+      //      puts("PLANNER UPDATED");
     } else if (update_id == laser->info.id) {   // laser readings update
-      puts("LASER UPDATED");
+      //      puts("LASER UPDATED");     
+      // TODO: Could wait for both position and laser to be fresh.
+      // Calculates and sends the new command
+      command(); 
+    } else if (update_id == pos2d->info.id) {
+      //      puts("POSITION2D UPDATED");
     } else {
-      puts("UNHANDLED");
-      printf("\t update_id: %p\n", update_id);
+      puts("UNHANDLED or ERROR");
+      //      printf("\t update_id: %p\n", update_id);
     }
-
-    // calculate new command
-    // publish command
   }
 
   shutdownArtPot();
-
   return 0;
 }
 
