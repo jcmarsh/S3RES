@@ -7,6 +7,10 @@
  * shared object.
  */
 
+// TODO:
+// Make sure that all inputs are properly triplicated (for example, requests to get waypoints).
+// Voting on outputs.
+
 #include <unistd.h>
 #include <string.h>
 #include <math.h>
@@ -15,10 +19,8 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 // The class for the driver
-class VoterBDriver : public ThreadedDriver
-{
+class VoterBDriver : public ThreadedDriver {
 public:
-    
   // Constructor; need that
   VoterBDriver(ConfigFile* cf, int section);
 
@@ -43,22 +45,19 @@ private:
   int ShutdownLaser();
   void ProcessLaser(player_laser_data_t &);
 
-  // Set up the Art Pot position devices
-  int SetupArtPotCmds();
-  int ShutdownArtPotCmds();
-
   // Set up the required position2ds
   void ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_cmd_vel_t &cmd, int replica_number);
 
-  // Underlying position2d from art_pots
-  
   void DoOneUpdate();
 
   // Commands for the position device
-  void PutCommand( double speed, double turnrate );
+  void PutCommand(double speed, double turnrate);
 
   // Check for new commands
   void ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_pos_t &);
+  
+  // reset / init voting state.
+  void ResetVotingState();
 
   // Devices provided
   player_devaddr_t position_id;
@@ -83,8 +82,12 @@ private:
   Device *laser;
   player_devaddr_t laser_addr;
 
-  // Should have your art_pot specific code here...
+  // Goal position
   double goal_x, goal_y, goal_a;
+
+  // Voting stuff
+  bool reporting[3];
+  double cmds[3][2];
 };
 
 // A factory creation function, declared outside of the class so that it
@@ -238,8 +241,7 @@ int VoterBDriver::MainSetup()
     return -1;
   }
 
-  // Let's try to launch the replicas
-
+  this->ResetVotingState();
 
   puts("Voter B driver ready");
 
@@ -386,21 +388,21 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
 				  this->data_to_cmd_from_rep_position2d_2)) {
     // New command velocity from replica 1
     assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
-    ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 1);
+    ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 0);
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
 				  PLAYER_POSITION2D_CMD_VEL,
 				  this->data_to_cmd_from_rep_position2d_3)) {
     // New command velocity from replica 2
     assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
-    ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 2);
+    ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 1);
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
 				  PLAYER_POSITION2D_CMD_VEL,
 				  this->data_to_cmd_from_rep_position2d_4)) {
     // New command velocity from replica 3
     assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
-    ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 3);
+    ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 2);
     return 0;
   } else {
     puts("I don't know what to do with that.");
@@ -440,9 +442,9 @@ void VoterBDriver::DoOneUpdate() {
 extern "C" {
   int player_driver_init(DriverTable* table)
   {
-    puts("Voter A driver initializing");
+    puts("Voter B driver initializing");
     VoterBDriver_Register(table);
-    puts("Voter A driver done");
+    puts("Voter B driver done");
     return(0);
   }
 }
@@ -451,7 +453,6 @@ extern "C" {
 // Shutdown the underlying odom device.
 int VoterBDriver::ShutdownOdom()
 {
-
   // Stop the robot before unsubscribing
   this->PutCommand(0, 0);
 
@@ -538,12 +539,55 @@ void VoterBDriver::ProcessLaser(player_laser_data_t &data)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// reset / init voting state
+void VoterBDriver::ResetVotingState() {
+  int i = 0;
+
+  for (i = 0; i < 3; i++) {
+    reporting[i] = false;
+    cmds[i][0] = 0.0;
+    cmds[i][1] = 0.0;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Process velocity command from replica
-void VoterBDriver::ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_cmd_vel_t &cmd, int replica_number) {
-  // TODO: Implement
-  //  printf("Replica report: (%d): \t%f\t%f\n", replica_number, cmd.vel.px, cmd.vel.pa);
-  if (replica_number == 1) {
-    this->PutCommand(cmd.vel.px, cmd.vel.pa);
+void VoterBDriver::ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_cmd_vel_t &cmd, int replica_num) {
+  int index = 0;
+  bool all_reporting = true;
+  bool all_agree = true;
+  double cmd_vel = 0.0;
+  double cmd_rot_vel = 0.0;
+  
+  if (reporting[replica_num] == true) {
+    // PROBLEM. This replica has now voted twice; likely another replica has failed.
+    puts("VOTING ERROR: Double Vote");
+  } else {
+    // record vote
+    reporting[replica_num] = true;
+    cmds[replica_num][0] = cmd.vel.px;
+    cmds[replica_num][1] = cmd.vel.pa;
+  }
+ 
+  cmd_vel = cmds[0][0];
+  cmd_rot_vel = cmds[0][1];
+  for (index = 0; index <3; index++) {
+    // Check that all have reported
+    all_reporting = all_reporting && reporting[index];
+
+    // Check that all agree
+    if (cmd_vel == cmds[index][0] && cmd_rot_vel == cmds[index][1]) {
+      // all_agree stays true
+    } else {
+      all_agree = false;
+    }
+  }
+
+  if (all_reporting && all_agree) {
+    this->PutCommand(cmd_vel, cmd_rot_vel);
+    ResetVotingState();
+  } else if (all_reporting) {
+    puts("VOTING ERROR: Not all votes agree");
   }
 }
 
