@@ -17,6 +17,8 @@
 
 #include <libplayercore/playercore.h>
 
+#define REP_COUNT 3
+
 typedef enum {
   RUNNING,
   CRASHED,
@@ -73,7 +75,12 @@ private:
 
   // Check for new commands
   void ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_pos_t &);
-  
+
+  // Send the same waypoints as each replica requests it.
+  void SendWaypoints(QueuePointer & resp_queue, int replica_num);
+
+  // reset / init input duplication state
+
   // reset / init voting state.
   void ResetVotingState();
 
@@ -83,21 +90,15 @@ private:
 
   // Replica related data
   struct replica_group_l repGroup;
-  struct replica_l replicas[3];
+  struct replica_l replicas[REP_COUNT];
 
   // Devices provided
   player_devaddr_t position_id;
-  // Redundant devices provided
-  player_devaddr_t replicated_laser_2;
-  player_devaddr_t data_to_cmd_from_rep_position2d_2;
-  player_devaddr_t cmd_to_rep_planner_2;
-  player_devaddr_t replicated_laser_3;
-  player_devaddr_t data_to_cmd_from_rep_position2d_3;
-  player_devaddr_t cmd_to_rep_planner_3;
-  player_devaddr_t replicated_laser_4;
-  player_devaddr_t data_to_cmd_from_rep_position2d_4;
-  player_devaddr_t cmd_to_rep_planner_4;
-
+  // Redundant devices provided, one for each of the three replicas
+  const char* rep_names[REP_COUNT];
+  player_devaddr_t replicated_lasers[REP_COUNT];
+  player_devaddr_t data_to_cmd_from_rep_position2ds[REP_COUNT];
+  player_devaddr_t cmd_to_rep_planners[REP_COUNT];
 
   // Required devices (odometry and laser)
   // Odometry Device info
@@ -111,9 +112,12 @@ private:
   // Goal position
   double goal_x, goal_y, goal_a;
 
+  // Input Duplication stuff
+  bool sent[REP_COUNT];
+
   // Voting stuff
-  bool reporting[3];
-  double cmds[3][2];
+  bool reporting[REP_COUNT];
+  double cmds[REP_COUNT][2];
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -192,6 +196,12 @@ void VoterBDriver_Register(DriverTable* table)
 VoterBDriver::VoterBDriver(ConfigFile* cf, int section)
   : ThreadedDriver(cf, section)
 {
+  int index = 0;
+
+  this->rep_names[0] = "rep_1";
+  this->rep_names[1] = "rep_2";
+  this->rep_names[2] = "rep_3";
+
   // Check for position2d (we provide)
   memset(&(this->position_id), 0, sizeof(player_devaddr_t));
   if (cf->ReadDeviceAddr(&(this->position_id), section, "provides",
@@ -203,77 +213,39 @@ VoterBDriver::VoterBDriver(ConfigFile* cf, int section)
   }
 
   // Check for 3 lasers provided
-  memset(&(this->replicated_laser_2), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->replicated_laser_2), section, "provides",
-			 PLAYER_LASER_CODE, -1, "rep_1") == 0) {
-    if (this->AddInterface(this->replicated_laser_2) != 0) {
-      this->SetError(-1);
-    }
-  }
-  memset(&(this->replicated_laser_3), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->replicated_laser_3), section, "provides",
-			 PLAYER_LASER_CODE, -1, "rep_2") == 0) {
-    if (this->AddInterface(this->replicated_laser_3) != 0) {
-      this->SetError(-1);
-    }
-  }
-  memset(&(this->replicated_laser_4), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->replicated_laser_4), section, "provides",
-			 PLAYER_LASER_CODE, -1, "rep_3") == 0) {
-    if (this->AddInterface(this->replicated_laser_4) != 0) {
-      this->SetError(-1);
+  for (index = 0; index < REP_COUNT; index++) {
+    memset(&(this->replicated_lasers[index]), 0, sizeof(player_devaddr_t));
+    if (cf->ReadDeviceAddr(&(this->replicated_lasers[index]), section, "provides",
+			   PLAYER_LASER_CODE, -1, this->rep_names[index]) == 0) {
+      printf("Adding laser interface:\m");
+      printf("\tindex: %d\trep_name: %s\n", index, this->rep_names[index]);
+      if (this->AddInterface(this->replicated_lasers[index]) != 0) {
+	this->SetError(-1);
+      }
     }
   }
 
   // Check for 3 position2d for commands from the replicas
-  memset(&(this->data_to_cmd_from_rep_position2d_2), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->data_to_cmd_from_rep_position2d_2), section, "provides",
-			 PLAYER_POSITION2D_CODE, -1, "rep_1") == 0) {
-    if (this->AddInterface(this->data_to_cmd_from_rep_position2d_2) != 0) {
-      this->SetError(-1);
-      return;
-    }
-  }
-  memset(&(this->data_to_cmd_from_rep_position2d_3), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->data_to_cmd_from_rep_position2d_3), section, "provides",
-			 PLAYER_POSITION2D_CODE, -1, "rep_2") == 0) {
-    if (this->AddInterface(this->data_to_cmd_from_rep_position2d_3) != 0) {
-      this->SetError(-1);
-      return;
-    }
-  }
-  memset(&(this->data_to_cmd_from_rep_position2d_4), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->data_to_cmd_from_rep_position2d_4), section, "provides",
-			 PLAYER_POSITION2D_CODE, -1, "rep_3") == 0) {
-    if (this->AddInterface(this->data_to_cmd_from_rep_position2d_4) != 0) {
-      this->SetError(-1);
-      return;
+  for (index = 0; index < REP_COUNT; index++) {
+    memset(&(this->data_to_cmd_from_rep_position2ds[index]), 0, sizeof(player_devaddr_t));
+    if (cf->ReadDeviceAddr(&(this->data_to_cmd_from_rep_position2ds[index]), section, "provides",
+			   PLAYER_POSITION2D_CODE, -1, this->rep_names[index]) == 0) {
+      if (this->AddInterface(this->data_to_cmd_from_rep_position2ds[index]) != 0) {
+	this->SetError(-1);
+	return;
+      }
     }
   }
 
   // Check for 3 planner for commands to the replicas
-  memset(&(this->cmd_to_rep_planner_2), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->cmd_to_rep_planner_2), section, "provides",
-			 PLAYER_PLANNER_CODE, -1, "rep_1") == 0) {
-    if (this->AddInterface(this->cmd_to_rep_planner_2) != 0) {
-      this->SetError(-1);
-      return;
-    }
-  }
-  memset(&(this->cmd_to_rep_planner_3), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->cmd_to_rep_planner_3), section, "provides",
-			 PLAYER_PLANNER_CODE, -1, "rep_2") == 0) {
-    if (this->AddInterface(this->cmd_to_rep_planner_3) != 0) {
-      this->SetError(-1);
-      return;
-    }
-  }
-  memset(&(this->cmd_to_rep_planner_4), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->cmd_to_rep_planner_4), section, "provides",
-			 PLAYER_PLANNER_CODE, -1, "rep_3") == 0) {
-    if (this->AddInterface(this->cmd_to_rep_planner_4) != 0) {
-      this->SetError(-1);
-      return;
+  for (index = 0; index < REP_COUNT; index++) {
+    memset(&(this->cmd_to_rep_planners[index]), 0, sizeof(player_devaddr_t));
+    if (cf->ReadDeviceAddr(&(this->cmd_to_rep_planners[index]), section, "provides",
+			   PLAYER_PLANNER_CODE, -1, this->rep_names[index]) == 0) {
+      if (this->AddInterface(this->cmd_to_rep_planners[index]) != 0) {
+	this->SetError(-1);
+	return;
+      }
     }
   }
 
@@ -351,6 +323,8 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
                                   player_msghdr * hdr,
                                   void * data)
 {
+  int index = 0;
+
   if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 			   PLAYER_POSITION2D_DATA_STATE, this->odom_addr)) {
     // Message from underlying position device; update state
@@ -407,94 +381,33 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
     this->Publish(resp_queue, rephdr, repdata);
     delete msg;
     return(0);
-  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_REQ,
+  } else { 
+    // Check the replica interfaces
+    for (index = 0; index < REP_COUNT; index++) {
+      // Check for requests for waypoints from replicas
+      if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_REQ,
 			       PLAYER_PLANNER_REQ_GET_WAYPOINTS,
-			       this->cmd_to_rep_planner_2)) {
-    // TODO: No checks are made that all replicas get the same waypoints...
-    //   WILL cause problems if interleaved with a command update.
-    // controller (1st replica) is requesting waypoints
-    // For now only one waypoint at a time (it's Art Pot, so fine.)
-    player_planner_waypoints_req_t reply;
+			       this->cmd_to_rep_planners[index])) {
+	SendWaypoints(resp_queue,  index);
+	return(0);
+      }
 
-    reply.waypoints_count = 1;
-    reply.waypoints = (player_pose2d_t*)malloc(sizeof(reply.waypoints[0]));
-    reply.waypoints[0].px = goal_x;
-    reply.waypoints[0].py = goal_y;
-    reply.waypoints[0].pa = goal_a;
-
-    this->Publish(this->cmd_to_rep_planner_2, resp_queue,
-		  PLAYER_MSGTYPE_RESP_ACK,
-		  PLAYER_PLANNER_REQ_GET_WAYPOINTS,
-		  (void*)&reply);
-    free(reply.waypoints);
-    return(0);
-  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_REQ,
-			       PLAYER_PLANNER_REQ_GET_WAYPOINTS,
-			       this->cmd_to_rep_planner_3)) {
-    // controller (2nd replica) is requesting waypoints
-    // For now only one waypoint at a time (it's Art Pot, so fine.)
-    player_planner_waypoints_req_t reply;
-
-    reply.waypoints_count = 1;
-    reply.waypoints = (player_pose2d_t*)malloc(sizeof(reply.waypoints[0]));
-    reply.waypoints[0].px = goal_x;
-    reply.waypoints[0].py = goal_y;
-    reply.waypoints[0].pa = goal_a;
-
-    this->Publish(this->cmd_to_rep_planner_3, resp_queue,
-		  PLAYER_MSGTYPE_RESP_ACK,
-		  PLAYER_PLANNER_REQ_GET_WAYPOINTS,
-		  (void*)&reply);
-    free(reply.waypoints);
-    return(0);
-  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_REQ,
-			       PLAYER_PLANNER_REQ_GET_WAYPOINTS,
-			       this->cmd_to_rep_planner_4)) {
-    // controller (3rd replica) is requesting waypoints
-    // For now only one waypoint at a time (it's Art Pot, so fine.)
-    player_planner_waypoints_req_t reply;
-
-    reply.waypoints_count = 1;
-    reply.waypoints = (player_pose2d_t*)malloc(sizeof(reply.waypoints[0]));
-    reply.waypoints[0].px = goal_x;
-    reply.waypoints[0].py = goal_y;
-    reply.waypoints[0].pa = goal_a;
-
-    this->Publish(this->cmd_to_rep_planner_4, resp_queue,
-		  PLAYER_MSGTYPE_RESP_ACK,
-		  PLAYER_PLANNER_REQ_GET_WAYPOINTS,
-		  (void*)&reply);
-    free(reply.waypoints);
-    return(0);
-  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
-				  PLAYER_POSITION2D_CMD_VEL,
-				  this->data_to_cmd_from_rep_position2d_2)) {
-    // New command velocity from replica 1
-    assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
-    ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 0);
-    return 0;
-  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
-				  PLAYER_POSITION2D_CMD_VEL,
-				  this->data_to_cmd_from_rep_position2d_3)) {
-    // New command velocity from replica 2
-    assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
-    ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 1);
-    return 0;
-  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
-				  PLAYER_POSITION2D_CMD_VEL,
-				  this->data_to_cmd_from_rep_position2d_4)) {
-    // New command velocity from replica 3
-    assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
-    ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), 2);
-    return 0;
-  } else {
+      // Check for commands from replicas
+      if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
+			       PLAYER_POSITION2D_CMD_VEL,
+			       this->data_to_cmd_from_rep_position2ds[index])) {
+	// New command velocity from replica [index]
+	assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
+	ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), index);
+	return 0;
+      }
+    }
+    
     puts("I don't know what to do with that.");
     // Message not dealt with with
     return -1;
   }
 }
-
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // Main function for device thread
@@ -589,36 +502,31 @@ int VoterBDriver::SetupLaser()
 // Process new odometry data
 void VoterBDriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &data)
 {
+  int index = 0;
   // Also change this info out for use by others
   player_msghdr_t newhdr = *hdr;
   newhdr.addr = this->position_id;
   this->Publish(&newhdr, (void*)&data);
 
   // Need to publish to the replicas
-  this->Publish(this->data_to_cmd_from_rep_position2d_2,
-		PLAYER_MSGTYPE_DATA, PLAYER_POSITION2D_DATA_STATE,
-		(void*)&data, 0, NULL, true);
-  this->Publish(this->data_to_cmd_from_rep_position2d_3,
-		PLAYER_MSGTYPE_DATA, PLAYER_POSITION2D_DATA_STATE,
-		(void*)&data, 0, NULL, true);
-  this->Publish(this->data_to_cmd_from_rep_position2d_4,
-		PLAYER_MSGTYPE_DATA, PLAYER_POSITION2D_DATA_STATE,
-		(void*)&data, 0, NULL, true);
+  for (index = 0; index < REP_COUNT; index++) {
+    this->Publish(this->data_to_cmd_from_rep_position2ds[index],
+		  PLAYER_MSGTYPE_DATA, PLAYER_POSITION2D_DATA_STATE,
+		  (void*)&data, 0, NULL, true);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process laser data
 void VoterBDriver::ProcessLaser(player_laser_data_t &data)
 {
-  this->Publish(this->replicated_laser_2,
-		PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
-		(void*)&data, 0, NULL, true);
-  this->Publish(this->replicated_laser_3,
-		PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
-		(void*)&data, 0, NULL, true);
-  this->Publish(this->replicated_laser_4,
-		PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
-		(void*)&data, 0, NULL, true);
+  int index = 0;
+
+  for (index = 0; index < REP_COUNT; index++) {
+    this->Publish(this->replicated_lasers[index],
+		  PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
+		  (void*)&data, 0, NULL, true);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -634,7 +542,31 @@ void VoterBDriver::ResetVotingState() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// handle the request for inputs
+// This is the primary input to the replicas, so make sure it is duplicated
+void VoterBDriver::SendWaypoints(QueuePointer & resp_queue, int replica_num) {
+  player_planner_waypoints_req_t reply;
+
+    // For now only one waypoint at a time (it's Art Pot, so fine.)
+  reply.waypoints_count = 1;
+  reply.waypoints = (player_pose2d_t*)malloc(sizeof(reply.waypoints[0]));
+  reply.waypoints[0].px = goal_x;
+  reply.waypoints[0].py = goal_y;
+  reply.waypoints[0].pa = goal_a;
+
+  //     this->Publish(this->cmd_to_rep_planner_3, resp_queue,
+  //    this->Publish(this->cmd_to_rep_planner_4, resp_queue,
+
+  this->Publish(this->cmd_to_rep_planners[replica_num], resp_queue,
+		PLAYER_MSGTYPE_RESP_ACK,
+		PLAYER_PLANNER_REQ_GET_WAYPOINTS,
+		(void*)&reply);
+  free(reply.waypoints);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Process velocity command from replica
+// This is the output from the replicas, so vote on it.
 void VoterBDriver::ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_cmd_vel_t &cmd, int replica_num) {
   int index = 0;
   bool all_reporting = true;
