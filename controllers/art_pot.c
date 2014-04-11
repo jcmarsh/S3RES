@@ -161,10 +161,14 @@ int main(int argc, const char **argv) {
       command(); 
     } else if (update_id == pos2d->info.id) {
       //      puts("POSITION2D UPDATED");
+    } else if (update_id == NULL) {
+      puts("ERROR");
+      exit(-1);
     } else {
-      puts("UNHANDLED or ERROR");
-      //      printf("\t update_id: %p\n", update_id);
+      puts("UNKNOWN");
     }
+      
+      //      printf("\t update_id: %p\n", update_id);
   }
 
   shutdownArtPot();

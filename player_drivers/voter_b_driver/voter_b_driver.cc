@@ -17,6 +17,24 @@
 
 #include <libplayercore/playercore.h>
 
+typedef enum {
+  RUNNING,
+  CRASHED,
+  FINISHED
+} replica_status; 
+
+// replicas with no fds
+struct replica_l {
+  pid_t pid;
+  int priority;
+  replica_status status;
+};
+
+struct replica_group_l {
+  struct replica_l* replicas;
+  int num;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 // The class for the driver
 class VoterBDriver : public ThreadedDriver {
@@ -59,6 +77,14 @@ private:
   // reset / init voting state.
   void ResetVotingState();
 
+  // Replica related methods
+  int InitReplicas(struct replica_group_l* rg, replica_l* reps, int num);
+  int ForkReplicas(struct replica_group_l* rg);
+
+  // Replica related data
+  struct replica_group_l repGroup;
+  struct replica_l replicas[3];
+
   // Devices provided
   player_devaddr_t position_id;
   // Redundant devices provided
@@ -89,6 +115,56 @@ private:
   bool reporting[3];
   double cmds[3][2];
 };
+
+////////////////////////////////////////////////////////////////////////////////
+int VoterBDriver::InitReplicas(struct replica_group_l* rg, replica_l* reps, int num) {
+  int index = 0;
+
+  rg->replicas = reps;
+  rg->num = num;
+
+  for (index = 0; index < rg->num; index++) {
+    rg->replicas[index].pid = -1;
+    rg->replicas[index].priority = -1;
+    rg->replicas[index].status = RUNNING;
+  }
+  return 1;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+int VoterBDriver::ForkReplicas(struct replica_group_l* rg) {
+  pid_t currentPID = 0;
+  int index = 0;
+  char rep_num[2];
+  char* rep_argv[] = {"art_pot", "127.0.0.1", "6666", rep_num, NULL};
+  char* rep_envp[] = {"PATH=/home/jcmarsh/research/PINT/controllers", NULL};
+
+  // Fork children
+  for (index = 0; index < rg->num; index++) {
+    sprintf(rep_num, "%d", 2 + index);
+    rep_argv[3] = rep_num;
+    currentPID = fork();
+
+    if (currentPID >= 0) { // Successful fork
+      if (currentPID == 0) { // Child process
+	//puts("VoterB:ForkReplicas: Child execing");
+	// art_pot expects something like: ./art_pot 127.0.0.1 6666 2
+	// 2 matches the interface index in the .cfg file
+	if (-1 == execve("art_pot", rep_argv, rep_envp)) {
+	  perror("EXEC ERROR!");
+	  exit(-1);
+	}
+      } else { // Parent Process
+	rg->replicas[index].pid = currentPID;
+      }
+    } else {
+      printf("Fork error!\n");
+      return -1;
+    }
+  }
+
+  return 1;
+}
 
 // A factory creation function, declared outside of the class so that it
 // can be invoked without any object context (alternatively, you can
@@ -242,6 +318,13 @@ int VoterBDriver::MainSetup()
   }
 
   this->ResetVotingState();
+
+  puts("VoterB: Init replicas");
+  this->InitReplicas(&repGroup, replicas, 3);
+  // Let's try to launch the replicas
+  puts("VoterB: Fork replicas");
+  this->ForkReplicas(&repGroup);
+
 
   puts("Voter B driver ready");
 
