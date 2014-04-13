@@ -142,7 +142,6 @@ int VoterBDriver::ForkReplicas(struct replica_group_l* rg) {
 
     if (currentPID >= 0) { // Successful fork
       if (currentPID == 0) { // Child process
-	//puts("VoterB:ForkReplicas: Child execing");
 	// art_pot expects something like: ./art_pot 127.0.0.1 6666 2
 	// 2 matches the interface index in the .cfg file
 	if (-1 == execve("art_pot", rep_argv, rep_envp)) {
@@ -208,8 +207,6 @@ VoterBDriver::VoterBDriver(ConfigFile* cf, int section)
     memset(&(this->replicated_lasers[index]), 0, sizeof(player_devaddr_t));
     if (cf->ReadDeviceAddr(&(this->replicated_lasers[index]), section, "provides",
 			   PLAYER_LASER_CODE, -1, this->rep_names[index]) == 0) {
-      printf("Adding laser interface:\n");
-      printf("\tindex: %d\trep_name: %s\n", index, this->rep_names[index]);
       if (this->AddInterface(this->replicated_lasers[index]) != 0) {
 	this->SetError(-1);
       }
@@ -288,12 +285,9 @@ int VoterBDriver::Setup()
 
   this->ResetVotingState();
 
-  puts("VoterB: Init replicas");
-  this->InitReplicas(&repGroup, replicas, 3);
   // Let's try to launch the replicas
-  puts("VoterB: Fork replicas");
+  this->InitReplicas(&repGroup, replicas, 3);
   this->ForkReplicas(&repGroup);
-
 
   puts("Voter B driver ready");
 
@@ -341,26 +335,11 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
     assert(hdr->size == sizeof(player_position2d_cmd_pos_t));
     ProcessCommand(hdr, *reinterpret_cast<player_position2d_cmd_pos_t *> (data));
     return 0;
-  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
-                                PLAYER_POSITION2D_CMD_VEL,
-                                this->position_id)) {
-    // Simply pass the velocity command through to the underlying position device
-    //    puts("Command - Velocity received");
-    // TODO: Consider removing this pass-through
-    assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
-    // make a copy of the header and change the address
-    player_msghdr_t newhdr = *hdr;
-    newhdr.addr = this->odom_addr;
-    this->odom->PutMsg(this->InQueue, &newhdr, (void*)data);
-
-    return 0;
   } else if (Message::MatchMessage(hdr, PLAYER_MSGTYPE_REQ, -1, this->position_id)) {
-    // Pass the request on to the underlying position device and wait for
-    // the reply.
+    // Pass the request on to the underlying position device and wait for the reply.
     Message* msg;
 
     //    puts("Odom configuration command");
-
     if(!(msg = this->odom->Request(this->InQueue,
                                    hdr->type,
                                    hdr->subtype,
@@ -521,7 +500,7 @@ void VoterBDriver::ResetVotingState() {
   int i = 0;
 
   for (i = 0; i < 3; i++) {
-     reporting[i] = false;
+    reporting[i] = false;
     cmds[i][0] = 0.0;
     cmds[i][1] = 0.0;
   }
@@ -541,7 +520,6 @@ void VoterBDriver::SendWaypoints(QueuePointer & resp_queue, int replica_num) {
     puts("SEND WAYPOINT ERROR: requester already has latest points.");
     return;
   } else { // send and mark sent
-    printf("Sending rep %d waypoint (%f,%f)%f\n", replica_num, curr_goal_x, curr_goal_y, curr_goal_a);
     sent[replica_num] = true;
 
     reply.waypoints_count = 1;

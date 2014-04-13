@@ -80,8 +80,6 @@ void command() {
   int total_factors, i;
 
   // Head towards the goal! odom_pose: 0-x, 1-y, 2-theta
-  printf("current pose for %d: (%f, %f) %f\n", id, pos2d->px, pos2d->py, pos2d->pa);
-
   dist = sqrt(pow(goal_x - pos2d->px, 2)  + pow(goal_y - pos2d->py, 2));
   theta = atan2(goal_y - pos2d->py, goal_x - pos2d->px) - pos2d->pa;
 
