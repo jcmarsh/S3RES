@@ -2,14 +2,7 @@
  * Second try at a Voter driver. 
  *
  * Designed to handle local navigation using three Art Pot controllers
- * 
- * Similar to (and based off of) the Player provided vfh driver
- * shared object.
  */
-
-// TODO:
-// Make sure that all inputs are properly triplicated (for example, requests to get waypoints).
-// Voting on outputs.
 
 #include <unistd.h>
 #include <string.h>
@@ -39,7 +32,7 @@ struct replica_group_l {
 
 ////////////////////////////////////////////////////////////////////////////////
 // The class for the driver
-class VoterBDriver : public ThreadedDriver {
+class VoterBDriver : public Driver {
 public:
   // Constructor; need that
   VoterBDriver(ConfigFile* cf, int section);
@@ -51,9 +44,9 @@ public:
   
 private:
   // Main function for device thread.
-  virtual void Main();
-  virtual int MainSetup();
-  virtual void MainQuit();
+  //  virtual void Main();
+  virtual int Setup();
+  virtual int Shutdown();
   
   // Set up the underlying odometry device
   int SetupOdom();
@@ -68,7 +61,7 @@ private:
   // Set up the required position2ds
   void ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_cmd_vel_t &cmd, int replica_number);
 
-  void DoOneUpdate();
+  void Update();
 
   // Commands for the position device
   void PutCommand(double speed, double turnrate);
@@ -192,7 +185,7 @@ void VoterBDriver_Register(DriverTable* table)
 // Constructor.  Retrieve options from the configuration file and do any
 // pre-Setup() setup.
 VoterBDriver::VoterBDriver(ConfigFile* cf, int section)
-  : ThreadedDriver(cf, section)
+  : Driver(cf, section)
 {
   int index = 0;
 
@@ -272,7 +265,7 @@ VoterBDriver::VoterBDriver(ConfigFile* cf, int section)
 
 ////////////////////////////////////////////////////////////////////////////////
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
-int VoterBDriver::MainSetup()
+int VoterBDriver::Setup()
 {   
   int index = 0;
 
@@ -309,7 +302,7 @@ int VoterBDriver::MainSetup()
 
 ////////////////////////////////////////////////////////////////////////////////
 // Shutdown the device
-void VoterBDriver::MainQuit()
+int VoterBDriver::Shutdown()
 {
   puts("Shutting Voter B driver down");
 
@@ -319,6 +312,7 @@ void VoterBDriver::MainQuit()
   ShutdownOdom();
 
   puts("Voter B driver has been shutdown");
+  return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -413,20 +407,8 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Main function for device thread
-void VoterBDriver::Main() 
-{
-  for(;;)
-  {
-    // test if we are supposed to cancel
-    this->Wait();
-    pthread_testcancel();
-    this->DoOneUpdate();
-  }
-}
-
-void VoterBDriver::DoOneUpdate() {
+// Called by player for each non-threaded driver.
+void VoterBDriver::Update() {
   if (this->InQueue->Empty()) {
     return;
   }
