@@ -4,9 +4,10 @@
  * Designed to handle local navigation using three Art Pot controllers
  */
 
-#include <unistd.h>
-#include <string.h>
 #include <math.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
 
 #include <libplayercore/playercore.h>
 
@@ -388,11 +389,22 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
 
 // Called by player for each non-threaded driver.
 void VoterBDriver::Update() {
+  //  struct timespec start;
+  //  struct timespec end;
+
   if (this->InQueue->Empty()) {
     return;
   }
 
+  //  clock_gettime(CLOCK_REALTIME, &start);  
   this->ProcessMessages();
+  //  clock_gettime(CLOCK_REALTIME, &end);
+
+  //  if (end.tv_sec - start.tv_sec != 0) {
+  //    printf("OVER 1 SECOND\n");
+  //  } else {
+  //    printf("ProcessMessages: %lf micro seconds\n", (end.tv_nsec - start.tv_nsec) / 1000.0);
+  //  }
 }
 
 
