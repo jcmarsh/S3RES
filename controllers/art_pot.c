@@ -25,6 +25,7 @@ playerc_laser_t *laser; // laser sensor readings
 // Controller state
 bool active_goal;
 double goal_x, goal_y, goal_a;
+int id;
 
 int setupArtPot(int argc, const char **argv) {
  int i;
@@ -33,6 +34,8 @@ int setupArtPot(int argc, const char **argv) {
     puts("Usage: art_pot_launch <ip_address> <port> <position2d id>");
     return -1;
   }
+
+  id = atoi(argv[3]);
 
   // Create client and connect
   client = playerc_client_create(0, argv[1], atoi(argv[2])); // I start at 6666
@@ -44,17 +47,17 @@ int setupArtPot(int argc, const char **argv) {
   
   // TODO: I can't imagine it is acceptable to use atoi() unchecked.
   // Subscribe to a redundant driver so that it will run!
-  pos2d = playerc_position2d_create(client, atoi(argv[3]));
+  pos2d = playerc_position2d_create(client, id);
   if (playerc_position2d_subscribe(pos2d, PLAYER_OPEN_MODE)) {
     return -1;
   }
 
-  planner = playerc_planner_create(client, atoi(argv[3]));
+  planner = playerc_planner_create(client, id);
   if (playerc_planner_subscribe(planner, PLAYER_OPEN_MODE)) {
     return -1;
   }
 
-  laser = playerc_laser_create(client, atoi(argv[3]));
+  laser = playerc_laser_create(client, id);
   if (playerc_laser_subscribe(laser, PLAYER_OPEN_MODE)) {
     return -1;
   }
@@ -77,6 +80,8 @@ void command() {
   int total_factors, i;
 
   // Head towards the goal! odom_pose: 0-x, 1-y, 2-theta
+  printf("current pose for %d: (%f, %f) %f\n", id, pos2d->px, pos2d->py, pos2d->pa);
+
   dist = sqrt(pow(goal_x - pos2d->px, 2)  + pow(goal_y - pos2d->py, 2));
   theta = atan2(goal_y - pos2d->py, goal_x - pos2d->px) - pos2d->pa;
 

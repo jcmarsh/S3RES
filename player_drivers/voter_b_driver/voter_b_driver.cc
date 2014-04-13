@@ -79,8 +79,6 @@ private:
   // Send the same waypoints as each replica requests it.
   void SendWaypoints(QueuePointer & resp_queue, int replica_num);
 
-  // reset / init input duplication state
-
   // reset / init voting state.
   void ResetVotingState();
 
@@ -109,11 +107,11 @@ private:
   Device *laser;
   player_devaddr_t laser_addr;
 
-  // Goal position
-  double goal_x, goal_y, goal_a;
-
+  // The voting information and input duplication stuff could be part of the replica struct....
   // Input Duplication stuff
   bool sent[REP_COUNT];
+  double curr_goal_x, curr_goal_y, curr_goal_a; // Current goal for planners
+  double next_goal_x, next_goal_y, next_goal_a; // Next goal for planners
 
   // Voting stuff
   bool reporting[REP_COUNT];
@@ -217,7 +215,7 @@ VoterBDriver::VoterBDriver(ConfigFile* cf, int section)
     memset(&(this->replicated_lasers[index]), 0, sizeof(player_devaddr_t));
     if (cf->ReadDeviceAddr(&(this->replicated_lasers[index]), section, "provides",
 			   PLAYER_LASER_CODE, -1, this->rep_names[index]) == 0) {
-      printf("Adding laser interface:\m");
+      printf("Adding laser interface:\n");
       printf("\tindex: %d\trep_name: %s\n", index, this->rep_names[index]);
       if (this->AddInterface(this->replicated_lasers[index]) != 0) {
 	this->SetError(-1);
@@ -276,8 +274,14 @@ VoterBDriver::VoterBDriver(ConfigFile* cf, int section)
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
 int VoterBDriver::MainSetup()
 {   
+  int index = 0;
+
   puts("Voter B driver initialising in MainSetup");
-  this->goal_x = this->goal_y = this->goal_a = 0;
+  this->curr_goal_x = this->curr_goal_y = this->curr_goal_a = 0;
+  this->next_goal_x = this->next_goal_y = this->next_goal_a = 0;
+  for (index = 0; index < REP_COUNT; index++) {
+    sent[index] = false;
+  }
 
   // Initialize the position device we are reading from
   if (this->SetupOdom() != 0) {
@@ -535,7 +539,7 @@ void VoterBDriver::ResetVotingState() {
   int i = 0;
 
   for (i = 0; i < 3; i++) {
-    reporting[i] = false;
+     reporting[i] = false;
     cmds[i][0] = 0.0;
     cmds[i][1] = 0.0;
   }
@@ -546,22 +550,43 @@ void VoterBDriver::ResetVotingState() {
 // This is the primary input to the replicas, so make sure it is duplicated
 void VoterBDriver::SendWaypoints(QueuePointer & resp_queue, int replica_num) {
   player_planner_waypoints_req_t reply;
+  int index = 0;
+  bool all_sent = true;
+  // For now only one waypoint at a time (it's Art Pot, so fine.)
+ 
+  // if replica already has latest... errors
+  if (sent[replica_num] == true) {
+    puts("SEND WAYPOINT ERROR: requester already has latest points.");
+    return;
+  } else { // send and mark sent
+    printf("Sending rep %d waypoint (%f,%f)%f\n", replica_num, curr_goal_x, curr_goal_y, curr_goal_a);
+    sent[replica_num] = true;
 
-    // For now only one waypoint at a time (it's Art Pot, so fine.)
-  reply.waypoints_count = 1;
-  reply.waypoints = (player_pose2d_t*)malloc(sizeof(reply.waypoints[0]));
-  reply.waypoints[0].px = goal_x;
-  reply.waypoints[0].py = goal_y;
-  reply.waypoints[0].pa = goal_a;
+    reply.waypoints_count = 1;
+    reply.waypoints = (player_pose2d_t*)malloc(sizeof(reply.waypoints[0]));
+    reply.waypoints[0].px = curr_goal_x;
+    reply.waypoints[0].py = curr_goal_y;
+    reply.waypoints[0].pa = curr_goal_a;
 
-  //     this->Publish(this->cmd_to_rep_planner_3, resp_queue,
-  //    this->Publish(this->cmd_to_rep_planner_4, resp_queue,
+    this->Publish(this->cmd_to_rep_planners[replica_num], resp_queue,
+		  PLAYER_MSGTYPE_RESP_ACK,
+		  PLAYER_PLANNER_REQ_GET_WAYPOINTS,
+		  (void*)&reply);
+    free(reply.waypoints);
+  }
 
-  this->Publish(this->cmd_to_rep_planners[replica_num], resp_queue,
-		PLAYER_MSGTYPE_RESP_ACK,
-		PLAYER_PLANNER_REQ_GET_WAYPOINTS,
-		(void*)&reply);
-  free(reply.waypoints);
+  // if all 3 sent, reset and move next to current
+  for (index = 0; index < REP_COUNT; index++) {
+    all_sent = all_sent && sent[index];
+  }
+  if (all_sent) {
+    curr_goal_x = next_goal_x;
+    curr_goal_y = next_goal_y;
+    curr_goal_a = next_goal_a;
+    for (index = 0; index < REP_COUNT; index++) {
+      sent[index] = false;
+    }
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -603,6 +628,9 @@ void VoterBDriver::ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_
     ResetVotingState();
   } else if (all_reporting) {
     puts("VOTING ERROR: Not all votes agree");
+    for (index = 0; index < REP_COUNT; index++) {
+      printf("\t Vote %d: (%f, %f)\n", index, cmds[index][0], cmds[index][1]);
+    }
   }
 }
 
@@ -628,8 +656,23 @@ void VoterBDriver::PutCommand(double cmd_speed, double cmd_turnrate)
 // Check for new commands from the server
 void VoterBDriver::ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_pos_t &cmd)
 {
-  goal_x = cmd.pos.px;
-  goal_y = cmd.pos.py;
-  goal_a = cmd.pos.pa;
+  bool all_sent = true;
+  bool non_sent = false;
+  int index = 0;
+
+  next_goal_x = cmd.pos.px;
+  next_goal_y = cmd.pos.py;
+  next_goal_a = cmd.pos.pa;
+
+  // if all three are waiting, move to current
+  for (index = 0; index < REP_COUNT; index++) {
+    all_sent = all_sent && sent[index];
+    non_sent = non_sent || sent[index];
+  }
+  if (all_sent || !non_sent) {
+    curr_goal_x = next_goal_x;
+    curr_goal_y = next_goal_y;
+    curr_goal_a = next_goal_a;
+  } 
 }
 
