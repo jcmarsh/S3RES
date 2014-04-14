@@ -14,6 +14,7 @@
 #include "../../include/customtimer.h"
 
 #define REP_COUNT 3
+#define MAX_TIME_N 50000000 // Max time for voting in nanoseconds (50 ms)
 
 typedef enum {
   RUNNING,
@@ -112,6 +113,10 @@ private:
   // Voting stuff
   bool reporting[REP_COUNT];
   double cmds[REP_COUNT][2];
+
+  // timing
+  struct timespec last;
+  long long elapsed_time_n;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -405,7 +410,21 @@ void VoterBDriver::Update() {
   struct timespec start;
   struct timespec end;
 #endif
+  struct timespec current;
 
+  clock_gettime(CLOCK_REALTIME, &current);
+  elapsed_time_n += ((current.tv_sec - last.tv_sec) * N_IN_S) + (current.tv_nsec - last.tv_nsec);
+
+  if (elapsed_time_n > MAX_TIME_N) {
+    // Shit has gone down. Trigger a restart as needed.
+    puts("ERROR replica has missed a deadline!");
+    printf("\telapsed_n: %lld\n", elapsed_time_n);
+    printf("\tdiff s: %ld\tdiff ns: %ld\n", current.tv_sec - last.tv_sec, current.tv_nsec - last.tv_nsec);
+    elapsed_time_n = 0;
+  }
+  last.tv_sec = current.tv_sec;
+  last.tv_nsec = current.tv_nsec;
+  
   if (this->InQueue->Empty()) {
     return;
   }
@@ -523,7 +542,12 @@ void VoterBDriver::ProcessLaser(player_laser_data_t &data)
 ////////////////////////////////////////////////////////////////////////////////
 // reset / init voting state
 void VoterBDriver::ResetVotingState() {
+  struct timespec current;
   int i = 0;
+  elapsed_time_n = 0;
+  clock_gettime(CLOCK_REALTIME, &current);
+  last.tv_sec = current.tv_sec;
+  last.tv_nsec = current.tv_nsec;
 
   for (i = 0; i < 3; i++) {
     reporting[i] = false;

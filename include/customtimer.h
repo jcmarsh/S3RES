@@ -4,7 +4,7 @@
 // All done by ifdefs for now
 //#define TIME_MAIN_LOOP
 //#define TIME_ART_POT
-#define TIME_FORK
+//#define TIME_FORK
 #define TIME_ROUND_TRIP
 #define TIME_PING_PONG
 
