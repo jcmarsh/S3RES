@@ -5,6 +5,8 @@
 #include <libplayerc/playerc.h>
 #include <math.h>
 #include <stdbool.h>
+#include <time.h>
+#include "../include/customtimer.h"
 
 // Configuration parameters
 #define VEL_SCALE 1
@@ -79,6 +81,13 @@ void command() {
   double dist, theta, delta_x, delta_y, v, tao, obs_x, obs_y, vel, rot_vel;
   int total_factors, i;
 
+#ifdef TIME_ART_POT
+  struct timespec start;
+  struct timespec end;
+
+  clock_gettime(CLOCK_REALTIME, &start);
+#endif
+
   // Head towards the goal! odom_pose: 0-x, 1-y, 2-theta
   dist = sqrt(pow(goal_x - pos2d->px, 2)  + pow(goal_y - pos2d->py, 2));
   theta = atan2(goal_y - pos2d->py, goal_x - pos2d->px) - pos2d->pa;
@@ -133,10 +142,23 @@ void command() {
   } else { // within distance epsilon. Give it up, man.
     playerc_position2d_set_cmd_vel(pos2d, 0, 0, 0, 1);
   }
+
+#ifdef TIME_ART_POT
+  clock_gettime(CLOCK_REALTIME, &end);
+
+  PRINT_MICRO("ArtPot", start, end);
+#endif
 }
 
 int main(int argc, const char **argv) {
   void * update_id;
+
+#ifdef TIME_FORK
+  struct timespec now;
+
+  clock_gettime(CLOCK_REALTIME, &now);
+  PRINT_SINGLE("\tChild Start", now);
+#endif
 
   if (setupArtPot(argc, argv) < 0) {
     puts("ERROR: failure in setup function.");

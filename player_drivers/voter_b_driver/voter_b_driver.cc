@@ -11,6 +11,8 @@
 
 #include <libplayercore/playercore.h>
 
+#include "../../include/customtimer.h"
+
 #define REP_COUNT 3
 
 typedef enum {
@@ -134,7 +136,12 @@ int VoterBDriver::ForkReplicas(struct replica_group_l* rg) {
   char rep_num[2];
   char* rep_argv[] = {"art_pot", "127.0.0.1", "6666", rep_num, NULL};
   char* rep_envp[] = {"PATH=/home/jcmarsh/research/PINT/controllers", NULL};
+#ifdef TIME_FORK
+  struct timespec start;
+  struct timespec end;
 
+  clock_gettime(CLOCK_REALTIME, &start);  
+#endif
   // Fork children
   for (index = 0; index < rg->num; index++) {
     sprintf(rep_num, "%d", 2 + index);
@@ -157,6 +164,11 @@ int VoterBDriver::ForkReplicas(struct replica_group_l* rg) {
       return -1;
     }
   }
+#ifdef TIME_FORK
+  clock_gettime(CLOCK_REALTIME, &end);
+  PRINT_SINGLE("Parent Start", start);
+  PRINT_SINGLE("\tParent End", end);
+#endif
 
   return 1;
 }
@@ -389,22 +401,24 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
 
 // Called by player for each non-threaded driver.
 void VoterBDriver::Update() {
-  //  struct timespec start;
-  //  struct timespec end;
+#ifdef TIME_MAIN_LOOP
+  struct timespec start;
+  struct timespec end;
+#endif
 
   if (this->InQueue->Empty()) {
     return;
   }
 
-  //  clock_gettime(CLOCK_REALTIME, &start);  
+#ifdef TIME_MAIN_LOOP
+  clock_gettime(CLOCK_REALTIME, &start);  
+#endif
   this->ProcessMessages();
-  //  clock_gettime(CLOCK_REALTIME, &end);
+#ifdef TIME_MAIN_LOOP
+  clock_gettime(CLOCK_REALTIME, &end);
 
-  //  if (end.tv_sec - start.tv_sec != 0) {
-  //    printf("OVER 1 SECOND\n");
-  //  } else {
-  //    printf("ProcessMessages: %lf micro seconds\n", (end.tv_nsec - start.tv_nsec) / 1000.0);
-  //  }
+  PRINT_MICRO("ProcMess", start, end);
+#endif
 }
 
 
