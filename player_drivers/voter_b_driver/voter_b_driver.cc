@@ -15,7 +15,15 @@
 
 #define REP_COUNT 3
 #define INIT_ROUNDS 4
-#define MAX_TIME_N 50 * 1000 * 1000 // Max time for voting in nanoseconds (50 ms)
+#define MAX_TIME_N 100 * 1000 * 1000 // Max time for voting in nanoseconds (50 ms)
+
+// Either waiting for replicas to vote or waiting for the next round (next laser input).
+// Or a replica has failed and recovery is needed
+typedef enum {
+  VOTING,
+  RECOVERY,
+  WAITING
+} voting_status;
 
 typedef enum {
   RUNNING,
@@ -83,6 +91,7 @@ private:
   // Replica related methods
   int InitReplicas(struct replica_group_l* rg, replica_l* reps, int num);
   int ForkReplicas(struct replica_group_l* rg);
+  int ForkSingle(struct replica_group_l* rg, int number);
 
   // Replica related data
   struct replica_group_l repGroup;
@@ -113,6 +122,7 @@ private:
   double next_goal_x, next_goal_y, next_goal_a; // Next goal for planners
 
   // Voting stuff
+  voting_status vote_stat;
   bool reporting[REP_COUNT];
   double cmds[REP_COUNT][2];
 
@@ -137,6 +147,35 @@ int VoterBDriver::InitReplicas(struct replica_group_l* rg, replica_l* reps, int 
     rg->replicas[index].status = RUNNING;
   }
   return 1;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+int VoterBDriver::ForkSingle(struct replica_group_l* rg, int number) {
+  pid_t currentPID = 0;
+  char rep_num[2];
+  char* rep_argv[] = {"art_pot", "127.0.0.1", "6666", rep_num, NULL};
+  char* rep_envp[] = {"PATH=/home/jcmarsh/research/PINT/controllers", NULL};
+
+  // Fork child
+  sprintf(rep_num, "%d", 2 + number);
+  rep_argv[3] = rep_num;
+  currentPID = fork();
+
+  if (currentPID >= 0) { // Successful fork
+    if (currentPID == 0) { // Child process
+      // art_pot expects something like: ./art_pot 127.0.0.1 6666 2
+      // 2 matches the interface index in the .cfg file
+      if (-1 == execve("art_pot", rep_argv, rep_envp)) {
+	perror("EXEC ERROR!");
+	exit(-1);
+      }
+    } else { // Parent Process
+      rg->replicas[number].pid = currentPID;
+    }
+  } else {
+    printf("Fork error!\n");
+    return -1;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -417,28 +456,43 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
 
 // Called by player for each non-threaded driver.
 void VoterBDriver::Update() {
+  struct timespec current;
+  int index = 0;
 #ifdef TIME_MAIN_LOOP
   struct timespec start;
   struct timespec end;
 #endif
-  struct timespec current;
 
-  clock_gettime(CLOCK_REALTIME, &current);
-  elapsed_time_n += ((current.tv_sec - last.tv_sec) * N_IN_S) + (current.tv_nsec - last.tv_nsec);
+
+  if (vote_stat == VOTING) {
+    clock_gettime(CLOCK_REALTIME, &current);
+    elapsed_time_n += ((current.tv_sec - last.tv_sec) * N_IN_S) + (current.tv_nsec - last.tv_nsec);
+  }
 
   if (laser_count < INIT_ROUNDS) {
     // Have not started running yet
-    elapsed_time_n = 0;
-  } else if (elapsed_time_n > MAX_TIME_N) {
+  } else if ((elapsed_time_n > MAX_TIME_N) && (vote_stat == VOTING)) {
     // Shit has gone down. Trigger a restart as needed.
     puts("ERROR replica has missed a deadline!");
     printf("\telapsed_n: %lld\n", elapsed_time_n);
     printf("\tdiff s: %ld\tdiff ns: %ld\n", current.tv_sec - last.tv_sec, current.tv_nsec - last.tv_nsec);
-    elapsed_time_n = 0;
+    vote_stat = RECOVERY;
   }
   last.tv_sec = current.tv_sec;
   last.tv_nsec = current.tv_nsec;
-  
+
+  if (vote_stat == RECOVERY) {
+    for (index = 0; index < REP_COUNT; index++) {
+      if (reporting[index] == false) {
+	// This is the failed replica, restart it
+	puts("\tNEW CONTROLLER HOPEFULLY");
+	this->ForkSingle(&repGroup, index);
+      }
+    }
+    elapsed_time_n = 0;
+    vote_stat = WAITING;
+  }
+
   if (this->InQueue->Empty()) {
     return;
   }
@@ -545,6 +599,7 @@ void VoterBDriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &d
 void VoterBDriver::ProcessLaser(player_laser_data_t &data)
 {
   int index = 0;
+  struct timespec current;
 #ifdef TIME_LASER_UPDATE
   struct timespec current_laser;
 
@@ -561,6 +616,11 @@ void VoterBDriver::ProcessLaser(player_laser_data_t &data)
     laser_count++;
   } else {
     puts("New Laser Data");
+    vote_stat = VOTING;
+    clock_gettime(CLOCK_REALTIME, &current);
+    last.tv_sec = current.tv_sec;
+    last.tv_nsec = current.tv_nsec;
+    
     for (index = 0; index < REP_COUNT; index++) {
       this->Publish(this->replicated_lasers[index],
 		    PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
@@ -572,12 +632,9 @@ void VoterBDriver::ProcessLaser(player_laser_data_t &data)
 ////////////////////////////////////////////////////////////////////////////////
 // reset / init voting state
 void VoterBDriver::ResetVotingState() {
-  struct timespec current;
   int i = 0;
+  vote_stat = WAITING;
   elapsed_time_n = 0;
-  clock_gettime(CLOCK_REALTIME, &current);
-  last.tv_sec = current.tv_sec;
-  last.tv_nsec = current.tv_nsec;
 
   for (i = 0; i < REP_COUNT; i++) {
     reporting[i] = false;
