@@ -14,13 +14,14 @@
 #include "../../include/customtimer.h"
 
 #define REP_COUNT 3
-#define MAX_TIME_N 50000000 // Max time for voting in nanoseconds (50 ms)
+#define INIT_ROUNDS 4
+#define MAX_TIME_N 50 * 1000 * 1000 // Max time for voting in nanoseconds (50 ms)
 
 typedef enum {
   RUNNING,
   CRASHED,
   FINISHED
-} replica_status; 
+} replica_status;
 
 // replicas with no fds
 struct replica_l {
@@ -101,6 +102,7 @@ private:
   player_devaddr_t odom_addr;
 
   // Laser Device info
+  int laser_count;
   Device *laser;
   player_devaddr_t laser_addr;
 
@@ -117,6 +119,9 @@ private:
   // timing
   struct timespec last;
   long long elapsed_time_n;
+#ifdef TIME_LASER_UPDATE
+  struct timespec last_laser;
+#endif
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -285,6 +290,12 @@ int VoterBDriver::Setup()
   int index = 0;
 
   puts("Voter B driver initialising in MainSetup");
+
+#ifdef TIME_LASER_UPDATE
+  clock_gettime(CLOCK_REALTIME, &last_laser);
+#endif
+  laser_count = 0;
+
   this->curr_goal_x = this->curr_goal_y = this->curr_goal_a = 0;
   this->next_goal_x = this->next_goal_y = this->next_goal_a = 0;
   for (index = 0; index < REP_COUNT; index++) {
@@ -304,7 +315,7 @@ int VoterBDriver::Setup()
   this->ResetVotingState();
 
   // Let's try to launch the replicas
-  this->InitReplicas(&repGroup, replicas, 3);
+  this->InitReplicas(&repGroup, replicas, REP_COUNT);
   this->ForkReplicas(&repGroup);
 
   puts("Voter B driver ready");
@@ -415,7 +426,10 @@ void VoterBDriver::Update() {
   clock_gettime(CLOCK_REALTIME, &current);
   elapsed_time_n += ((current.tv_sec - last.tv_sec) * N_IN_S) + (current.tv_nsec - last.tv_nsec);
 
-  if (elapsed_time_n > MAX_TIME_N) {
+  if (laser_count < INIT_ROUNDS) {
+    // Have not started running yet
+    elapsed_time_n = 0;
+  } else if (elapsed_time_n > MAX_TIME_N) {
     // Shit has gone down. Trigger a restart as needed.
     puts("ERROR replica has missed a deadline!");
     printf("\telapsed_n: %lld\n", elapsed_time_n);
@@ -531,11 +545,27 @@ void VoterBDriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &d
 void VoterBDriver::ProcessLaser(player_laser_data_t &data)
 {
   int index = 0;
+#ifdef TIME_LASER_UPDATE
+  struct timespec current_laser;
 
-  for (index = 0; index < REP_COUNT; index++) {
-    this->Publish(this->replicated_lasers[index],
-		  PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
-		  (void*)&data, 0, NULL, true);
+  clock_gettime(CLOCK_REALTIME, &current_laser);
+
+  PRINT_MICRO("LASER UPDATE", last_laser, current_laser);
+  last_laser.tv_sec = current_laser.tv_sec;
+  last_laser.tv_nsec = current_laser.tv_nsec;
+#endif
+
+  // Ignore first laser update (to give everything a chance to init)
+  if (laser_count < INIT_ROUNDS) {
+    puts("Ignore first few lasers");
+    laser_count++;
+  } else {
+    puts("New Laser Data");
+    for (index = 0; index < REP_COUNT; index++) {
+      this->Publish(this->replicated_lasers[index],
+		    PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
+		    (void*)&data, 0, NULL, true);
+    }
   }
 }
 
@@ -549,7 +579,7 @@ void VoterBDriver::ResetVotingState() {
   last.tv_sec = current.tv_sec;
   last.tv_nsec = current.tv_nsec;
 
-  for (i = 0; i < 3; i++) {
+  for (i = 0; i < REP_COUNT; i++) {
     reporting[i] = false;
     cmds[i][0] = 0.0;
     cmds[i][1] = 0.0;
@@ -608,10 +638,17 @@ void VoterBDriver::ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_
   bool all_agree = true;
   double cmd_vel = 0.0;
   double cmd_rot_vel = 0.0;
+
+  printf("VOTE rep: %d - %f\t%f\n", replica_num, cmd.vel.px, cmd.vel.pa);
   
   if (reporting[replica_num] == true) {
-    // PROBLEM. This replica has now voted twice; likely another replica has failed.
-    puts("VOTING ERROR: Double Vote");
+    // If vote is same as previous, then ignore.
+    if ((cmds[replica_num][0] == cmd.vel.px) &&
+    	(cmds[replica_num][1] == cmd.vel.pa)) {
+      // Ignore
+    } else {
+      puts("PROBLEMS VOTING");
+    }
   } else {
     // record vote
     reporting[replica_num] = true;
@@ -621,7 +658,7 @@ void VoterBDriver::ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_
  
   cmd_vel = cmds[0][0];
   cmd_rot_vel = cmds[0][1];
-  for (index = 0; index <3; index++) {
+  for (index = 0; index < REP_COUNT; index++) {
     // Check that all have reported
     all_reporting = all_reporting && reporting[index];
 
