@@ -15,7 +15,7 @@
 
 #define REP_COUNT 3
 #define INIT_ROUNDS 4
-#define MAX_TIME_N 100 * 1000 * 1000 // Max time for voting in nanoseconds (50 ms)
+#define MAX_TIME_N 50 * 1000 * 1000 // Max time for voting in nanoseconds (50 ms)
 
 // Either waiting for replicas to vote or waiting for the next round (next laser input).
 // Or a replica has failed and recovery is needed
@@ -180,11 +180,7 @@ int VoterBDriver::ForkSingle(struct replica_group_l* rg, int number) {
 
 ////////////////////////////////////////////////////////////////////////////////
 int VoterBDriver::ForkReplicas(struct replica_group_l* rg) {
-  pid_t currentPID = 0;
   int index = 0;
-  char rep_num[2];
-  char* rep_argv[] = {"art_pot", "127.0.0.1", "6666", rep_num, NULL};
-  char* rep_envp[] = {"PATH=/home/jcmarsh/research/PINT/controllers", NULL};
 #ifdef TIME_FORK
   struct timespec start;
   struct timespec end;
@@ -193,25 +189,8 @@ int VoterBDriver::ForkReplicas(struct replica_group_l* rg) {
 #endif
   // Fork children
   for (index = 0; index < rg->num; index++) {
-    sprintf(rep_num, "%d", 2 + index);
-    rep_argv[3] = rep_num;
-    currentPID = fork();
-
-    if (currentPID >= 0) { // Successful fork
-      if (currentPID == 0) { // Child process
-	// art_pot expects something like: ./art_pot 127.0.0.1 6666 2
-	// 2 matches the interface index in the .cfg file
-	if (-1 == execve("art_pot", rep_argv, rep_envp)) {
-	  perror("EXEC ERROR!");
-	  exit(-1);
-	}
-      } else { // Parent Process
-	rg->replicas[index].pid = currentPID;
-      }
-    } else {
-      printf("Fork error!\n");
-      return -1;
-    }
+    this->ForkSingle(rg, index);
+    // TODO: Handle possible errors
   }
 #ifdef TIME_FORK
   clock_gettime(CLOCK_REALTIME, &end);
@@ -463,7 +442,6 @@ void VoterBDriver::Update() {
   struct timespec end;
 #endif
 
-
   if (vote_stat == VOTING) {
     clock_gettime(CLOCK_REALTIME, &current);
     elapsed_time_n += ((current.tv_sec - last.tv_sec) * N_IN_S) + (current.tv_nsec - last.tv_nsec);
@@ -486,7 +464,7 @@ void VoterBDriver::Update() {
       if (reporting[index] == false) {
 	// This is the failed replica, restart it
 	puts("\tNEW CONTROLLER HOPEFULLY");
-	this->ForkSingle(&repGroup, index);
+	//this->ForkSingle(&repGroup, index);
       }
     }
     elapsed_time_n = 0;
