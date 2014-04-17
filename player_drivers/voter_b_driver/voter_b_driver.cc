@@ -15,7 +15,7 @@
 
 #define REP_COUNT 3
 #define INIT_ROUNDS 4
-#define MAX_TIME_N 80 * 1000 * 1000 // Max time for voting in nanoseconds (50 ms)
+#define MAX_TIME_N 50 * 1000 * 1000 // Max time for voting in nanoseconds (50 ms)
 
 // Either waiting for replicas to vote or waiting for the next round (next laser input).
 // Or a replica has failed and recovery is needed
@@ -155,7 +155,6 @@ int VoterBDriver::ForkSingle(struct replica_group_l* rg, int number) {
   pid_t currentPID = 0;
   char rep_num[2];
   char* rep_argv[] = {"art_pot", "127.0.0.1", "6666", rep_num, NULL};
-  char* rep_envp[] = {"PATH=/home/jcmarsh/research/PINT/controllers", NULL};
 
   // Fork child
   sprintf(rep_num, "%d", 2 + number);
@@ -166,7 +165,7 @@ int VoterBDriver::ForkSingle(struct replica_group_l* rg, int number) {
     if (currentPID == 0) { // Child process
       // art_pot expects something like: ./art_pot 127.0.0.1 6666 2
       // 2 matches the interface index in the .cfg file
-      if (-1 == execve("art_pot", rep_argv, rep_envp)) {
+      if (-1 == execv("art_pot", rep_argv)) {
 	perror("EXEC ERROR!");
 	exit(-1);
       }
@@ -479,7 +478,8 @@ void VoterBDriver::DoOneUpdate() {
       if (reporting[index] == false) {
 	// This is the failed replica, restart it
 	puts("\tNEW CONTROLLER HOPEFULLY");
-	//this->ForkSingle(&repGroup, index);
+	PRINT_SINGLE("\tFORK CONTROLLER", current);
+	this->ForkSingle(&repGroup, index);
       }
     }
     elapsed_time_n = 0;
@@ -593,6 +593,7 @@ void VoterBDriver::ProcessLaser(player_laser_data_t &data)
 {
   int index = 0;
   struct timespec current;
+
 #ifdef TIME_LASER_UPDATE
   struct timespec current_laser;
 
@@ -611,6 +612,7 @@ void VoterBDriver::ProcessLaser(player_laser_data_t &data)
     puts("New Laser Data");
     vote_stat = VOTING;
     clock_gettime(CLOCK_REALTIME, &current);
+    PRINT_SINGLE("Laser time", current);
     last.tv_sec = current.tv_sec;
     last.tv_nsec = current.tv_nsec;
     
@@ -688,6 +690,9 @@ void VoterBDriver::ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_
   bool all_agree = true;
   double cmd_vel = 0.0;
   double cmd_rot_vel = 0.0;
+#ifdef TIME_VOTE_CYCLE
+  struct timespec current;
+#endif
 
   printf("VOTE rep: %d - %f\t%f\n", replica_num, cmd.vel.px, cmd.vel.pa);
   
@@ -722,6 +727,11 @@ void VoterBDriver::ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_
 
   if (all_reporting && all_agree) {
     this->PutCommand(cmd_vel, cmd_rot_vel);
+#ifdef TIME_VOTE_CYCLE
+    clock_gettime(CLOCK_REALTIME, &current);
+    elapsed_time_n += ((current.tv_sec - last.tv_sec) * N_IN_S) + (current.tv_nsec - last.tv_nsec);
+    printf("VOTING SUCCESFUL. Time elapsed %f us\n", elapsed_time_n / 1000.0);
+#endif
     ResetVotingState();
   } else if (all_reporting) {
     puts("VOTING ERROR: Not all votes agree");

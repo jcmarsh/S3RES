@@ -33,7 +33,7 @@ int setupArtPot(int argc, const char **argv) {
  int i;
 
   if (argc < 4) {
-    puts("Usage: art_pot_launch <ip_address> <port> <position2d id>");
+    puts("Usage: art_pot <ip_address> <port> <position2d id>");
     return -1;
   }
 
