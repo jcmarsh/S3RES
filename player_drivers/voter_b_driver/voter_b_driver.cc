@@ -15,7 +15,7 @@
 
 #define REP_COUNT 3
 #define INIT_ROUNDS 4
-#define MAX_TIME_N 50 * 1000 * 1000 // Max time for voting in nanoseconds (50 ms)
+#define MAX_TIME_N 80 * 1000 * 1000 // Max time for voting in nanoseconds (50 ms)
 
 // Either waiting for replicas to vote or waiting for the next round (next laser input).
 // Or a replica has failed and recovery is needed
@@ -45,7 +45,7 @@ struct replica_group_l {
 
 ////////////////////////////////////////////////////////////////////////////////
 // The class for the driver
-class VoterBDriver : public Driver {
+class VoterBDriver : public ThreadedDriver {
 public:
   // Constructor; need that
   VoterBDriver(ConfigFile* cf, int section);
@@ -57,9 +57,9 @@ public:
   
 private:
   // Main function for device thread.
-  //  virtual void Main();
-  virtual int Setup();
-  virtual int Shutdown();
+  virtual void Main();
+  virtual int MainSetup();
+  virtual int MainShutdown();
   
   // Set up the underlying odometry device
   int SetupOdom();
@@ -74,7 +74,7 @@ private:
   // Set up the required position2ds
   void ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_cmd_vel_t &cmd, int replica_number);
 
-  void Update();
+  void DoOneUpdate();
 
   // Commands for the position device
   void PutCommand(double speed, double turnrate);
@@ -111,6 +111,7 @@ private:
   player_devaddr_t odom_addr;
 
   // Laser Device info
+  double laser_last_timestamp;
   int laser_count;
   Device *laser;
   player_devaddr_t laser_addr;
@@ -225,7 +226,7 @@ void VoterBDriver_Register(DriverTable* table)
 // Constructor.  Retrieve options from the configuration file and do any
 // pre-Setup() setup.
 VoterBDriver::VoterBDriver(ConfigFile* cf, int section)
-  : Driver(cf, section)
+  : ThreadedDriver(cf, section)
 {
   int index = 0;
 
@@ -303,7 +304,7 @@ VoterBDriver::VoterBDriver(ConfigFile* cf, int section)
 
 ////////////////////////////////////////////////////////////////////////////////
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
-int VoterBDriver::Setup()
+int VoterBDriver::MainSetup()
 {   
   int index = 0;
 
@@ -313,6 +314,7 @@ int VoterBDriver::Setup()
   clock_gettime(CLOCK_REALTIME, &last_laser);
 #endif
   laser_count = 0;
+  laser_last_timestamp = 0.0;
 
   this->curr_goal_x = this->curr_goal_y = this->curr_goal_a = 0;
   this->next_goal_x = this->next_goal_y = this->next_goal_a = 0;
@@ -343,7 +345,7 @@ int VoterBDriver::Setup()
 
 ////////////////////////////////////////////////////////////////////////////////
 // Shutdown the device
-int VoterBDriver::Shutdown()
+int VoterBDriver::MainShutdown()
 {
   puts("Shutting Voter B driver down");
 
@@ -373,7 +375,12 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 				  PLAYER_LASER_DATA_SCAN, this->laser_addr)) {
     // Laser scan update; update scan data
-    ProcessLaser(*reinterpret_cast<player_laser_data_t *> (data));
+    if (laser_last_timestamp == hdr->timestamp) {
+      // Likely a duplicate message; ignore
+    } else {
+      laser_last_timestamp = hdr->timestamp;
+      ProcessLaser(*reinterpret_cast<player_laser_data_t *> (data));
+    }
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
 				  PLAYER_POSITION2D_CMD_POS,
@@ -433,8 +440,16 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
   }
 }
 
+void VoterBDriver::Main() {
+  for(;;) {
+    Wait(0.001);
+    this->DoOneUpdate();
+    pthread_testcancel();
+  }
+}
+
 // Called by player for each non-threaded driver.
-void VoterBDriver::Update() {
+void VoterBDriver::DoOneUpdate() {
   struct timespec current;
   int index = 0;
 #ifdef TIME_MAIN_LOOP
