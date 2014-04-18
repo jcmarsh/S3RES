@@ -44,6 +44,7 @@ void command();
 
 // Need to restart a replica with (id + 1) % REP_COUNT
 void restartHandler(int signo) {
+  printf("What up from the restart handler! Word. Signal: %d\n", signo);
 
   pid_t currentPID = 0;
   // fork
@@ -72,11 +73,6 @@ void restartHandler(int signo) {
 int parseArgs(int argc, const char **argv) {
   int i;
 
-  if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
-    puts("Failed to register the restart handler");
-    return -1;
-  }
-
   if (argc < 4) {
     puts("Usage: art_pot <ip_address> <port> <position2d id>");
     return -1;
@@ -90,6 +86,11 @@ int parseArgs(int argc, const char **argv) {
 }
 
 int createConnections(char * ip, char * port, int id) {
+  if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
+    puts("Failed to register the restart handler");
+    return -1;
+  }
+
   // Create client and connect
   client = playerc_client_create(0, ip, atoi(port)); // I start at 6666
   if (0 != playerc_client_connect(client)) {
@@ -234,8 +235,8 @@ void enterLoop() {
     } else if (update_id == pos2d->info.id) {
       //      puts("POSITION2D UPDATED");
     } else if (update_id == NULL) {
-      puts("ERROR");
-      exit(-1);
+      puts("ERROR: client read error.");
+      //      exit(-1);
     } else {
       puts("UNKNOWN");
     }

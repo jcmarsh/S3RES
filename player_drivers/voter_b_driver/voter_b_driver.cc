@@ -452,6 +452,7 @@ void VoterBDriver::Main() {
 void VoterBDriver::DoOneUpdate() {
   struct timespec current;
   int index = 0;
+  int restart_id = -1;
 #ifdef TIME_MAIN_LOOP
   struct timespec start;
   struct timespec end;
@@ -478,11 +479,10 @@ void VoterBDriver::DoOneUpdate() {
     for (index = 0; index < REP_COUNT; index++) {
       if (reporting[index] == false) {
 	// This is the failed replica, restart it
-	puts("\tNEW CONTROLLER HOPEFULLY");
-	PRINT_SINGLE("\tFORK CONTROLLER", current);
 	// Send a signal to the rep's friend
-	kill(repGroup.replicas[(index - 1) % REP_COUNT].pid, SIGUSR1);
-	//	this->ForkSingle(&repGroup, index);
+	restart_id = (index + (REP_COUNT - 1)) % REP_COUNT; // Plus 2 is minus 1!
+	// printf("Restarting %d, %d now!\n", index, restart_id);
+	kill(repGroup.replicas[restart_id].pid, SIGUSR1);
       }
     }
     elapsed_time_n = 0;
