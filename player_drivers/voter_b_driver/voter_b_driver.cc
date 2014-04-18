@@ -5,6 +5,7 @@
  */
 
 #include <math.h>
+#include <signal.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
@@ -479,7 +480,9 @@ void VoterBDriver::DoOneUpdate() {
 	// This is the failed replica, restart it
 	puts("\tNEW CONTROLLER HOPEFULLY");
 	PRINT_SINGLE("\tFORK CONTROLLER", current);
-	this->ForkSingle(&repGroup, index);
+	// Send a signal to the rep's friend
+	kill(repGroup.replicas[(index - 1) % REP_COUNT].pid, SIGUSR1);
+	//	this->ForkSingle(&repGroup, index);
       }
     }
     elapsed_time_n = 0;

@@ -4,6 +4,7 @@
 
 #include <libplayerc/playerc.h>
 #include <math.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <time.h>
 #include "../include/customtimer.h"
@@ -29,8 +30,18 @@ bool active_goal;
 double goal_x, goal_y, goal_a;
 int id;
 
+void restartHandler(int signo) {
+  // Need to restart a replica with (id + 1) % REP_COUNT
+  printf("Shit... this may work\n");
+}
+
 int setupArtPot(int argc, const char **argv) {
- int i;
+  int i;
+
+  if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
+    puts("Failed to register the restart handler");
+    return -1;
+  }
 
   if (argc < 4) {
     puts("Usage: art_pot <ip_address> <port> <position2d id>");
