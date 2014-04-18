@@ -6,6 +6,7 @@
 #include <math.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <string.h>
 #include <time.h>
 #include "../include/customtimer.h"
 
@@ -28,14 +29,47 @@ playerc_laser_t *laser; // laser sensor readings
 // Controller state
 bool active_goal;
 double goal_x, goal_y, goal_a;
-int id;
 
+// Position
+double pos_x, pos_y, pos_a;
+int laser_count;
+double laser_ranges[365]; // 365 comes from somewhere in Player as the max.
+
+char ip_address[17];
+char port_number[10];
+int id_number;
+
+void enterLoop();
+void command();
+
+// Need to restart a replica with (id + 1) % REP_COUNT
 void restartHandler(int signo) {
-  // Need to restart a replica with (id + 1) % REP_COUNT
-  printf("Shit... this may work\n");
+
+  pid_t currentPID = 0;
+  // fork
+  currentPID = fork();
+
+  if (currentPID >= 0) { // Successful fork
+    if (currentPID == 0) { // Child process
+      // child sets new id, recreates connects, loops?
+      // TODO: child will not register this signal handler!
+      id_number = id_number - 2; // This is ugly. For 3 reps, ids should be 2, 3, and 4
+      id_number = (id_number + 1) % 3;
+      id_number = id_number + 2;
+      //      printf("Child forked, new ID: %d\n", id_number);
+      createConnections(ip_address, port_number, id_number);
+      command(); // recalculate missed command
+      enterLoop(); // return to normal
+    } else {   // Parent just returns
+      return;
+    }
+  } else {
+    printf("Fork error!\n");
+    return;
+  }
 }
 
-int setupArtPot(int argc, const char **argv) {
+int parseArgs(int argc, const char **argv) {
   int i;
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
@@ -48,10 +82,16 @@ int setupArtPot(int argc, const char **argv) {
     return -1;
   }
 
-  id = atoi(argv[3]);
+  id_number = atoi(argv[3]);
+  strncpy(ip_address, argv[1], sizeof(ip_address));
+  strncpy(port_number, argv[2], sizeof(port_number));
 
+  return 0;
+}
+
+int createConnections(char * ip, char * port, int id) {
   // Create client and connect
-  client = playerc_client_create(0, argv[1], atoi(argv[2])); // I start at 6666
+  client = playerc_client_create(0, ip, atoi(port)); // I start at 6666
   if (0 != playerc_client_connect(client)) {
     return -1;
   }
@@ -74,7 +114,7 @@ int setupArtPot(int argc, const char **argv) {
   if (playerc_laser_subscribe(laser, PLAYER_OPEN_MODE)) {
     return -1;
   }
-
+  return 0;
 }
 
 void shutdownArtPot() {
@@ -100,8 +140,8 @@ void command() {
 #endif
 
   // Head towards the goal! odom_pose: 0-x, 1-y, 2-theta
-  dist = sqrt(pow(goal_x - pos2d->px, 2)  + pow(goal_y - pos2d->py, 2));
-  theta = atan2(goal_y - pos2d->py, goal_x - pos2d->px) - pos2d->pa;
+  dist = sqrt(pow(goal_x - pos_x, 2)  + pow(goal_y - pos_y, 2));
+  theta = atan2(goal_y - pos_y, goal_x - pos_x) - pos_a;
 
   total_factors = 0;
   if (dist < GOAL_RADIUS) {
@@ -124,11 +164,11 @@ void command() {
   // TODO: Now will not react to obstacles while at a waypoint. Even moving ones.
   if (dist > DIST_EPSILON) {
     // Makes the assumption that scans are evenly spaced around the robot.
-    for (i = 0; i < laser->scan_count; i++) {
+    for (i = 0; i < laser_count; i++) {
       // figure out location of the obstacle...
-      tao = (2 * M_PI * i) / laser->scan_count;
-      obs_x = laser->ranges[i] * cos(tao);
-      obs_y = laser->ranges[i] * sin(tao);
+      tao = (2 * M_PI * i) / laser_count;
+      obs_x = laser_ranges[i] * cos(tao);
+      obs_y = laser_ranges[i] * sin(tao);
       // obs.x and obs.y are relative to the robot, and I'm okay with that.
       dist = sqrt(pow(obs_x, 2) + pow(obs_y, 2));
       theta = atan2(obs_y, obs_x);
@@ -161,26 +201,16 @@ void command() {
 #endif
 }
 
-int main(int argc, const char **argv) {
-  void * update_id;
-
-#ifdef TIME_FORK
-  struct timespec now;
-
-  clock_gettime(CLOCK_REALTIME, &now);
-  PRINT_SINGLE("\tChild Start", now);
-#endif
-
-  if (setupArtPot(argc, argv) < 0) {
-    puts("ERROR: failure in setup function.");
-    return -1;
-  }
-
-  // should loop until waypoints are received? Or does this block?
+void requestWaypoints() {
   playerc_planner_get_waypoints(planner);
   goal_x = planner->waypoints[0][0];
   goal_y = planner->waypoints[0][1];
   goal_a = planner->waypoints[0][2];
+}
+
+void enterLoop() {
+  void * update_id;
+  int index;
 
   while(1) { // while something else.
     update_id = playerc_client_read(client);
@@ -192,7 +222,13 @@ int main(int argc, const char **argv) {
       //      puts("PLANNER UPDATED");
     } else if (update_id == laser->info.id) {   // laser readings update
       //      puts("LASER UPDATED");     
-      // TODO: Could wait for both position and laser to be fresh.
+      pos_x = pos2d->px;
+      pos_y = pos2d->py;
+      pos_a = pos2d->pa;
+      laser_count = laser->scan_count;
+      for (index = 0; index < laser_count; index++) {
+	laser_ranges[index] = laser->ranges[index];
+      }
       // Calculates and sends the new command
       command(); 
     } else if (update_id == pos2d->info.id) {
@@ -206,6 +242,29 @@ int main(int argc, const char **argv) {
       
       //      printf("\t update_id: %p\n", update_id);
   }
+}
+
+int main(int argc, const char **argv) {
+#ifdef TIME_FORK
+  struct timespec now;
+
+  clock_gettime(CLOCK_REALTIME, &now);
+  PRINT_SINGLE("\tChild Start", now);
+#endif
+
+  if (parseArgs(argc, argv) < 0) {
+    puts("ERROR: failure parsing args.");
+    return -1;
+  }
+
+  if (createConnections(ip_address, port_number, id_number) < 0) {
+    puts("ERROR: failure in setup function.");
+    return -1;
+  }
+
+  requestWaypoints();
+
+  enterLoop();
 
   shutdownArtPot();
   return 0;
