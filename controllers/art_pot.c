@@ -111,7 +111,7 @@ int createConnections(char * ip, char * port, int id) {
     return -1;
   }
 
-  laser = playerc_laser_create(client, id);
+  laser = playerc_laser_create(client, 2);
   if (playerc_laser_subscribe(laser, PLAYER_OPEN_MODE)) {
     return -1;
   }

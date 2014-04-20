@@ -102,9 +102,10 @@ private:
   player_devaddr_t position_id;
   // Redundant devices provided, one for each of the three replicas
   const char* rep_names[REP_COUNT];
-  player_devaddr_t replicated_lasers[REP_COUNT];
-  player_devaddr_t data_to_cmd_from_rep_position2ds[REP_COUNT];
+  player_devaddr_t replicat_lasers;
   player_devaddr_t cmd_to_rep_planners[REP_COUNT];
+  player_devaddr_t data_to_cmd_from_rep_position2ds[REP_COUNT];
+
 
   // Required devices (odometry and laser)
   // Odometry Device info
@@ -244,13 +245,23 @@ VoterBDriver::VoterBDriver(ConfigFile* cf, int section)
     }
   }
 
-  // Check for 3 lasers provided
-  for (index = 0; index < REP_COUNT; index++) {
-    memset(&(this->replicated_lasers[index]), 0, sizeof(player_devaddr_t));
-    if (cf->ReadDeviceAddr(&(this->replicated_lasers[index]), section, "provides",
-			   PLAYER_LASER_CODE, -1, this->rep_names[index]) == 0) {
-      if (this->AddInterface(this->replicated_lasers[index]) != 0) {
+  // Check for provided laser
+  memset(&(this->replicat_lasers), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->replicat_lasers), section, "provides",
+			 PLAYER_LASER_CODE, -1, NULL) == 0) {
+    if (this->AddInterface(this->replicat_lasers) != 0) {
+      this->SetError(-1);
+    }
+  }
+
+  // Check for planner for commands to the replicas
+  for (index = 0; index < REP_COUNT; index++) { 
+    memset(&(this->cmd_to_rep_planners[index]), 0, sizeof(player_devaddr_t));
+    if (cf->ReadDeviceAddr(&(this->cmd_to_rep_planners[index]), section, "provides",
+			   PLAYER_PLANNER_CODE, -1, this->rep_names[index]) == 0) {
+      if (this->AddInterface(this->cmd_to_rep_planners[index]) != 0) {
 	this->SetError(-1);
+	return;
       }
     }
   }
@@ -261,18 +272,6 @@ VoterBDriver::VoterBDriver(ConfigFile* cf, int section)
     if (cf->ReadDeviceAddr(&(this->data_to_cmd_from_rep_position2ds[index]), section, "provides",
 			   PLAYER_POSITION2D_CODE, -1, this->rep_names[index]) == 0) {
       if (this->AddInterface(this->data_to_cmd_from_rep_position2ds[index]) != 0) {
-	this->SetError(-1);
-	return;
-      }
-    }
-  }
-
-  // Check for 3 planner for commands to the replicas
-  for (index = 0; index < REP_COUNT; index++) {
-    memset(&(this->cmd_to_rep_planners[index]), 0, sizeof(player_devaddr_t));
-    if (cf->ReadDeviceAddr(&(this->cmd_to_rep_planners[index]), section, "provides",
-			   PLAYER_PLANNER_CODE, -1, this->rep_names[index]) == 0) {
-      if (this->AddInterface(this->cmd_to_rep_planners[index]) != 0) {
 	this->SetError(-1);
 	return;
       }
@@ -619,11 +618,9 @@ void VoterBDriver::ProcessLaser(player_laser_data_t &data)
     last.tv_sec = current.tv_sec;
     last.tv_nsec = current.tv_nsec;
     
-    for (index = 0; index < REP_COUNT; index++) {
-      this->Publish(this->replicated_lasers[index],
-		    PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
-		    (void*)&data, 0, NULL, true);
-    }
+    this->Publish(this->replicat_lasers,
+		  PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
+		  (void*)&data, 0, NULL, true);
   }
 }
 
