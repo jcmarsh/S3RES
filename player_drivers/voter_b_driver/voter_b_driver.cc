@@ -18,7 +18,7 @@
 
 #define REP_COUNT 3
 #define INIT_ROUNDS 4
-#define MAX_TIME_SECONDS 0.005 // Max time for voting in seconds (50 ms)
+#define MAX_TIME_SECONDS 0.05 // Max time for voting in seconds (50 ms)
 
 // Either waiting for replicas to vote or waiting for the next round (next laser input).
 // Or a replica has failed and recovery is needed
@@ -63,7 +63,8 @@ private:
   virtual void Main();
   virtual int MainSetup();
   virtual int MainShutdown();
-  
+  int InitTAS();  
+
   // Set up the underlying odometry device
   int SetupOdom();
   int ShutdownOdom();
@@ -131,10 +132,36 @@ private:
   bool reporting[REP_COUNT];
   double cmds[REP_COUNT][2];
 
+  // TAS Stuff
+  pid_t pid;
+  int priority;
+  cpu_speed_t cpu_speed;
+  cpu_id_t cpu;
+  int timer_priority;
+
   // timing
   timestamp_t last;
   realtime_t elapsed_time_seconds;
 };
+
+////////////////////////////////////////////////////////////////////////////////
+int VoterBDriver::InitTAS() {
+  cpu = DEFAULT_CPU;
+  pid = getpid();
+
+  // TODO:
+  // Bind!
+
+  // Set Realtime Scheduling
+
+  // Test for high resolution timers? Maybe just once... no need everytime
+
+  // * get the cpu speed *
+  if( cpu_c::get_speed( cpu_speed, cpu ) != cpu_c::ERROR_NONE ) {
+    printf("(test_timer.cpp) init() failed calling cpu_c::get_frequency(cpu_speed,cpu)\n" );
+  }
+  printf("CPU Speed: %lld\n", cpu_speed);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 int VoterBDriver::InitReplicas(struct replica_group_l* rg, replica_l* reps, int num) {
@@ -298,6 +325,8 @@ int VoterBDriver::MainSetup()
 
   puts("Voter B driver initialising in MainSetup");
 
+  this->InitTAS();
+
   laser_count = 0;
   laser_last_timestamp = 0.0;
 
@@ -441,7 +470,7 @@ void VoterBDriver::DoOneUpdate() {
 
   if (vote_stat == VOTING) {
     current = generate_timestamp();
-    //    elapsed_time_seconds += timestamp_to_realtime(current - last, );
+    elapsed_time_seconds += timestamp_to_realtime(current - last, cpu_speed);
   }
 
   if (laser_count < INIT_ROUNDS) {
@@ -449,7 +478,7 @@ void VoterBDriver::DoOneUpdate() {
   } else if ((elapsed_time_seconds > MAX_TIME_SECONDS) && (vote_stat == VOTING)) {
     // Shit has gone down. Trigger a restart as needed.
     puts("ERROR replica has missed a deadline!");
-    printf("\elapseds_n: %lf\n", elapsed_time_seconds);
+    printf("elapsed_seconds: %lf\n", elapsed_time_seconds);
     vote_stat = RECOVERY;
   }
   last = current;
