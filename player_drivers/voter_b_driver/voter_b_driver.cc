@@ -12,11 +12,13 @@
 
 #include <libplayercore/playercore.h>
 
-#include "../../include/customtimer.h"
+#include "../../include/time.h"
+#include "../../include/cpu.h"
+
 
 #define REP_COUNT 3
 #define INIT_ROUNDS 4
-#define MAX_TIME_N 50 * 1000 * 1000 // Max time for voting in nanoseconds (50 ms)
+#define MAX_TIME_SECONDS 0.005 // Max time for voting in seconds (50 ms)
 
 // Either waiting for replicas to vote or waiting for the next round (next laser input).
 // Or a replica has failed and recovery is needed
@@ -130,11 +132,8 @@ private:
   double cmds[REP_COUNT][2];
 
   // timing
-  struct timespec last;
-  long long elapsed_time_n;
-#ifdef TIME_LASER_UPDATE
-  struct timespec last_laser;
-#endif
+  timestamp_t last;
+  realtime_t elapsed_time_seconds;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -183,22 +182,12 @@ int VoterBDriver::ForkSingle(struct replica_group_l* rg, int number) {
 ////////////////////////////////////////////////////////////////////////////////
 int VoterBDriver::ForkReplicas(struct replica_group_l* rg) {
   int index = 0;
-#ifdef TIME_FORK
-  struct timespec start;
-  struct timespec end;
 
-  clock_gettime(CLOCK_REALTIME, &start);  
-#endif
   // Fork children
   for (index = 0; index < rg->num; index++) {
     this->ForkSingle(rg, index);
     // TODO: Handle possible errors
   }
-#ifdef TIME_FORK
-  clock_gettime(CLOCK_REALTIME, &end);
-  PRINT_SINGLE("Parent Start", start);
-  PRINT_SINGLE("\tParent End", end);
-#endif
 
   return 1;
 }
@@ -309,9 +298,6 @@ int VoterBDriver::MainSetup()
 
   puts("Voter B driver initialising in MainSetup");
 
-#ifdef TIME_LASER_UPDATE
-  clock_gettime(CLOCK_REALTIME, &last_laser);
-#endif
   laser_count = 0;
   laser_last_timestamp = 0.0;
 
@@ -449,30 +435,24 @@ void VoterBDriver::Main() {
 
 // Called by player for each non-threaded driver.
 void VoterBDriver::DoOneUpdate() {
-  struct timespec current;
+  timestamp_t current;
   int index = 0;
   int restart_id = -1;
-#ifdef TIME_MAIN_LOOP
-  struct timespec start;
-  struct timespec end;
-#endif
 
   if (vote_stat == VOTING) {
-    clock_gettime(CLOCK_REALTIME, &current);
-    elapsed_time_n += ((current.tv_sec - last.tv_sec) * N_IN_S) + (current.tv_nsec - last.tv_nsec);
+    current = generate_timestamp();
+    //    elapsed_time_seconds += timestamp_to_realtime(current - last, );
   }
 
   if (laser_count < INIT_ROUNDS) {
     // Have not started running yet
-  } else if ((elapsed_time_n > MAX_TIME_N) && (vote_stat == VOTING)) {
+  } else if ((elapsed_time_seconds > MAX_TIME_SECONDS) && (vote_stat == VOTING)) {
     // Shit has gone down. Trigger a restart as needed.
     puts("ERROR replica has missed a deadline!");
-    printf("\telapsed_n: %lld\n", elapsed_time_n);
-    printf("\tdiff s: %ld\tdiff ns: %ld\n", current.tv_sec - last.tv_sec, current.tv_nsec - last.tv_nsec);
+    printf("\elapseds_n: %lf\n", elapsed_time_seconds);
     vote_stat = RECOVERY;
   }
-  last.tv_sec = current.tv_sec;
-  last.tv_nsec = current.tv_nsec;
+  last = current;
 
   if (vote_stat == RECOVERY) {
     for (index = 0; index < REP_COUNT; index++) {
@@ -484,7 +464,7 @@ void VoterBDriver::DoOneUpdate() {
 	kill(repGroup.replicas[restart_id].pid, SIGUSR1);
       }
     }
-    elapsed_time_n = 0;
+    elapsed_time_seconds = 0.0;
     vote_stat = WAITING;
   }
 
@@ -492,15 +472,7 @@ void VoterBDriver::DoOneUpdate() {
     return;
   }
 
-#ifdef TIME_MAIN_LOOP
-  clock_gettime(CLOCK_REALTIME, &start);  
-#endif
   this->ProcessMessages();
-#ifdef TIME_MAIN_LOOP
-  clock_gettime(CLOCK_REALTIME, &end);
-
-  PRINT_MICRO("ProcMess", start, end);
-#endif
 }
 
 
@@ -594,17 +566,7 @@ void VoterBDriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &d
 void VoterBDriver::ProcessLaser(player_laser_data_t &data)
 {
   int index = 0;
-  struct timespec current;
-
-#ifdef TIME_LASER_UPDATE
-  struct timespec current_laser;
-
-  clock_gettime(CLOCK_REALTIME, &current_laser);
-
-  PRINT_MICRO("LASER UPDATE", last_laser, current_laser);
-  last_laser.tv_sec = current_laser.tv_sec;
-  last_laser.tv_nsec = current_laser.tv_nsec;
-#endif
+  timestamp_t current;
 
   // Ignore first laser update (to give everything a chance to init)
   if (laser_count < INIT_ROUNDS) {
@@ -613,10 +575,8 @@ void VoterBDriver::ProcessLaser(player_laser_data_t &data)
   } else {
     puts("New Laser Data");
     vote_stat = VOTING;
-    clock_gettime(CLOCK_REALTIME, &current);
-    PRINT_SINGLE("Laser time", current);
-    last.tv_sec = current.tv_sec;
-    last.tv_nsec = current.tv_nsec;
+    current = generate_timestamp();
+    last = current;
     
     this->Publish(this->replicat_lasers,
 		  PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
@@ -629,7 +589,7 @@ void VoterBDriver::ProcessLaser(player_laser_data_t &data)
 void VoterBDriver::ResetVotingState() {
   int i = 0;
   vote_stat = WAITING;
-  elapsed_time_n = 0;
+  elapsed_time_seconds = 0.0;
 
   for (i = 0; i < REP_COUNT; i++) {
     reporting[i] = false;
@@ -690,9 +650,6 @@ void VoterBDriver::ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_
   bool all_agree = true;
   double cmd_vel = 0.0;
   double cmd_rot_vel = 0.0;
-#ifdef TIME_VOTE_CYCLE
-  struct timespec current;
-#endif
 
   printf("VOTE rep: %d - %f\t%f\n", replica_num, cmd.vel.px, cmd.vel.pa);
   
@@ -727,11 +684,6 @@ void VoterBDriver::ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_
 
   if (all_reporting && all_agree) {
     this->PutCommand(cmd_vel, cmd_rot_vel);
-#ifdef TIME_VOTE_CYCLE
-    clock_gettime(CLOCK_REALTIME, &current);
-    elapsed_time_n += ((current.tv_sec - last.tv_sec) * N_IN_S) + (current.tv_nsec - last.tv_nsec);
-    printf("VOTING SUCCESFUL. Time elapsed %f us\n", elapsed_time_n / 1000.0);
-#endif
     ResetVotingState();
   } else if (all_reporting) {
     puts("VOTING ERROR: Not all votes agree");

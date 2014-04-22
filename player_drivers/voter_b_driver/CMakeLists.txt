@@ -5,7 +5,7 @@ PROJECT (voter_b_driver)
 SET (CMAKE_MODULE_PATH "/usr/local/share/cmake/Modules")
 INCLUDE (UsePlayerPlugin)
 
-PLAYER_ADD_PLUGIN_DRIVER (voter_b_driver SOURCES voter_b_driver.cc)
+PLAYER_ADD_PLUGIN_DRIVER (voter_b_driver SOURCES voter_b_driver.cc cpu.cpp time.cpp)
 
 INSTALL(FILES ./build/libvoter_b_driver.so
   DESTINATION ./lib/)
