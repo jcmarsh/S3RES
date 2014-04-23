@@ -7,7 +7,9 @@
 #include <signal.h>
 #include <stdbool.h>
 #include <string.h>
-#include <time.h>
+#include <unistd.h>
+#include "../include/time.h"
+#include "../include/cpu.h"
 
 // Configuration parameters
 #define VEL_SCALE 1
@@ -38,8 +40,15 @@ char ip_address[17];
 char port_number[10];
 int id_number;
 
+// TAS related
+pid_t pid;
+int priority;
+cpu_id_t cpu;
+
+
 void enterLoop();
 void command();
+int createConnections(char * ip, char * port, int id);
 
 // Need to restart a replica with (id + 1) % REP_COUNT
 void restartHandler(int signo) {
@@ -52,11 +61,10 @@ void restartHandler(int signo) {
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
       // child sets new id, recreates connects, loops?
-      // TODO: child will not register this signal handler!
       id_number = id_number - 2; // This is ugly. For 3 reps, ids should be 2, 3, and 4
       id_number = (id_number + 1) % 3;
       id_number = id_number + 2;
-      //      printf("Child forked, new ID: %d\n", id_number);
+      // TODO: The pid is not known to the voter
       createConnections(ip_address, port_number, id_number);
       command(); // recalculate missed command
       enterLoop(); // return to normal
@@ -84,7 +92,17 @@ int parseArgs(int argc, const char **argv) {
   return 0;
 }
 
+// Basically the init function
 int createConnections(char * ip, char * port, int id) {
+  // Bind to a cpu
+  cpu = DEFAULT_CPU;
+  pid = getpid();
+  if( cpu_c::bind(pid, cpu) != cpu_c::ERROR_NONE ) {
+    printf("(art_pot.c) createConnections() failed calling cpu_c::_bind(pid,DEFAULT_CPU).\nExiting\n");
+    return -1;
+  }
+
+
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     puts("Failed to register the restart handler");
     return -1;
@@ -226,7 +244,6 @@ void enterLoop() {
     } else {
       puts("UNKNOWN");
     }
-      
       //      printf("\t update_id: %p\n", update_id);
   }
 }
