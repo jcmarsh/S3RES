@@ -14,7 +14,7 @@ author: James Taylor : jrt@gwu.edu
 
 //-----------------------------------------------------------------------------
 
-#define DEFAULT_CPU    0
+#define DEFAULT_CPU    2 // By default has less interrupts (eth0 is set to 0)
 
 //-----------------------------------------------------------------------------
 
