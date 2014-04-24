@@ -15,7 +15,7 @@
 
 #include "../../include/time.h"
 #include "../../include/cpu.h"
-
+#include "../../include/scheduler.h"
 
 #define REP_COUNT 3
 #define INIT_ROUNDS 4
@@ -182,11 +182,16 @@ int VoterBDriver::InitTAS() {
 
   // Bind
   if( cpu_c::bind(pid, cpu) != cpu_c::ERROR_NONE ) {
-    printf("(test_timer.cpp) init() failed calling cpu_c::_bind(pid,DEFAULT_CPU).\nExiting\n");
+    printf("(voter_b_driver) InitTAS() failed calling cpu_c::_bind(pid,DEFAULT_CPU).\n");
   }
 
-  // TODO:
   // Set Realtime Scheduling
+  // set the process to be scheduled with realtime policy and max priority              
+  if( scheduler_c::set_realtime_policy( pid, priority ) != scheduler_c::ERROR_NONE ) {
+    printf("(voter_b_driver) InitTAS() failed calling schedule_set_realtime_max(pid,priority).\n" );
+  }
+  printf( "process priority: %d\n", priority );
+
 
   // * get the cpu speed *
   if( cpu_c::get_speed( cpu_speed, cpu ) != cpu_c::ERROR_NONE ) {
