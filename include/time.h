@@ -33,8 +33,8 @@ typedef cycle_t timestamp_t;
 
 /// Assembly call to get current content of rdtsc register
 //#define rdtscll(val) __asm__ __volatile__("rdtsc" : "=A" (val))
-#define rdtscll(value)			       \
-  __asm__ ("rdtsc\n\t"			       \
+#define rdtscll(value)				       \
+  __asm__ ("rdtsc\n\t"				       \
 	   "shl $(32), %%rdx\n\t"		       \
 	   "or %%rax, %%rdx" : "=d" (value) : : "rax")
 
