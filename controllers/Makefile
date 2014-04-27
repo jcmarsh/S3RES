@@ -5,7 +5,7 @@ INC=-I$(PLAYERC)/ -I$(PLAYERC)/client_libs/ -I$(PLAYERC)/build/
 all: regular
 
 regular:
-	g++ $(INC) -o art_pot art_pot.c cpu.cpp time.cpp -lplayerc -lrt
+	g++ $(INC) -o art_pot art_pot.c ../src/cpu.cpp ../src/time.cpp -lplayerc -lrt
 	gcc $(INC) -o redundant_test redundant_test.c -lplayerc
 
 clean:
