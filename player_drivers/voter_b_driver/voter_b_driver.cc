@@ -7,15 +7,11 @@
 #include <math.h>
 #include <signal.h>
 #include <string.h>
-#include <sys/resource.h>
 #include <time.h>
-#include <unistd.h>
 
 #include <libplayercore/playercore.h>
 
-#include "../../include/time.h"
-#include "../../include/cpu.h"
-#include "../../include/scheduler.h"
+#include "../../include/taslimited.h"
 
 #define REP_COUNT 3
 #define INIT_ROUNDS 4
@@ -65,9 +61,8 @@ private:
   virtual int MainSetup();
   virtual int MainShutdown();
 
-  void call_getrlimit(int id, char *name);
-  void call_setrlimit(int id, rlim_t c, rlim_t m);
-  int InitTAS();
+  //  void call_getrlimit(int id, char *name);
+  //  void call_setrlimit(int id, rlim_t c, rlim_t m);
 
   // Set up the underlying odometry device
   int SetupOdom();
@@ -137,68 +132,12 @@ private:
   double cmds[REP_COUNT][2];
 
   // TAS Stuff
-  pid_t pid;
-  int priority;
   cpu_speed_t cpu_speed;
-  cpu_id_t cpu;
 
   // timing
   timestamp_t last;
   realtime_t elapsed_time_seconds;
 };
-
-// From Gabe's cos_loader.c
-void VoterBDriver::call_getrlimit(int id, char *name) {
-  struct rlimit rl;
-
-    if (getrlimit(id, &rl)) {
-    perror("getrlimit: ");
-  }
-  printf("rlimit for %s is %d:%d (inf %d)\n", 
-  	 name, (int)rl.rlim_cur, (int)rl.rlim_max, (int)RLIM_INFINITY);
-}
-
-// From Gabe's cos_loader.c
-void VoterBDriver::call_setrlimit(int id, rlim_t c, rlim_t m)
-{
-  struct rlimit rl;
-
-  rl.rlim_cur = c;
-  rl.rlim_max = m;
-  if (setrlimit(id, &rl)) {
-    perror("setrlimit: ");
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-int VoterBDriver::InitTAS() {
-  cpu = DEFAULT_CPU;
-  pid = getpid();
-
-  // R-Limit
-  //call_getrlimit(RLIMIT_RTPRIO, "RTPRIO");
-  call_setrlimit(RLIMIT_RTPRIO, RLIM_INFINITY, RLIM_INFINITY);
-  call_getrlimit(RLIMIT_RTPRIO, "RTPRIO");
-
-  // Bind
-  if( cpu_c::bind(pid, cpu) != cpu_c::ERROR_NONE ) {
-    printf("(voter_b_driver) InitTAS() failed calling cpu_c::_bind(pid,DEFAULT_CPU).\n");
-  }
-
-  // Set Realtime Scheduling
-  // set the process to be scheduled with realtime policy and max priority              
-  if( scheduler_c::set_realtime_policy( pid, priority ) != scheduler_c::ERROR_NONE ) {
-    printf("(voter_b_driver) InitTAS() failed calling schedule_set_realtime_max(pid,priority).\n" );
-  }
-  printf( "process priority: %d\n", priority );
-
-
-  // * get the cpu speed *
-  if( cpu_c::get_speed( cpu_speed, cpu ) != cpu_c::ERROR_NONE ) {
-    printf("(test_timer.cpp) init() failed calling cpu_c::get_frequency(cpu_speed,cpu)\n" );
-  }
-  printf("CPU Speed: %lld\n", cpu_speed);
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 int VoterBDriver::InitReplicas(struct replica_group_l* rg, replica_l* reps, int num) {
@@ -362,7 +301,7 @@ int VoterBDriver::MainSetup()
 
   puts("Voter B driver initialising in MainSetup");
 
-  this->InitTAS();
+  InitTAS(&cpu_speed);
 
   laser_count = 0;
   laser_last_timestamp = 0.0;

@@ -8,8 +8,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
-#include "../include/time.h"
-#include "../include/cpu.h"
+#include "../include/taslimited.h"
 
 // Configuration parameters
 #define VEL_SCALE 1
@@ -41,9 +40,7 @@ char port_number[10];
 int id_number;
 
 // TAS related
-pid_t pid;
-int priority;
-cpu_id_t cpu;
+cpu_speed_t cpu_speed;
 
 
 void enterLoop();
@@ -92,16 +89,10 @@ int parseArgs(int argc, const char **argv) {
   return 0;
 }
 
+// Should probably separate this out correctly
 // Basically the init function
 int createConnections(char * ip, char * port, int id) {
-  // Bind to a cpu
-  cpu = DEFAULT_CPU;
-  pid = getpid();
-  if( cpu_c::bind(pid, cpu) != cpu_c::ERROR_NONE ) {
-    printf("(art_pot.c) createConnections() failed calling cpu_c::_bind(pid,DEFAULT_CPU).\nExiting\n");
-    return -1;
-  }
-
+  InitTAS(&cpu_speed);
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     puts("Failed to register the restart handler");
