@@ -9,6 +9,6 @@
 #include "scheduler.h"
 #include "force.h"
 
-int InitTAS(cpu_speed_t *cpu_speed);
+int InitTAS(cpu_id_t cpu, cpu_speed_t *cpu_speed);
 
 #endif // _TAS_LIMITED_H_

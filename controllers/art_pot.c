@@ -42,7 +42,6 @@ int id_number;
 // TAS related
 cpu_speed_t cpu_speed;
 
-
 void enterLoop();
 void command();
 int createConnections(char * ip, char * port, int id);
@@ -92,7 +91,7 @@ int parseArgs(int argc, const char **argv) {
 // Should probably separate this out correctly
 // Basically the init function
 int createConnections(char * ip, char * port, int id) {
-  InitTAS(&cpu_speed);
+  InitTAS(DEFAULT_CPU, &cpu_speed);
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     puts("Failed to register the restart handler");

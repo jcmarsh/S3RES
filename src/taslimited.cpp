@@ -23,12 +23,10 @@ void call_setrlimit(int id, rlim_t c, rlim_t m)
   }
 }
 
-int InitTAS(cpu_speed_t *cpu_speed) {
+int InitTAS(cpu_id_t cpu, cpu_speed_t *cpu_speed) {
   pid_t pid;
   int priority;
-  cpu_id_t cpu;
-  
-  cpu = DEFAULT_CPU;
+
   pid = getpid();
 
   // R-Limit

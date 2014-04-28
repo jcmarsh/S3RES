@@ -104,7 +104,7 @@ private:
   player_devaddr_t position_id;
   // Redundant devices provided, one for each of the three replicas
   const char* rep_names[REP_COUNT];
-  player_devaddr_t replicat_lasers;
+  player_devaddr_t replicate_lasers;
   player_devaddr_t cmd_to_rep_planners[REP_COUNT];
   player_devaddr_t data_to_cmd_from_rep_position2ds[REP_COUNT];
 
@@ -238,10 +238,10 @@ VoterBDriver::VoterBDriver(ConfigFile* cf, int section)
   }
 
   // Check for provided laser
-  memset(&(this->replicat_lasers), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->replicat_lasers), section, "provides",
+  memset(&(this->replicate_lasers), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->replicate_lasers), section, "provides",
 			 PLAYER_LASER_CODE, -1, NULL) == 0) {
-    if (this->AddInterface(this->replicat_lasers) != 0) {
+    if (this->AddInterface(this->replicate_lasers) != 0) {
       this->SetError(-1);
     }
   }
@@ -301,7 +301,7 @@ int VoterBDriver::MainSetup()
 
   puts("Voter B driver initialising in MainSetup");
 
-  InitTAS(&cpu_speed);
+  InitTAS(DEFAULT_CPU, &cpu_speed);
 
   laser_count = 0;
   laser_last_timestamp = 0.0;
@@ -583,7 +583,7 @@ void VoterBDriver::ProcessLaser(player_laser_data_t &data)
     current = generate_timestamp();
     last = current;
     
-    this->Publish(this->replicat_lasers,
+    this->Publish(this->replicate_lasers,
 		  PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
 		  (void*)&data, 0, NULL, true);
   }
