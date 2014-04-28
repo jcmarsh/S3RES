@@ -369,7 +369,6 @@ void BenchmarkerDriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data
 // Process laser data
 void BenchmarkerDriver::ProcessLaser(player_laser_data_t &data)
 {
-  puts("Bench passing along laser");
   this->Publish(this->replicate_lasers,
 		PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
 		(void*)&data, 0, NULL, true);
@@ -407,12 +406,8 @@ void BenchmarkerDriver::PutCommand(double cmd_speed, double cmd_turnrate)
 }
 
 void BenchmarkerDriver::ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_pos_t &cmd) {
-  puts("Sending command to Voter... maybe");
   this->odom_voter->PutMsg(this->InQueue,
 			   PLAYER_MSGTYPE_CMD,
 			   PLAYER_POSITION2D_CMD_POS,
 			   (void*)&cmd, sizeof(cmd), NULL);
-  //  this->Publish(this->replicate_odom,
-  //		PLAYER_MSGTYPE_CMD, PLAYER_POSITION2D_CMD_POS,
-  //		(void*)&cmd, 0, NULL, true);
 }

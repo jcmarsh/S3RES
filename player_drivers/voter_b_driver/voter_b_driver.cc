@@ -367,9 +367,7 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 				  PLAYER_LASER_DATA_SCAN, this->laser_addr)) {
     // Laser scan update; update scan data
-    printf("Laser Time: %f\tLast Laser Time: %f\n", hdr->timestamp, laser_last_timestamp);
     if ((hdr->timestamp - laser_last_timestamp) < LASER_EPSILON) {
-      puts("Ignoring duplicate");
       // Likely a duplicate message; ignore
     } else {
       laser_last_timestamp = hdr->timestamp;
@@ -557,10 +555,6 @@ int VoterBDriver::SetupLaser()
 void VoterBDriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &data)
 {
   int index = 0;
-  // Also change this info out for use by others
-  player_msghdr_t newhdr = *hdr;
-  newhdr.addr = this->position_id;
-  this->Publish(&newhdr, (void*)&data);
 
   // Need to publish to the replicas
   for (index = 0; index < REP_COUNT; index++) {
@@ -577,7 +571,6 @@ void VoterBDriver::ProcessLaser(player_laser_data_t &data)
   int index = 0;
   timestamp_t current;
 
-  puts("VoterB recieved laser");
   // Ignore first laser update (to give everything a chance to init)
   if (laser_count < INIT_ROUNDS) {
     puts("Ignore first few lasers");
@@ -728,10 +721,6 @@ void VoterBDriver::ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_po
   bool all_sent = true;
   bool non_sent = false;
   int index = 0;
-
-  puts("NEW COMMAND!");
-  puts("NEW COMMAND!");
-  puts("NEW COMMAND!");
 
   next_goal_x = cmd.pos.px;
   next_goal_y = cmd.pos.py;
