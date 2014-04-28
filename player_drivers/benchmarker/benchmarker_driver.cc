@@ -37,10 +37,10 @@ private:
   int ShutdownOdom();
   void ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &data);
 
-  // Set up the laser device
-  int SetupLaser();
-  int ShutdownLaser();
-  void ProcessLaser(player_laser_data_t &);
+  // Set up the ranger device
+  int SetupRanger();
+  int ShutdownRanger();
+  void ProcessRanger(player_ranger_data_range_t &);
 
   // Set up the required position2ds
   void ProcessVelCmdFromVoter(player_msghdr_t* hdr, player_position2d_cmd_vel_t &cmd, int replica_number);
@@ -55,11 +55,11 @@ private:
 
   // Devices provided
   player_devaddr_t replicate_odom; // "actual:localhost:6666:position2d:10"
-  player_devaddr_t replicate_lasers; // "actual:localhost:6666:laser:10"
+  player_devaddr_t replicate_rangers; // "actual:localhost:6666:ranger:10"
   player_devaddr_t cmd_planner;
   player_devaddr_t cmd_out_odom; // "original:localhost:6666:position2d:1"
 
-  // Required devices (odometry and laser)
+  // Required devices (odometry and ranger)
   // Odometry Device info
   Device *odom;
   player_devaddr_t odom_addr; // "original:localhost:6666:position2d:0"
@@ -68,11 +68,11 @@ private:
   Device *odom_voter;
   player_devaddr_t odom_voter_addr; // "original:localhost:6666:position2d:0"
 
-  // Laser Device info
-  double laser_last_timestamp;
-  int laser_count;
-  Device *laser;
-  player_devaddr_t laser_addr; // "original:localhost:6666:laser:0"
+  // Ranger Device info
+  double ranger_last_timestamp;
+  int ranger_count;
+  Device *ranger;
+  player_devaddr_t ranger_addr; // "original:localhost:6666:ranger:0"
 
   double curr_goal_x, curr_goal_y, curr_goal_a; // Current goal for planners
 
@@ -123,11 +123,11 @@ BenchmarkerDriver::BenchmarkerDriver(ConfigFile* cf, int section)
     }
   }
 
-  // Check for provided laser
-  memset(&(this->replicate_lasers), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->replicate_lasers), section, "provides",
-			 PLAYER_LASER_CODE, -1, "actual") == 0) {
-    if (this->AddInterface(this->replicate_lasers) != 0) {
+  // Check for provided ranger
+  memset(&(this->replicate_rangers), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->replicate_rangers), section, "provides",
+			 PLAYER_RANGER_CODE, -1, "actual") == 0) {
+    if (this->AddInterface(this->replicate_rangers) != 0) {
       this->SetError(-1);
     }
   }
@@ -171,12 +171,12 @@ BenchmarkerDriver::BenchmarkerDriver(ConfigFile* cf, int section)
     return;
   }
 
-  // LASER!
-  this->laser = NULL;
-  memset(&(this->laser_addr), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->laser_addr), section, "requires",
-			 PLAYER_LASER_CODE, -1, "original") != 0) {
-    PLAYER_ERROR("Could not find required laser device!");
+  // RANGER!
+  this->ranger = NULL;
+  memset(&(this->ranger_addr), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->ranger_addr), section, "requires",
+			 PLAYER_RANGER_CODE, -1, "original") != 0) {
+    PLAYER_ERROR("Could not find required ranger device!");
     this->SetError(-1);
     return;
   }
@@ -194,8 +194,8 @@ int BenchmarkerDriver::MainSetup()
 
   InitTAS(3, &cpu_speed);
 
-  laser_count = 0;
-  laser_last_timestamp = 0.0;
+  ranger_count = 0;
+  ranger_last_timestamp = 0.0;
 
   this->curr_goal_x = this->curr_goal_y = this->curr_goal_a = 0;
 
@@ -204,8 +204,8 @@ int BenchmarkerDriver::MainSetup()
     return -1;
   }
 
-  // Initialize the laser
-  if (this->laser_addr.interf && this->SetupLaser() != 0) {
+  // Initialize the ranger
+  if (this->ranger_addr.interf && this->SetupRanger() != 0) {
     return -1;
   }
 
@@ -220,8 +220,8 @@ int BenchmarkerDriver::MainShutdown()
 {
   puts("Shutting Benchmarker driver down");
 
-  if(this->laser)
-    this->ShutdownLaser();
+  if(this->ranger)
+    this->ShutdownRanger();
 
   ShutdownOdom();
 
@@ -244,9 +244,13 @@ int BenchmarkerDriver::ProcessMessage(QueuePointer & resp_queue,
     ProcessOdom(hdr, *reinterpret_cast<player_position2d_data_t *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
-				  PLAYER_LASER_DATA_SCAN, this->laser_addr)) {
-    // Laser scan update; update scan data
-    ProcessLaser(*reinterpret_cast<player_laser_data_t *> (data));
+				  PLAYER_RANGER_DATA_RANGE, this->ranger_addr)) {
+    // Ranger scan update; update scan data
+    ProcessRanger(*reinterpret_cast<player_ranger_data_range_t *> (data));
+    return 0;
+  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
+				  PLAYER_RANGER_DATA_INTNS, this->ranger_addr)) {
+    // we are ignoring the intensity values for now
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
 				  PLAYER_POSITION2D_CMD_POS,
@@ -333,10 +337,10 @@ int BenchmarkerDriver::ShutdownOdom()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Shut down the laser
-int BenchmarkerDriver::ShutdownLaser()
+// Shut down the ranger
+int BenchmarkerDriver::ShutdownRanger()
 {
-  this->laser->Unsubscribe(this->InQueue);
+  this->ranger->Unsubscribe(this->InQueue);
   return 0;
 }
 
@@ -372,15 +376,15 @@ int BenchmarkerDriver::SetupOdom()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Set up the laser
-int BenchmarkerDriver::SetupLaser()
+// Set up the ranger
+int BenchmarkerDriver::SetupRanger()
 {
-  if(!(this->laser = deviceTable->GetDevice(this->laser_addr))) {
-    PLAYER_ERROR("unable to locate suitable laser device");
+  if(!(this->ranger = deviceTable->GetDevice(this->ranger_addr))) {
+    PLAYER_ERROR("unable to locate suitable ranger device");
     return -1;
   }
-  if (this->laser->Subscribe(this->InQueue) != 0) {
-    PLAYER_ERROR("unable to subscribe to laser device");
+  if (this->ranger->Subscribe(this->InQueue) != 0) {
+    PLAYER_ERROR("unable to subscribe to ranger device");
     return -1;
   }
 
@@ -402,13 +406,13 @@ void BenchmarkerDriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Process laser data
-void BenchmarkerDriver::ProcessLaser(player_laser_data_t &data)
+// Process ranger data
+void BenchmarkerDriver::ProcessRanger(player_ranger_data_range_t &data)
 {
   // Set timer
   puts("TIMER START");
-  this->Publish(this->replicate_lasers,
-		PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
+  this->Publish(this->replicate_rangers,
+		PLAYER_MSGTYPE_DATA, PLAYER_RANGER_DATA_RANGE,
 		(void*)&data, 0, NULL, true);
 }
 

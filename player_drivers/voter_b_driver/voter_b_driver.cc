@@ -17,9 +17,7 @@
 #define INIT_ROUNDS 4
 #define MAX_TIME_SECONDS 0.05 // Max time for voting in seconds (50 ms)
 
-#define LASER_EPSILON 0.001
-
-// Either waiting for replicas to vote or waiting for the next round (next laser input).
+// Either waiting for replicas to vote or waiting for the next round (next ranger input).
 // Or a replica has failed and recovery is needed
 typedef enum {
   VOTING,
@@ -71,10 +69,10 @@ private:
   int ShutdownOdom();
   void ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &data);
 
-  // Set up the laser device
-  int SetupLaser();
-  int ShutdownLaser();
-  void ProcessLaser(player_laser_data_t &);
+  // Set up the ranger device
+  int SetupRanger();
+  int ShutdownRanger();
+  void ProcessRanger(player_ranger_data_range_t &);
 
   // Set up the required position2ds
   void ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_cmd_vel_t &cmd, int replica_number);
@@ -106,21 +104,21 @@ private:
   player_devaddr_t position_id;
   // Redundant devices provided, one for each of the three replicas
   const char* rep_names[REP_COUNT];
-  player_devaddr_t replicate_lasers;
+  player_devaddr_t replicate_rangers;
   player_devaddr_t cmd_to_rep_planners[REP_COUNT];
   player_devaddr_t data_to_cmd_from_rep_position2ds[REP_COUNT];
 
 
-  // Required devices (odometry and laser)
+  // Required devices (odometry and ranger)
   // Odometry Device info
   Device *odom;
   player_devaddr_t odom_addr;
 
-  // Laser Device info
-  double laser_last_timestamp;
-  int laser_count;
-  Device *laser;
-  player_devaddr_t laser_addr;
+  // Ranger Device info
+  double ranger_last_timestamp;
+  int ranger_count;
+  Device *ranger;
+  player_devaddr_t ranger_addr;
 
   // The voting information and input duplication stuff could be part of the replica struct....
   // Input Duplication stuff
@@ -239,11 +237,11 @@ VoterBDriver::VoterBDriver(ConfigFile* cf, int section)
     }
   }
 
-  // Check for provided laser
-  memset(&(this->replicate_lasers), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->replicate_lasers), section, "provides",
-			 PLAYER_LASER_CODE, -1, NULL) == 0) {
-    if (this->AddInterface(this->replicate_lasers) != 0) {
+  // Check for provided ranger
+  memset(&(this->replicate_rangers), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->replicate_rangers), section, "provides",
+			 PLAYER_RANGER_CODE, -1, NULL) == 0) {
+    if (this->AddInterface(this->replicate_rangers) != 0) {
       this->SetError(-1);
     }
   }
@@ -282,12 +280,12 @@ VoterBDriver::VoterBDriver(ConfigFile* cf, int section)
     return;
   }
 
-  // LASER!
-  this->laser = NULL;
-  memset(&(this->laser_addr), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->laser_addr), section, "requires",
-			 PLAYER_LASER_CODE, -1, "actual") != 0) {
-    PLAYER_ERROR("Could not find required laser device!");
+  // RANGER!
+  this->ranger = NULL;
+  memset(&(this->ranger_addr), 0, sizeof(player_devaddr_t));
+  if (cf->ReadDeviceAddr(&(this->ranger_addr), section, "requires",
+			 PLAYER_RANGER_CODE, -1, "actual") != 0) {
+    PLAYER_ERROR("Could not find required ranger device!");
     this->SetError(-1);
     return;
   }
@@ -305,8 +303,8 @@ int VoterBDriver::MainSetup()
 
   InitTAS(DEFAULT_CPU, &cpu_speed);
 
-  laser_count = 0;
-  laser_last_timestamp = 0.0;
+  ranger_count = 0;
+  ranger_last_timestamp = 0.0;
 
   this->curr_goal_x = this->curr_goal_y = this->curr_goal_a = 0;
   this->next_goal_x = this->next_goal_y = this->next_goal_a = 0;
@@ -319,8 +317,8 @@ int VoterBDriver::MainSetup()
     return -1;
   }
 
-  // Initialize the laser
-  if (this->laser_addr.interf && this->SetupLaser() != 0) {
+  // Initialize the ranger
+  if (this->ranger_addr.interf && this->SetupRanger() != 0) {
     return -1;
   }
 
@@ -341,8 +339,8 @@ int VoterBDriver::MainShutdown()
 {
   puts("Shutting Voter B driver down");
 
-  if(this->laser)
-    this->ShutdownLaser();
+  if(this->ranger)
+    this->ShutdownRanger();
 
   ShutdownOdom();
 
@@ -365,14 +363,14 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
     ProcessOdom(hdr, *reinterpret_cast<player_position2d_data_t *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
-				  PLAYER_LASER_DATA_SCAN, this->laser_addr)) {
-    // Laser scan update; update scan data
-    if ((hdr->timestamp - laser_last_timestamp) < LASER_EPSILON) {
-      // Likely a duplicate message; ignore
-    } else {
-      laser_last_timestamp = hdr->timestamp;
-      ProcessLaser(*reinterpret_cast<player_laser_data_t *> (data));
-    }
+				  PLAYER_RANGER_DATA_RANGE, this->ranger_addr)) {
+    // Ranger scan update; update scan data
+    ranger_last_timestamp = hdr->timestamp;
+    ProcessRanger(*reinterpret_cast<player_ranger_data_range *> (data));
+    return 0;
+  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
+				  PLAYER_RANGER_DATA_INTNS, this->ranger_addr)) {
+    // Ignore intensty readings from the ranger
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
 				  PLAYER_POSITION2D_CMD_POS,
@@ -451,7 +449,7 @@ void VoterBDriver::DoOneUpdate() {
     elapsed_time_seconds += timestamp_to_realtime(current - last, cpu_speed);
   }
 
-  if (laser_count < INIT_ROUNDS) {
+  if (ranger_count < INIT_ROUNDS) {
     // Have not started running yet
   } else if ((elapsed_time_seconds > MAX_TIME_SECONDS) && (vote_stat == VOTING)) {
     // Shit has gone down. Trigger a restart as needed.
@@ -509,10 +507,10 @@ int VoterBDriver::ShutdownOdom()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Shut down the laser
-int VoterBDriver::ShutdownLaser()
+// Shut down the ranger
+int VoterBDriver::ShutdownRanger()
 {
-  this->laser->Unsubscribe(this->InQueue);
+  this->ranger->Unsubscribe(this->InQueue);
   return 0;
 }
 
@@ -535,15 +533,15 @@ int VoterBDriver::SetupOdom()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Set up the laser
-int VoterBDriver::SetupLaser()
+// Set up the ranger
+int VoterBDriver::SetupRanger()
 {
-  if(!(this->laser = deviceTable->GetDevice(this->laser_addr))) {
-    PLAYER_ERROR("unable to locate suitable laser device");
+  if(!(this->ranger = deviceTable->GetDevice(this->ranger_addr))) {
+    PLAYER_ERROR("unable to locate suitable ranger device");
     return -1;
   }
-  if (this->laser->Subscribe(this->InQueue) != 0) {
-    PLAYER_ERROR("unable to subscribe to laser device");
+  if (this->ranger->Subscribe(this->InQueue) != 0) {
+    PLAYER_ERROR("unable to subscribe to ranger device");
     return -1;
   }
 
@@ -565,24 +563,24 @@ void VoterBDriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &d
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Process laser data
-void VoterBDriver::ProcessLaser(player_laser_data_t &data)
+// Process ranger data
+void VoterBDriver::ProcessRanger(player_ranger_data_range_t &data)
 {
   int index = 0;
   timestamp_t current;
 
-  // Ignore first laser update (to give everything a chance to init)
-  if (laser_count < INIT_ROUNDS) {
-    puts("Ignore first few lasers");
-    laser_count++;
+  // Ignore first ranger update (to give everything a chance to init)
+  if (ranger_count < INIT_ROUNDS) {
+    puts("Ignore first few rangers");
+    ranger_count++;
   } else {
-    puts("New Laser Data");
+    puts("New Ranger Data");
     vote_stat = VOTING;
     current = generate_timestamp();
     last = current;
     
-    this->Publish(this->replicate_lasers,
-		  PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
+    this->Publish(this->replicate_rangers,
+		  PLAYER_MSGTYPE_DATA, PLAYER_RANGER_DATA_RANGE,
 		  (void*)&data, 0, NULL, true);
   }
 }

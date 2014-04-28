@@ -24,7 +24,7 @@
 playerc_client_t *client;
 playerc_position2d_t *pos2d; // Check position, send velocity command
 playerc_planner_t *planner; // Check for new position goals
-playerc_laser_t *laser; // laser sensor readings
+playerc_ranger_t *ranger; // ranger sensor readings
 
 // Controller state
 bool active_goal;
@@ -32,8 +32,8 @@ double goal_x, goal_y, goal_a;
 
 // Position
 double pos_x, pos_y, pos_a;
-int laser_count;
-double laser_ranges[365]; // 365 comes from somewhere in Player as the max.
+int ranger_count;
+double ranger_ranges[365]; // 365 comes from somewhere in Player as the max.
 
 char ip_address[17];
 char port_number[10];
@@ -118,16 +118,16 @@ int createConnections(char * ip, char * port, int id) {
     return -1;
   }
 
-  laser = playerc_laser_create(client, 2);
-  if (playerc_laser_subscribe(laser, PLAYER_OPEN_MODE)) {
+  ranger = playerc_ranger_create(client, 2);
+  if (playerc_ranger_subscribe(ranger, PLAYER_OPEN_MODE)) {
     return -1;
   }
   return 0;
 }
 
 void shutdownArtPot() {
-  playerc_laser_unsubscribe(laser);
-  playerc_laser_destroy(laser);
+  playerc_ranger_unsubscribe(ranger);
+  playerc_ranger_destroy(ranger);
   playerc_planner_unsubscribe(planner);
   playerc_planner_destroy(planner);
   playerc_position2d_unsubscribe(pos2d);
@@ -165,11 +165,11 @@ void command() {
   // TODO: Now will not react to obstacles while at a waypoint. Even moving ones.
   if (dist > DIST_EPSILON) {
     // Makes the assumption that scans are evenly spaced around the robot.
-    for (i = 0; i < laser_count; i++) {
+    for (i = 0; i < ranger_count; i++) {
       // figure out location of the obstacle...
-      tao = (2 * M_PI * i) / laser_count;
-      obs_x = laser_ranges[i] * cos(tao);
-      obs_y = laser_ranges[i] * sin(tao);
+      tao = (2 * M_PI * i) / ranger_count;
+      obs_x = ranger_ranges[i] * cos(tao);
+      obs_y = ranger_ranges[i] * sin(tao);
       // obs.x and obs.y are relative to the robot, and I'm okay with that.
       dist = sqrt(pow(obs_x, 2) + pow(obs_y, 2));
       theta = atan2(obs_y, obs_x);
@@ -215,14 +215,14 @@ void enterLoop() {
       //      puts("CLIENT UPDATED");
     } else if (update_id == planner->info.id) { // planner? shouldn't be updating here.
       //      puts("PLANNER UPDATED");
-    } else if (update_id == laser->info.id) {   // laser readings update
-      //      puts("LASER UPDATED");     
+    } else if (update_id == ranger->info.id) {   // ranger readings update
+      //      puts("RANGER UPDATED");     
       pos_x = pos2d->px;
       pos_y = pos2d->py;
       pos_a = pos2d->pa;
-      laser_count = laser->scan_count;
-      for (index = 0; index < laser_count; index++) {
-	laser_ranges[index] = laser->ranges[index];
+      ranger_count = ranger->ranges_count;
+      for (index = 0; index < ranger_count; index++) {
+	ranger_ranges[index] = ranger->ranges[index];
       }
       // Calculates and sends the new command
       command(); 
