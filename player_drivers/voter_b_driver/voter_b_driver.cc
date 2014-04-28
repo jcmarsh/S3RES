@@ -17,6 +17,8 @@
 #define INIT_ROUNDS 4
 #define MAX_TIME_SECONDS 0.05 // Max time for voting in seconds (50 ms)
 
+#define LASER_EPSILON 0.001
+
 // Either waiting for replicas to vote or waiting for the next round (next laser input).
 // Or a replica has failed and recovery is needed
 typedef enum {
@@ -365,7 +367,9 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 				  PLAYER_LASER_DATA_SCAN, this->laser_addr)) {
     // Laser scan update; update scan data
-    if (laser_last_timestamp == hdr->timestamp) {
+    printf("Laser Time: %f\tLast Laser Time: %f\n", hdr->timestamp, laser_last_timestamp);
+    if ((hdr->timestamp - laser_last_timestamp) < LASER_EPSILON) {
+      puts("Ignoring duplicate");
       // Likely a duplicate message; ignore
     } else {
       laser_last_timestamp = hdr->timestamp;
@@ -424,7 +428,7 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
       }
     }
     
-    puts("I don't know what to do with that.");
+    puts("VoterB: I don't know what to do with that.");
     // Message not dealt with with
     return -1;
   }
@@ -573,6 +577,7 @@ void VoterBDriver::ProcessLaser(player_laser_data_t &data)
   int index = 0;
   timestamp_t current;
 
+  puts("VoterB recieved laser");
   // Ignore first laser update (to give everything a chance to init)
   if (laser_count < INIT_ROUNDS) {
     puts("Ignore first few lasers");
@@ -723,6 +728,10 @@ void VoterBDriver::ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_po
   bool all_sent = true;
   bool non_sent = false;
   int index = 0;
+
+  puts("NEW COMMAND!");
+  puts("NEW COMMAND!");
+  puts("NEW COMMAND!");
 
   next_goal_x = cmd.pos.px;
   next_goal_y = cmd.pos.py;

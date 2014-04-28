@@ -49,19 +49,21 @@ private:
 
   // Commands for the position device
   void PutCommand(double speed, double turnrate);
-
-  // Check for new commands
-  void ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_pos_t &);
+  void ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_pos_t &cmd);
 
   // Devices provided
-  player_devaddr_t replicate_odom; // "tovoter:localhost:6666:position2d:10"
-  player_devaddr_t replicate_lasers; // "tovoter:localhost:6666:laser:10"
+  player_devaddr_t replicate_odom; // "actual:localhost:6666:position2d:10"
+  player_devaddr_t replicate_lasers; // "actual:localhost:6666:laser:10"
   player_devaddr_t cmd_out_odom; // "original:localhost:6666:position2d:1"
 
   // Required devices (odometry and laser)
   // Odometry Device info
   Device *odom;
   player_devaddr_t odom_addr; // "original:localhost:6666:position2d:0"
+
+  // Odometry Device to Voter
+  Device *odom_voter;
+  player_devaddr_t odom_voter_addr; // "original:localhost:6666:position2d:0"
 
   // Laser Device info
   double laser_last_timestamp;
@@ -109,7 +111,7 @@ BenchmarkerDriver::BenchmarkerDriver(ConfigFile* cf, int section)
   // Check for position2d (we provide)
   memset(&(this->replicate_odom), 0, sizeof(player_devaddr_t));
   if (cf->ReadDeviceAddr(&(this->replicate_odom), section, "provides",
-			 PLAYER_POSITION2D_CODE, -1, "tovoter") == 0) {
+			 PLAYER_POSITION2D_CODE, -1, "actual") == 0) {
     if (this->AddInterface(this->replicate_odom) != 0) {
       this->SetError(-1);
       return;
@@ -119,7 +121,7 @@ BenchmarkerDriver::BenchmarkerDriver(ConfigFile* cf, int section)
   // Check for provided laser
   memset(&(this->replicate_lasers), 0, sizeof(player_devaddr_t));
   if (cf->ReadDeviceAddr(&(this->replicate_lasers), section, "provides",
-			 PLAYER_LASER_CODE, -1, "tovoter") == 0) {
+			 PLAYER_LASER_CODE, -1, "actual") == 0) {
     if (this->AddInterface(this->replicate_lasers) != 0) {
       this->SetError(-1);
     }
@@ -141,6 +143,15 @@ BenchmarkerDriver::BenchmarkerDriver(ConfigFile* cf, int section)
   if (cf->ReadDeviceAddr(&(this->odom_addr), section, "requires",
 			 PLAYER_POSITION2D_CODE, -1, "original") != 0) {
     PLAYER_ERROR("Could not find required position2d device!");
+    this->SetError(-1);
+    return;
+  }
+
+  // Check for position2d to the voter
+  this->odom_voter = NULL;
+  if (cf->ReadDeviceAddr(&(this->odom_voter_addr), section, "requires",
+			 PLAYER_POSITION2D_CODE, -1, "actual") != 0) {
+    PLAYER_ERROR("Could not find required position2d device: odom_voter");
     this->SetError(-1);
     return;
   }
@@ -223,10 +234,8 @@ int BenchmarkerDriver::ProcessMessage(QueuePointer & resp_queue,
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
 				  PLAYER_POSITION2D_CMD_POS,
 				  this->cmd_out_odom)) {
-    // Set a new goal position for the control to try to achieve.
     assert(hdr->size == sizeof(player_position2d_cmd_pos_t));
     ProcessCommand(hdr, *reinterpret_cast<player_position2d_cmd_pos_t *> (data));
-    return 0;
   } else { 
     // Check for commands from voter
     if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
@@ -238,7 +247,7 @@ int BenchmarkerDriver::ProcessMessage(QueuePointer & resp_queue,
       return 0;
     }
   
-    puts("I don't know what to do with that.");
+    puts("Benchmarker: I don't know what to do with that.");
     // Message not dealt with with
     return -1;
   }
@@ -284,6 +293,7 @@ int BenchmarkerDriver::ShutdownOdom()
   this->PutCommand(0, 0);
 
   this->odom->Unsubscribe(this->InQueue);
+  this->odom_voter->Unsubscribe(this->InQueue);
   return 0;
 }
 
@@ -301,14 +311,26 @@ int BenchmarkerDriver::SetupOdom()
 {
   if(!(this->odom = deviceTable->GetDevice(this->odom_addr)))
   {
-    PLAYER_ERROR("unable to locate suitable position device");
+    PLAYER_ERROR("ODOM: unable to locate suitable position device");
     return -1;
   }
   if(this->odom->Subscribe(this->InQueue) != 0)
   {
-    PLAYER_ERROR("unable to subscribe to position device");
+    PLAYER_ERROR("ODOM: unable to subscribe to position device");
     return -1;
   }
+
+  if(!(this->odom_voter = deviceTable->GetDevice(this->odom_voter_addr)))
+  {
+    PLAYER_ERROR("ODOM_VOTER: unable to locate suitable position device");
+    return -1;
+  }
+  if(this->odom_voter->Subscribe(this->InQueue) != 0)
+  {
+    PLAYER_ERROR("ODOM_VOTER: unable to subscribe to position device");
+    return -1;
+  }
+
 
   return 0;
 }
@@ -347,6 +369,7 @@ void BenchmarkerDriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data
 // Process laser data
 void BenchmarkerDriver::ProcessLaser(player_laser_data_t &data)
 {
+  puts("Bench passing along laser");
   this->Publish(this->replicate_lasers,
 		PLAYER_MSGTYPE_DATA, PLAYER_LASER_DATA_SCAN,
 		(void*)&data, 0, NULL, true);
@@ -381,4 +404,15 @@ void BenchmarkerDriver::PutCommand(double cmd_speed, double cmd_turnrate)
 		     PLAYER_MSGTYPE_CMD,
 		     PLAYER_POSITION2D_CMD_VEL,
 		     (void*)&cmd, sizeof(cmd), NULL);
+}
+
+void BenchmarkerDriver::ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_pos_t &cmd) {
+  puts("Sending command to Voter... maybe");
+  this->odom_voter->PutMsg(this->InQueue,
+			   PLAYER_MSGTYPE_CMD,
+			   PLAYER_POSITION2D_CMD_POS,
+			   (void*)&cmd, sizeof(cmd), NULL);
+  //  this->Publish(this->replicate_odom,
+  //		PLAYER_MSGTYPE_CMD, PLAYER_POSITION2D_CMD_POS,
+  //		(void*)&cmd, 0, NULL, true);
 }
