@@ -69,7 +69,6 @@ private:
   player_devaddr_t odom_voter_addr; // "original:localhost:6666:position2d:0"
 
   // Ranger Device info
-  double ranger_last_timestamp;
   int ranger_count;
   Device *ranger;
   player_devaddr_t ranger_addr; // "original:localhost:6666:ranger:0"
@@ -77,14 +76,11 @@ private:
   double curr_goal_x, curr_goal_y, curr_goal_a; // Current goal for planners
 
   // TAS Stuff
-  pid_t pid;
-  int priority;
   cpu_speed_t cpu_speed;
-  cpu_id_t cpu;
 
   // timing
   timestamp_t last;
-  realtime_t elapsed_time_seconds;
+  //  realtime_t elapsed_time_seconds;
 };
 
 // A factory creation function, declared outside of the class so that it
@@ -195,7 +191,6 @@ int BenchmarkerDriver::MainSetup()
   InitTAS(3, &cpu_speed);
 
   ranger_count = 0;
-  ranger_last_timestamp = 0.0;
 
   this->curr_goal_x = this->curr_goal_y = this->curr_goal_a = 0;
 
@@ -294,7 +289,7 @@ void BenchmarkerDriver::SendWaypoints(QueuePointer & resp_queue) {
 
 void BenchmarkerDriver::Main() {
   for(;;) {
-    Wait(0.001);
+    Wait(0.0001);
     this->DoOneUpdate();
     pthread_testcancel();
   }
@@ -410,7 +405,7 @@ void BenchmarkerDriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data
 void BenchmarkerDriver::ProcessRanger(player_ranger_data_range_t &data)
 {
   // Set timer
-  puts("TIMER START");
+  //  last = generate_timestamp();
   this->Publish(this->replicate_rangers,
 		PLAYER_MSGTYPE_DATA, PLAYER_RANGER_DATA_RANGE,
 		(void*)&data, 0, NULL, true);
@@ -422,9 +417,11 @@ void BenchmarkerDriver::ProcessRanger(player_ranger_data_range_t &data)
 void BenchmarkerDriver::ProcessVelCmdFromVoter(player_msghdr_t* hdr, player_position2d_cmd_vel_t &cmd, int replica_num) {
   double cmd_vel = 0.0;
   double cmd_rot_vel = 0.0;
+  timestamp_t current;
 
   // Stop timer and report
-  puts("TIMER STOP");
+  //current = generate_timestamp();
+  //printf("TIME: %lf\n", timestamp_to_realtime(current - last, cpu_speed));
 
   cmd_vel = cmd.vel.px;
   cmd_rot_vel = cmd.vel.pa;

@@ -115,7 +115,6 @@ private:
   player_devaddr_t odom_addr;
 
   // Ranger Device info
-  double ranger_last_timestamp;
   int ranger_count;
   Device *ranger;
   player_devaddr_t ranger_addr;
@@ -304,7 +303,6 @@ int VoterBDriver::MainSetup()
   InitTAS(DEFAULT_CPU, &cpu_speed);
 
   ranger_count = 0;
-  ranger_last_timestamp = 0.0;
 
   this->curr_goal_x = this->curr_goal_y = this->curr_goal_a = 0;
   this->next_goal_x = this->next_goal_y = this->next_goal_a = 0;
@@ -365,7 +363,6 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 				  PLAYER_RANGER_DATA_RANGE, this->ranger_addr)) {
     // Ranger scan update; update scan data
-    ranger_last_timestamp = hdr->timestamp;
     ProcessRanger(*reinterpret_cast<player_ranger_data_range *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
@@ -432,7 +429,7 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
 
 void VoterBDriver::Main() {
   for(;;) {
-    Wait(0.001);
+    Wait(0.0001);
     this->DoOneUpdate();
     pthread_testcancel();
   }
@@ -571,10 +568,9 @@ void VoterBDriver::ProcessRanger(player_ranger_data_range_t &data)
 
   // Ignore first ranger update (to give everything a chance to init)
   if (ranger_count < INIT_ROUNDS) {
-    puts("Ignore first few rangers");
+    //    puts("Ignore first few rangers");
     ranger_count++;
   } else {
-    puts("New Ranger Data");
     vote_stat = VOTING;
     current = generate_timestamp();
     last = current;
@@ -652,7 +648,7 @@ void VoterBDriver::ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_
   double cmd_vel = 0.0;
   double cmd_rot_vel = 0.0;
 
-  printf("VOTE rep: %d - %f\t%f\n", replica_num, cmd.vel.px, cmd.vel.pa);
+  //  printf("VOTE rep: %d - %f\t%f\n", replica_num, cmd.vel.px, cmd.vel.pa);
   
   if (reporting[replica_num] == true) {
     // If vote is same as previous, then ignore.
