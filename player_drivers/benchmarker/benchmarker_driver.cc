@@ -12,7 +12,7 @@
 #include <libplayercore/playercore.h>
 
 #include "../../include/taslimited.h"
-
+#include "../../include/statstime.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // The class for the driver
@@ -241,6 +241,7 @@ int BenchmarkerDriver::ProcessMessage(QueuePointer & resp_queue,
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 				  PLAYER_RANGER_DATA_RANGE, this->ranger_addr)) {
     // Ranger scan update; update scan data
+
     ProcessRanger(*reinterpret_cast<player_ranger_data_range_t *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
@@ -404,11 +405,21 @@ void BenchmarkerDriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data
 // Process ranger data
 void BenchmarkerDriver::ProcessRanger(player_ranger_data_range_t &data)
 {
-  // Set timer
-  //  last = generate_timestamp();
+#ifdef _STATS_RANGER_BENCH_OUT_
+  timestamp_t current;
+  current = generate_timestamp();
+#endif
+
+#ifdef _STATS_BENCH_ROUND_TRIP_
+  last = generate_timestamp();
+#endif // _STATS_BENCH_ROUND_TRIP_
+
   this->Publish(this->replicate_rangers,
 		PLAYER_MSGTYPE_DATA, PLAYER_RANGER_DATA_RANGE,
 		(void*)&data, 0, NULL, true);
+#ifdef _STATS_RANGER_BENCH_OUT_
+  printf("RANGER left bench at: %lf\n", timestamp_to_realtime(current, cpu_speed));
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -420,8 +431,10 @@ void BenchmarkerDriver::ProcessVelCmdFromVoter(player_msghdr_t* hdr, player_posi
   timestamp_t current;
 
   // Stop timer and report
-  //current = generate_timestamp();
-  //printf("TIME: %lf\n", timestamp_to_realtime(current - last, cpu_speed));
+#ifdef _STATS_BENCH_ROUND_TRIP_
+  current = generate_timestamp();
+  printf("TIME: %lf\n", timestamp_to_realtime(current - last, cpu_speed));
+#endif // _STATS_BENCH_ROUND_TRIP_
 
   cmd_vel = cmd.vel.px;
   cmd_rot_vel = cmd.vel.pa;

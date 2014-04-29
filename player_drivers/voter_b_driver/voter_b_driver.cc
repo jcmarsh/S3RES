@@ -12,6 +12,7 @@
 #include <libplayercore/playercore.h>
 
 #include "../../include/taslimited.h"
+#include "../../include/statstime.h"
 
 #define REP_COUNT 3
 #define INIT_ROUNDS 4
@@ -352,6 +353,7 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
                                   player_msghdr * hdr,
                                   void * data)
 {
+  timestamp_t current;
   int index = 0;
 
   if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
@@ -363,6 +365,10 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 				  PLAYER_RANGER_DATA_RANGE, this->ranger_addr)) {
     // Ranger scan update; update scan data
+#ifdef _STATS_RANGER_VOTE_IN_
+    current = generate_timestamp();
+    printf("RANGER reached voter at: %lf\n", timestamp_to_realtime(current, cpu_speed));
+#endif
     ProcessRanger(*reinterpret_cast<player_ranger_data_range *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
@@ -578,6 +584,9 @@ void VoterBDriver::ProcessRanger(player_ranger_data_range_t &data)
     this->Publish(this->replicate_rangers,
 		  PLAYER_MSGTYPE_DATA, PLAYER_RANGER_DATA_RANGE,
 		  (void*)&data, 0, NULL, true);
+#ifdef _STATS_RANGER_VOTE_OUT_
+    printf("RANGER left vote at: %lf\n", timestamp_to_realtime(current, cpu_speed));
+#endif
   }
 }
 

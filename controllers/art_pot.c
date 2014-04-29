@@ -104,7 +104,7 @@ int createConnections(char * ip, char * port, int id) {
     return -1;
   }
 
-  playerc_client_datamode(client, PLAYERC_DATAMODE_PUSH);
+  playerc_client_datamode(client, PLAYERC_DATAMODE_PULL);
   
   // TODO: I can't imagine it is acceptable to use atoi() unchecked.
   // Subscribe to a redundant driver so that it will run!
@@ -209,46 +209,40 @@ void enterLoop() {
   int index;
   timestamp_t last;
   timestamp_t current;
+  double last_ranger;
+  double current_ranger;
 
   while(1) { // while something else.
     //read_ret = playerc_client_read_nonblock_withproxy(client, &update_id);
     update_id = playerc_client_read(client);
 
-    // figure out type of update from read
-    //if (read_ret == 0) {
-      // nothing to update
-    //} else if (read_ret == 1) {
-      if (update_id == client->id) {         // client update?
-	//      puts("CLIENT UPDATED");
-      } else if (update_id == planner->info.id) { // planner? shouldn't be updating here.
-	//      puts("PLANNER UPDATED");
-      } else if (update_id == ranger->info.id) {   // ranger readings update
-	//      puts("RANGER UPDATED");     
-	//last = generate_timestamp();
-	pos_x = pos2d->px;
-	pos_y = pos2d->py;
-	pos_a = pos2d->pa;
-	ranger_count = ranger->ranges_count;
-	for (index = 0; index < ranger_count; index++) {
-	  ranger_ranges[index] = ranger->ranges[index];
-	}
-	// Calculates and sends the new command
-	command(); 
-	//current = generate_timestamp();
-	//printf("TIME: %lf\n", timestamp_to_realtime(current - last, cpu_speed));
+    printf("Timestamps %f\t%f\n", pos2d->info.datatime, ranger->info.datatime);
+    pos_x = pos2d->px;
+    pos_y = pos2d->py;
+    pos_a = pos2d->pa;
+    
+    ranger_count = ranger->ranges_count;
+    for (index = 0; index < ranger_count; index++) {
+      ranger_ranges[index] = ranger->ranges[index];
+    }
 
-      } else if (update_id == pos2d->info.id) {
-	//      puts("POSITION2D UPDATED");
-      } else if (update_id == NULL) {
-	puts("ERROR: client read error (NULL).");
-	//      exit(-1);
-      } else {
-	puts("UNKNOWN");
+    current_ranger = ranger->info.datatime;
+    if (last_ranger != current_ranger) {
+      // Calculates and sends the new command
+      command();
+    } else {
+      playerc_client_read(client);
+      ranger_count = ranger->ranges_count;
+      for (index = 0; index < ranger_count; index++) {
+	ranger_ranges[index] = ranger->ranges[index];
       }
-      //} else {
-      //  puts("ERROR: client read error (-1).");
-      //}
-      //      printf("\t update_id: %p\n", update_id);
+      printf("\tCrazyTime %f\t%f\n", current_ranger, ranger->info.datatime);
+      command();
+    }
+    last_ranger = current_ranger;
+
+    //current = generate_timestamp();
+    //printf("TIME: %lf\n", timestamp_to_realtime(current - last, cpu_speed));
   }
 }
 
