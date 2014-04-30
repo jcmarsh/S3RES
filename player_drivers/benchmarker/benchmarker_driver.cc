@@ -433,7 +433,8 @@ void BenchmarkerDriver::ProcessVelCmdFromVoter(player_msghdr_t* hdr, player_posi
   // Stop timer and report
 #ifdef _STATS_BENCH_ROUND_TRIP_
   current = generate_timestamp();
-  printf("TIME: %lf\n", timestamp_to_realtime(current - last, cpu_speed));
+  //  printf("TIME: %lf\n", timestamp_to_realtime(current - last, cpu_speed));
+  printf("%lf\n", timestamp_to_realtime(current - last, cpu_speed));
 #endif // _STATS_BENCH_ROUND_TRIP_
 
   cmd_vel = cmd.vel.px;

@@ -10,8 +10,8 @@
 // Half stats
 //#define _STATS_RANGER_BENCH_OUT_
 //#define _STATS_RANGER_VOTE_IN_
-#define _STATS_RANGER_VOTE_OUT_
-#define _STATS_RANGER_CONT_IN_
+//#define _STATS_RANGER_VOTE_OUT_
+//#define _STATS_RANGER_CONT_IN_
 //#define _STATS_CMD_CONT_OUT_
 //#define _STATS_CMD_VOTE_IN_
 //#define _STATS_CMD_VOTE_OUT_

@@ -161,7 +161,6 @@ void command() {
     vel_cmd[1] = VEL_SCALE * vel_cmd[1];
 
     // Write move command
-    printf("ArtPot: Writing out to fd: %d\n", write_out_fd);
     write(write_out_fd, &hdr, sizeof(struct comm_header));
 
     write(write_out_fd, vel_cmd, hdr.byte_count);
@@ -196,17 +195,15 @@ void enterLoop() {
     // This is how to read the ranges_count
     read_ret = read(read_in_fd, &hdr, sizeof(struct comm_header));
     if (read_ret > 0) {
+      assert(read_ret == sizeof(struct comm_header));
       switch (hdr.type) {
       case COMM_RANGE_DATA:
 	read_ret = read(read_in_fd, ranger_ranges, hdr.byte_count);
-	if (read_ret > 0) { // process the ranger data and run command routine
-	  ranger_count = read_ret / sizeof(double);
-      
-	  printf("\tRead %d ranges!\n", ranger_count);
+	ranger_count = read_ret / sizeof(double);      
+	assert(read_ret == hdr.byte_count);
 
-	  // Calculates and sends the new command
-	  command();
-	}
+	// Calculates and sends the new command
+	command();
 	break;
       case COMM_POS_DATA:
 	//	printf("Recieved Position Data\n");
@@ -222,8 +219,10 @@ void enterLoop() {
 	// TODO: Fail? or drop data?
 	printf("ERROR: art_pot_p can't handle comm type: %d\n", hdr.type);
       }
+    } else if (read_ret == -1) {
+      perror("Blocking, eh?");
     } else {
-      usleep(1);
+      puts("WHAT THE HELL DOES THIS MEAN?");
     }
   }
 }

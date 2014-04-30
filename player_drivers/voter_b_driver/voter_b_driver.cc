@@ -18,7 +18,7 @@
 
 #define REP_COUNT 3
 #define INIT_ROUNDS 4
-#define MAX_TIME_SECONDS 0.05 // Max time for voting in seconds (50 ms)
+#define MAX_TIME_SECONDS 0.005 // Max time for voting in seconds (50 ms)
 
 // Either waiting for replicas to vote or waiting for the next round (next ranger input).
 // Or a replica has failed and recovery is needed
@@ -71,7 +71,7 @@ private:
   void ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_pos_t &);
 
   // Send the same waypoints as each replica requests it.
-  void SendWaypoints(QueuePointer & resp_queue, int replica_num);
+  void SendWaypoints(int replica_num);
 
   // reset / init voting state.
   void ResetVotingState();
@@ -444,7 +444,6 @@ void VoterBDriver::DoOneUpdate() {
 	this->SendWaypoints(index);
 	break;
       case COMM_MOV_CMD:
-	printf("VoterB: Recieved a move command!\n");
 	retval = read(replicas[index].pipefd_outof_rep[0], cmd_vel, hdr.byte_count);
 	assert(retval == hdr.byte_count);
 	this->ProcessVelCmdFromRep(cmd_vel[0], cmd_vel[1], index);
@@ -648,7 +647,7 @@ void VoterBDriver::ProcessVelCmdFromRep(double cmd_vel_x, double cmd_vel_a, int 
   double cmd_vel = 0.0;
   double cmd_rot_vel = 0.0;
 
-  printf("VOTE rep: %d - %f\t%f\n", replica_num, cmd_vel_x, cmd_vel_a);
+  //  printf("VOTE rep: %d - %f\t%f\n", replica_num, cmd_vel_x, cmd_vel_a);
   
   if (reporting[replica_num] == true) {
     // If vote is same as previous, then ignore.

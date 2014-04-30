@@ -12,20 +12,19 @@ int initReplicas(struct replica_group* rg, struct replica* reps, int num) {
   // Init three replicas
   for (index = 0; index < rg->num; index++) {
     //    printf("Initing index: %d\n", index);
-    if (pipe2(rg->replicas[index].pipefd_into_rep, O_NONBLOCK) == -1) {
+    if (pipe(rg->replicas[index].pipefd_into_rep) == -1) {
       printf("Pipe error!\n");
       return 0;
     }
 
-    if (pipe2(rg->replicas[index].pipefd_outof_rep, O_NONBLOCK) == -1) {
+    if (pipe(rg->replicas[index].pipefd_outof_rep) == -1) {
       printf("Pipe error!\n");
       return 0;
     }
 
     // Need to set to be non-blocking for reading.
-    // Not needed if set in pipe2()
-    //    flags = fcntl(rg->replicas[index].pipefd_outof_rep[0], F_GETFL, 0);
-    //    fcntl(rg->replicas[index].pipefd_outof_rep[0], F_SETFL, flags | O_NONBLOCK);
+        flags = fcntl(rg->replicas[index].pipefd_outof_rep[0], F_GETFL, 0);
+        fcntl(rg->replicas[index].pipefd_outof_rep[0], F_SETFL, flags | O_NONBLOCK);
     //    flags = fcntl(rg->replicas[index].pipefd_into_rep[0], F_GETFL, 0);
     //    fcntl(rg->replicas[index].pipefd_into_rep[0], F_SETFL, flags | O_NONBLOCK);
 
