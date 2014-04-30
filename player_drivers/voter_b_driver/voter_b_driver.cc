@@ -14,6 +14,7 @@
 #include "../../include/taslimited.h"
 #include "../../include/statstime.h"
 #include "../../include/replicas.h"
+#include "../../include/commtypes.h"
 
 #define REP_COUNT 3
 #define INIT_ROUNDS 4
@@ -51,7 +52,7 @@ private:
   // Set up the underlying odometry device
   int SetupOdom();
   int ShutdownOdom();
-  void ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &data);
+  void ProcessOdom(player_position2d_data_t &data);
 
   // Set up the ranger device
   int SetupRanger();
@@ -59,7 +60,7 @@ private:
   void ProcessRanger(player_ranger_data_range_t &);
 
   // Set up the required position2ds
-  void ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_cmd_vel_t &cmd, int replica_number);
+  void ProcessVelCmdFromRep(double cmd_vel_x, double cmd_vel_a, int replica_number);
 
   void DoOneUpdate();
 
@@ -105,8 +106,8 @@ private:
   // The voting information and input duplication stuff could be part of the replica struct....
   // Input Duplication stuff
   bool sent[REP_COUNT];
-  double curr_goal_x, curr_goal_y, curr_goal_a; // Current goal for planners
-  double next_goal_x, next_goal_y, next_goal_a; // Next goal for planners
+  double curr_goal[3]; // Current goal for planners
+  double next_goal[3]; // Next goal for planners
 
   // Voting stuff
   voting_status vote_stat;
@@ -278,8 +279,8 @@ int VoterBDriver::MainSetup()
 
   ranger_count = 0;
 
-  this->curr_goal_x = this->curr_goal_y = this->curr_goal_a = 0;
-  this->next_goal_x = this->next_goal_y = this->next_goal_a = 0;
+  curr_goal[INDEX_X] = curr_goal[INDEX_Y] = curr_goal[INDEX_A] = 0.0;
+  next_goal[INDEX_X] = next_goal[INDEX_Y] = next_goal[INDEX_A] = 0.0;
   for (index = 0; index < REP_COUNT; index++) {
     sent[index] = false;
   }
@@ -333,7 +334,7 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
 			   PLAYER_POSITION2D_DATA_STATE, this->odom_addr)) {
     // Message from underlying position device; update state
     assert(hdr->size == sizeof(player_position2d_data_t));
-    ProcessOdom(hdr, *reinterpret_cast<player_position2d_data_t *> (data));
+    ProcessOdom(*reinterpret_cast<player_position2d_data_t *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 				  PLAYER_RANGER_DATA_RANGE, this->ranger_addr)) {
@@ -379,27 +380,6 @@ int VoterBDriver::ProcessMessage(QueuePointer & resp_queue,
     delete msg;
     return(0);
   } else { 
-    // Check the replica interfaces
-    for (index = 0; index < REP_COUNT; index++) {
-      // Check for requests for waypoints from replicas
-      if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_REQ,
-			       PLAYER_PLANNER_REQ_GET_WAYPOINTS,
-			       this->cmd_to_rep_planners[index])) {
-	SendWaypoints(resp_queue,  index);
-	return(0);
-      }
-
-      // Check for commands from replicas
-      if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
-			       PLAYER_POSITION2D_CMD_VEL,
-			       this->data_to_cmd_from_rep_position2ds[index])) {
-	// New command velocity from replica [index]
-	assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
-	ProcessVelCmdFromRep(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), index);
-	return 0;
-      }
-    }
-    
     puts("VoterB: I don't know what to do with that.");
     // Message not dealt with with
     return -1;
@@ -419,6 +399,12 @@ void VoterBDriver::DoOneUpdate() {
   timestamp_t current;
   int index = 0;
   int restart_id = -1;
+
+  struct timeval tv;
+  int retval = 0;
+
+  struct comm_header hdr;
+  double cmd_vel[2];
 
   if (vote_stat == VOTING) {
     current = generate_timestamp();
@@ -447,6 +433,26 @@ void VoterBDriver::DoOneUpdate() {
     }
     elapsed_time_seconds = 0.0;
     vote_stat = WAITING;
+  }
+
+  // Check all replicas for data
+  for (index = 0; index < REP_COUNT; index++) {
+    retval = read(replicas[index].pipefd_outof_rep[0], &hdr, sizeof(struct comm_header));
+    if (retval > 0) {
+      switch (hdr.type) {
+      case COMM_WAY_REQ:
+	this->SendWaypoints(index);
+	break;
+      case COMM_MOV_CMD:
+	printf("VoterB: Recieved a move command!\n");
+	retval = read(replicas[index].pipefd_outof_rep[0], cmd_vel, hdr.byte_count);
+	assert(retval == hdr.byte_count);
+	this->ProcessVelCmdFromRep(cmd_vel[0], cmd_vel[1], index);
+	break;
+      default:
+	printf("ERROR: VoterB can't handle comm type: %d\n", hdr.type);
+      }
+    }
   }
 
   if (this->InQueue->Empty()) {
@@ -526,15 +532,23 @@ int VoterBDriver::SetupRanger()
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process new odometry data
-void VoterBDriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &data)
+void VoterBDriver::ProcessOdom(player_position2d_data_t &data)
 {
   int index = 0;
+  struct comm_header hdr;
+  double pose[3];
+
+  pose[INDEX_X] = data.pos.px;
+  pose[INDEX_Y] = data.pos.py;
+  pose[INDEX_A] = data.pos.pa;
 
   // Need to publish to the replicas
   for (index = 0; index < REP_COUNT; index++) {
-    this->Publish(this->data_to_cmd_from_rep_position2ds[index],
-		  PLAYER_MSGTYPE_DATA, PLAYER_POSITION2D_DATA_STATE,
-		  (void*)&data, 0, NULL, true);
+    hdr.type = COMM_POS_DATA;
+    hdr.byte_count = 3 * sizeof(double);
+    write(replicas[index].pipefd_into_rep[1], (void*)(&hdr), sizeof(struct comm_header));
+
+    write(replicas[index].pipefd_into_rep[1], (void*)(pose), hdr.byte_count);
   }
 }
 
@@ -544,6 +558,7 @@ void VoterBDriver::ProcessRanger(player_ranger_data_range_t &data)
 {
   int index = 0;
   timestamp_t current;
+  struct comm_header hdr;
 
   // Ignore first ranger update (to give everything a chance to init)
   if (ranger_count < INIT_ROUNDS) {
@@ -556,13 +571,13 @@ void VoterBDriver::ProcessRanger(player_ranger_data_range_t &data)
     
     //
     for (index = 0; index < REP_COUNT; index++) {
-      // range_t has uint32_t ranges_count and double* ranges
-      // write ranges_count
-      //      printf("Writing ranges_count: %u\n", *((uint *)((void *)(&data))));
-      //      write(replicas[index].pipefd_into_rep[1], (void*)&data, sizeof(uint));
-      
+      // Write header
+      hdr.type = COMM_RANGE_DATA;
+      hdr.byte_count = data.ranges_count * sizeof(double);
+      write(replicas[index].pipefd_into_rep[1], (void*)(&hdr), sizeof(struct comm_header));
+
       // write each of the ranges
-      write(replicas[index].pipefd_into_rep[1], (void*)(data.ranges), sizeof(double) * data.ranges_count);
+      write(replicas[index].pipefd_into_rep[1], (void*)(data.ranges), hdr.byte_count);
     }
 #ifdef _STATS_RANGER_VOTE_OUT_
     printf("RANGER left vote at: %lf\n", timestamp_to_realtime(current, cpu_speed));
@@ -587,10 +602,11 @@ void VoterBDriver::ResetVotingState() {
 ////////////////////////////////////////////////////////////////////////////////
 // handle the request for inputs
 // This is the primary input to the replicas, so make sure it is duplicated
-void VoterBDriver::SendWaypoints(QueuePointer & resp_queue, int replica_num) {
-  player_planner_waypoints_req_t reply;
+void VoterBDriver::SendWaypoints(int replica_num) {
   int index = 0;
   bool all_sent = true;
+  struct comm_header hdr;
+
   // For now only one waypoint at a time (it's Art Pot, so fine.)
  
   // if replica already has latest... errors
@@ -600,17 +616,12 @@ void VoterBDriver::SendWaypoints(QueuePointer & resp_queue, int replica_num) {
   } else { // send and mark sent
     sent[replica_num] = true;
 
-    reply.waypoints_count = 1;
-    reply.waypoints = (player_pose2d_t*)malloc(sizeof(reply.waypoints[0]));
-    reply.waypoints[0].px = curr_goal_x;
-    reply.waypoints[0].py = curr_goal_y;
-    reply.waypoints[0].pa = curr_goal_a;
+    hdr.type = COMM_WAY_RES;
+    hdr.byte_count = 3 * sizeof(double);
 
-    this->Publish(this->cmd_to_rep_planners[replica_num], resp_queue,
-		  PLAYER_MSGTYPE_RESP_ACK,
-		  PLAYER_PLANNER_REQ_GET_WAYPOINTS,
-		  (void*)&reply);
-    free(reply.waypoints);
+    write(replicas[replica_num].pipefd_into_rep[1], (void*)(&hdr), sizeof(struct comm_header));
+
+    write(replicas[replica_num].pipefd_into_rep[1], (void*)(curr_goal), hdr.byte_count);
   }
 
   // if all 3 sent, reset and move next to current
@@ -618,9 +629,9 @@ void VoterBDriver::SendWaypoints(QueuePointer & resp_queue, int replica_num) {
     all_sent = all_sent && sent[index];
   }
   if (all_sent) {
-    curr_goal_x = next_goal_x;
-    curr_goal_y = next_goal_y;
-    curr_goal_a = next_goal_a;
+    curr_goal[INDEX_X] = next_goal[INDEX_X];
+    curr_goal[INDEX_Y] = next_goal[INDEX_Y];
+    curr_goal[INDEX_A] = next_goal[INDEX_A];
     for (index = 0; index < REP_COUNT; index++) {
       sent[index] = false;
     }
@@ -630,19 +641,19 @@ void VoterBDriver::SendWaypoints(QueuePointer & resp_queue, int replica_num) {
 ////////////////////////////////////////////////////////////////////////////////
 // Process velocity command from replica
 // This is the output from the replicas, so vote on it.
-void VoterBDriver::ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_cmd_vel_t &cmd, int replica_num) {
+void VoterBDriver::ProcessVelCmdFromRep(double cmd_vel_x, double cmd_vel_a, int replica_num) {
   int index = 0;
   bool all_reporting = true;
   bool all_agree = true;
   double cmd_vel = 0.0;
   double cmd_rot_vel = 0.0;
 
-  //  printf("VOTE rep: %d - %f\t%f\n", replica_num, cmd.vel.px, cmd.vel.pa);
+  printf("VOTE rep: %d - %f\t%f\n", replica_num, cmd_vel_x, cmd_vel_a);
   
   if (reporting[replica_num] == true) {
     // If vote is same as previous, then ignore.
-    if ((cmds[replica_num][0] == cmd.vel.px) &&
-    	(cmds[replica_num][1] == cmd.vel.pa)) {
+    if ((cmds[replica_num][0] == cmd_vel_x) &&
+    	(cmds[replica_num][1] == cmd_vel_a)) {
       // Ignore
     } else {
       puts("PROBLEMS VOTING");
@@ -650,8 +661,8 @@ void VoterBDriver::ProcessVelCmdFromRep(player_msghdr_t* hdr, player_position2d_
   } else {
     // record vote
     reporting[replica_num] = true;
-    cmds[replica_num][0] = cmd.vel.px;
-    cmds[replica_num][1] = cmd.vel.pa;
+    cmds[replica_num][0] = cmd_vel_x;
+    cmds[replica_num][1] = cmd_vel_a;
   }
  
   cmd_vel = cmds[0][0];
@@ -705,9 +716,9 @@ void VoterBDriver::ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_po
   bool non_sent = false;
   int index = 0;
 
-  next_goal_x = cmd.pos.px;
-  next_goal_y = cmd.pos.py;
-  next_goal_a = cmd.pos.pa;
+  next_goal[INDEX_X] = cmd.pos.px;
+  next_goal[INDEX_Y] = cmd.pos.py;
+  next_goal[INDEX_A] = cmd.pos.pa;
 
   // if all three are waiting, move to current
   for (index = 0; index < REP_COUNT; index++) {
@@ -715,9 +726,9 @@ void VoterBDriver::ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_po
     non_sent = non_sent || sent[index];
   }
   if (all_sent || !non_sent) {
-    curr_goal_x = next_goal_x;
-    curr_goal_y = next_goal_y;
-    curr_goal_a = next_goal_a;
+    curr_goal[INDEX_X] = next_goal[INDEX_X];
+    curr_goal[INDEX_Y] = next_goal[INDEX_Y];
+    curr_goal[INDEX_A] = next_goal[INDEX_A];
   } 
 }
 

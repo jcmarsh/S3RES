@@ -9,7 +9,9 @@
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
+
 #include "../include/taslimited.h"
+#include "../include/commtypes.h"
 
 // Configuration parameters
 #define VEL_SCALE 1
@@ -21,18 +23,12 @@
 #define OBST_EXTENT 1
 #define OBST_SCALE .3
 
-// player interfaces
-playerc_client_t *client;
-playerc_position2d_t *pos2d; // Check position, send velocity command
-playerc_planner_t *planner; // Check for new position goals
-playerc_ranger_t *ranger; // ranger sensor readings
-
 // Controller state
 bool active_goal;
-double goal_x, goal_y, goal_a;
+double goal[3];
 
 // Position
-double pos_x, pos_y, pos_a;
+double pos[3];
 int ranger_count;
 double ranger_ranges[365]; // 365 comes from somewhere in Player as the max.
 
@@ -103,45 +99,21 @@ int createConnections(char * ip, char * port, int id) {
     return -1;
   }
 
-  // Create client and connect
-  client = playerc_client_create(0, ip, atoi(port)); // I start at 6666
-  if (0 != playerc_client_connect(client)) {
-    return -1;
-  }
-
-  playerc_client_datamode(client, PLAYERC_DATAMODE_PULL);
-  
-  // TODO: I can't imagine it is acceptable to use atoi() unchecked.
-  // Subscribe to a redundant driver so that it will run!
-  pos2d = playerc_position2d_create(client, id);
-  if (playerc_position2d_subscribe(pos2d, PLAYER_OPEN_MODE)) {
-    return -1;
-  }
-
-  planner = playerc_planner_create(client, id);
-  if (playerc_planner_subscribe(planner, PLAYER_OPEN_MODE)) {
-    return -1;
-  }
-
   return 0;
 }
 
-void shutdownArtPot() {
-  playerc_planner_unsubscribe(planner);
-  playerc_planner_destroy(planner);
-  playerc_position2d_unsubscribe(pos2d);
-  playerc_position2d_destroy(pos2d);
-  playerc_client_disconnect(client);
-  playerc_client_destroy(client);
-}
-
 void command() {
-  double dist, theta, delta_x, delta_y, v, tao, obs_x, obs_y, vel, rot_vel;
+  double dist, theta, delta_x, delta_y, v, tao, obs_x, obs_y;
+  double vel_cmd[2];
   int total_factors, i;
+  struct comm_header hdr;
+
+  hdr.type = COMM_MOV_CMD;
+  hdr.byte_count = 2 * sizeof(double);
 
   // Head towards the goal! odom_pose: 0-x, 1-y, 2-theta
-  dist = sqrt(pow(goal_x - pos_x, 2)  + pow(goal_y - pos_y, 2));
-  theta = atan2(goal_y - pos_y, goal_x - pos_x) - pos_a;
+  dist = sqrt(pow(goal[INDEX_X] - pos[INDEX_X], 2)  + pow(goal[INDEX_Y] - pos[INDEX_Y], 2));
+  theta = atan2(goal[INDEX_Y] - pos[INDEX_Y], goal[INDEX_X] - pos[INDEX_X]) - pos[INDEX_A];
 
   total_factors = 0;
   if (dist < GOAL_RADIUS) {
@@ -183,23 +155,32 @@ void command() {
     delta_x = delta_x / total_factors;
     delta_y = delta_y / total_factors;
   
-    vel = sqrt(pow(delta_x, 2) + pow(delta_y, 2));
-    rot_vel = atan2(delta_y, delta_x);
-    vel = VEL_SCALE * vel * (abs(M_PI - rot_vel) / M_PI);
-    rot_vel = VEL_SCALE * rot_vel;
+    vel_cmd[0] = sqrt(pow(delta_x, 2) + pow(delta_y, 2));
+    vel_cmd[1] = atan2(delta_y, delta_x);
+    vel_cmd[0] = VEL_SCALE * vel_cmd[0] * (abs(M_PI - vel_cmd[1]) / M_PI);
+    vel_cmd[1] = VEL_SCALE * vel_cmd[1];
 
-    // TODO: Should turn to the desired theta, goal_t
-    playerc_position2d_set_cmd_vel(pos2d, vel, 0, rot_vel, 1);
+    // Write move command
+    printf("ArtPot: Writing out to fd: %d\n", write_out_fd);
+    write(write_out_fd, &hdr, sizeof(struct comm_header));
+
+    write(write_out_fd, vel_cmd, hdr.byte_count);
   } else { // within distance epsilon. Give it up, man.
-    playerc_position2d_set_cmd_vel(pos2d, 0, 0, 0, 1);
+    vel_cmd[0] = 0.0;
+    vel_cmd[1] = 0.0;
+    write(write_out_fd, &hdr, sizeof(struct comm_header));
+
+    write(write_out_fd, vel_cmd, hdr.byte_count);
   }
 }
 
 void requestWaypoints() {
-  playerc_planner_get_waypoints(planner);
-  goal_x = planner->waypoints[0][0];
-  goal_y = planner->waypoints[0][1];
-  goal_a = planner->waypoints[0][2];
+  struct comm_header hdr;
+  
+  hdr.type = COMM_WAY_REQ;
+  hdr.byte_count = 0;
+
+  write(write_out_fd, &hdr, sizeof(struct comm_header));
 }
 
 void enterLoop() {
@@ -209,29 +190,41 @@ void enterLoop() {
   timestamp_t last;
   timestamp_t current;
   int read_ret;
+  struct comm_header hdr;
 
   while(1) { // while something else.
     // This is how to read the ranges_count
-    //    read_ret = read(read_in_fd, &ranger_count, sizeof(uint));
-    //    if (read_ret > 0) {
-    //      printf("\tRecieved ranger_count: %u\n", ranger_count);
-    //    }
-
-    read_ret = read(read_in_fd, ranger_ranges, sizeof(double) * 365);
-    if (read_ret > 0) { // process the ranger data and run command routine
-      ranger_count = read_ret / sizeof(double);
+    read_ret = read(read_in_fd, &hdr, sizeof(struct comm_header));
+    if (read_ret > 0) {
+      switch (hdr.type) {
+      case COMM_RANGE_DATA:
+	read_ret = read(read_in_fd, ranger_ranges, hdr.byte_count);
+	if (read_ret > 0) { // process the ranger data and run command routine
+	  ranger_count = read_ret / sizeof(double);
       
-      printf("\tRead %d ranges!\n", ranger_count);
+	  printf("\tRead %d ranges!\n", ranger_count);
 
-      // Calculates and sends the new command
-      command();
+	  // Calculates and sends the new command
+	  command();
+	}
+	break;
+      case COMM_POS_DATA:
+	//	printf("Recieved Position Data\n");
+	read_ret = read(read_in_fd, pos, hdr.byte_count);
+	assert(read_ret == hdr.byte_count);
+	break;
+      case COMM_WAY_RES:
+	//	printf("Recieved Waypoint Response\n");
+	read_ret = read(read_in_fd, goal, hdr.byte_count);
+	assert(read_ret == hdr.byte_count);
+	break;
+      default:
+	// TODO: Fail? or drop data?
+	printf("ERROR: art_pot_p can't handle comm type: %d\n", hdr.type);
+      }
+    } else {
+      usleep(1);
     }
-      
-    update_id = playerc_client_read(client);
-
-    pos_x = pos2d->px;
-    pos_y = pos2d->py;
-    pos_a = pos2d->pa;
   }
 }
 
@@ -250,7 +243,6 @@ int main(int argc, const char **argv) {
 
   enterLoop();
 
-  shutdownArtPot();
   return 0;
 }
 
