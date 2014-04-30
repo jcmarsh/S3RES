@@ -554,9 +554,16 @@ void VoterBDriver::ProcessRanger(player_ranger_data_range_t &data)
     current = generate_timestamp();
     last = current;
     
-    this->Publish(this->replicate_rangers,
-		  PLAYER_MSGTYPE_DATA, PLAYER_RANGER_DATA_RANGE,
-		  (void*)&data, 0, NULL, true);
+    //
+    for (index = 0; index < REP_COUNT; index++) {
+      // range_t has uint32_t ranges_count and double* ranges
+      // write ranges_count
+      //      printf("Writing ranges_count: %u\n", *((uint *)((void *)(&data))));
+      //      write(replicas[index].pipefd_into_rep[1], (void*)&data, sizeof(uint));
+      
+      // write each of the ranges
+      write(replicas[index].pipefd_into_rep[1], (void*)(data.ranges), sizeof(double) * data.ranges_count);
+    }
 #ifdef _STATS_RANGER_VOTE_OUT_
     printf("RANGER left vote at: %lf\n", timestamp_to_realtime(current, cpu_speed));
 #endif
