@@ -13,6 +13,7 @@
 
 #include "../../include/taslimited.h"
 #include "../../include/statstime.h"
+#include "../../include/replicas.h"
 
 #define REP_COUNT 3
 #define INIT_ROUNDS 4
@@ -25,24 +26,6 @@ typedef enum {
   RECOVERY,
   WAITING
 } voting_status;
-
-typedef enum {
-  RUNNING,
-  CRASHED,
-  FINISHED
-} replica_status;
-
-// replicas with no fds
-struct replica_l {
-  pid_t pid;
-  int priority;
-  replica_status status;
-};
-
-struct replica_group_l {
-  struct replica_l* replicas;
-  int num;
-};
 
 ////////////////////////////////////////////////////////////////////////////////
 // The class for the driver
@@ -93,13 +76,12 @@ private:
   void ResetVotingState();
 
   // Replica related methods
-  int InitReplicas(struct replica_group_l* rg, replica_l* reps, int num);
-  int ForkReplicas(struct replica_group_l* rg);
-  int ForkSingle(struct replica_group_l* rg, int number);
+  int ForkReplicas(struct replica_group* rg);
+  int ForkSingle(struct replica_group* rg, int number);
 
   // Replica related data
-  struct replica_group_l repGroup;
-  struct replica_l replicas[REP_COUNT];
+  struct replica_group repGroup;
+  struct replica replicas[REP_COUNT];
 
   // Devices provided
   player_devaddr_t position_id;
@@ -140,28 +122,15 @@ private:
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-int VoterBDriver::InitReplicas(struct replica_group_l* rg, replica_l* reps, int num) {
-  int index = 0;
-
-  rg->replicas = reps;
-  rg->num = num;
-
-  for (index = 0; index < rg->num; index++) {
-    rg->replicas[index].pid = -1;
-    rg->replicas[index].priority = -1;
-    rg->replicas[index].status = RUNNING;
-  }
-  return 1;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-int VoterBDriver::ForkSingle(struct replica_group_l* rg, int number) {
+int VoterBDriver::ForkSingle(struct replica_group* rg, int number) {
   pid_t currentPID = 0;
-  char rep_num[2];
-  char* rep_argv[] = {"art_pot", "127.0.0.1", "6666", rep_num, NULL};
+  char rep_num[3];
+  char write_out[3]; // File descriptor rep will write to. Should survive exec()
+  char read_in[3];
+  char* rep_argv[] = {"art_pot_p", "127.0.0.1", "6666", rep_num, read_in, write_out, NULL};
 
   // Fork child
-  sprintf(rep_num, "%d", 2 + number);
+  sprintf(rep_num, "%02d", 2 + number);
   rep_argv[3] = rep_num;
   currentPID = fork();
 
@@ -169,7 +138,11 @@ int VoterBDriver::ForkSingle(struct replica_group_l* rg, int number) {
     if (currentPID == 0) { // Child process
       // art_pot expects something like: ./art_pot 127.0.0.1 6666 2
       // 2 matches the interface index in the .cfg file
-      if (-1 == execv("art_pot", rep_argv)) {
+      sprintf(read_in, "%02d", rg->replicas[number].pipefd_into_rep[0]);
+      rep_argv[4] = read_in;
+      sprintf(write_out, "%02d", rg->replicas[number].pipefd_outof_rep[1]);
+      rep_argv[5] = write_out;
+      if (-1 == execv("art_pot_p", rep_argv)) {
 	perror("EXEC ERROR!");
 	exit(-1);
       }
@@ -183,7 +156,7 @@ int VoterBDriver::ForkSingle(struct replica_group_l* rg, int number) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-int VoterBDriver::ForkReplicas(struct replica_group_l* rg) {
+int VoterBDriver::ForkReplicas(struct replica_group* rg) {
   int index = 0;
 
   // Fork children
@@ -324,7 +297,7 @@ int VoterBDriver::MainSetup()
   this->ResetVotingState();
 
   // Let's try to launch the replicas
-  this->InitReplicas(&repGroup, replicas, REP_COUNT);
+  initReplicas(&repGroup, replicas, REP_COUNT);
   this->ForkReplicas(&repGroup);
 
   puts("Voter B driver ready");

@@ -23,7 +23,8 @@ typedef enum {
 struct replica {
   pid_t pid; // The pid of the thread
   int priority; // Not yet implemented
-  int pipefd[2]; // pipe to communicate with controller
+  int pipefd_into_rep[2]; // pipe to communicate with controller
+  int pipefd_outof_rep[2];
   // Possibly put a pointer to entry function
   replica_status status;
   //  unsigned long last_result; // TODO: Usefull comment.
@@ -36,18 +37,6 @@ struct replica_group {
   fd_set read_fds;
 }; 
 
-// replicas with no fds
-struct replica_l {
-  pid_t pid;
-  int priority;
-  replica_status status;
-};
-
-struct replica_group_l {
-  struct replica_l* replicas;
-  int num;
-};
-
 /*
  *
  */
@@ -58,8 +47,4 @@ int initReplicas(struct replica_group* rg, struct replica* reps, int num);
  */
 void replicaCrash(struct replica_group* rg, pid_t pid);
 
-/* 
- * return 0 if the parent, - if error, the write_out fd if child
- */
-int launchChildren(struct replica_group* rg);
 #endif // __REP_GUARD
