@@ -45,6 +45,11 @@ int initReplicas(struct replica_group* rg, struct replica* reps, int num);
 /*
  *
  */
+int forkSingleReplica(struct replica_group* rg, int num);
+
+/*
+ *
+ */
 void replicaCrash(struct replica_group* rg, pid_t pid);
 
 #endif // __REP_GUARD

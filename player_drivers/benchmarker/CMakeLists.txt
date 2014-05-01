@@ -5,7 +5,7 @@ PROJECT (benchmarker_driver)
 SET (CMAKE_MODULE_PATH "/usr/local/share/cmake/Modules")
 INCLUDE (UsePlayerPlugin)
 
-PLAYER_ADD_PLUGIN_DRIVER (benchmarker_driver SOURCES benchmarker_driver.cc ../../src/cpu.cpp ../../src/time.cpp ../../src/scheduler.cpp ../../src/force.cpp ../../src/taslimited.cpp)
+PLAYER_ADD_PLUGIN_DRIVER (benchmarker_driver SOURCES benchmarker_driver.cc ../../src/cpu.cpp ../../src/time.cpp ../../src/scheduler.cpp ../../src/force.cpp ../../src/taslimited.cpp ../../src/replicas.cpp)
 
 INSTALL(FILES ./build/libbenchmarker_driver.so
   DESTINATION ./lib/)

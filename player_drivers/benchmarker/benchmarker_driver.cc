@@ -13,6 +13,10 @@
 
 #include "../../include/taslimited.h"
 #include "../../include/statstime.h"
+#include "../../include/replicas.h"
+#include "../../include/commtypes.h"
+
+#define REP_COUNT 1
 
 ////////////////////////////////////////////////////////////////////////////////
 // The class for the driver
@@ -35,28 +39,22 @@ private:
   // Set up the underlying odometry device
   int SetupOdom();
   int ShutdownOdom();
-  void ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &data);
+  void ProcessOdom(player_position2d_data_t &data);
 
   // Set up the ranger device
   int SetupRanger();
   int ShutdownRanger();
   void ProcessRanger(player_ranger_data_range_t &);
 
-  // Set up the required position2ds
-  void ProcessVelCmdFromVoter(player_msghdr_t* hdr, player_position2d_cmd_vel_t &cmd, int replica_number);
-
   void DoOneUpdate();
 
   // Commands for the position device
   void PutCommand(double speed, double turnrate);
-  void ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_pos_t &cmd);
+  void ProcessCommand(player_position2d_cmd_pos_t &cmd);
 
-  void SendWaypoints(QueuePointer & resp_queue);
+  void SendWaypoints();
 
-  // Devices provided
-  player_devaddr_t replicate_odom; // "actual:localhost:6666:position2d:10"
-  player_devaddr_t replicate_rangers; // "actual:localhost:6666:ranger:10"
-  player_devaddr_t cmd_planner;
+  // Devices provided - These are how to send goals to the benchmarker.
   player_devaddr_t cmd_out_odom; // "original:localhost:6666:position2d:1"
 
   // Required devices (odometry and ranger)
@@ -64,16 +62,11 @@ private:
   Device *odom;
   player_devaddr_t odom_addr; // "original:localhost:6666:position2d:0"
 
-  // Odometry Device to Voter
-  Device *odom_voter;
-  player_devaddr_t odom_voter_addr; // "original:localhost:6666:position2d:0"
-
   // Ranger Device info
-  int ranger_count;
   Device *ranger;
   player_devaddr_t ranger_addr; // "original:localhost:6666:ranger:0"
 
-  double curr_goal_x, curr_goal_y, curr_goal_a; // Current goal for planners
+  double curr_goal[3]; // Current goal for planners
 
   // TAS Stuff
   cpu_speed_t cpu_speed;
@@ -81,6 +74,10 @@ private:
   // timing
   timestamp_t last;
   //  realtime_t elapsed_time_seconds;
+
+  // Replica related data
+  struct replica_group repGroup;
+  struct replica replicas[REP_COUNT];
 };
 
 // A factory creation function, declared outside of the class so that it
@@ -109,35 +106,6 @@ void BenchmarkerDriver_Register(DriverTable* table)
 BenchmarkerDriver::BenchmarkerDriver(ConfigFile* cf, int section)
   : ThreadedDriver(cf, section)
 {
-  // Check for position2d (we provide)
-  memset(&(this->replicate_odom), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->replicate_odom), section, "provides",
-			 PLAYER_POSITION2D_CODE, -1, "actual") == 0) {
-    if (this->AddInterface(this->replicate_odom) != 0) {
-      this->SetError(-1);
-      return;
-    }
-  }
-
-  // Check for provided ranger
-  memset(&(this->replicate_rangers), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->replicate_rangers), section, "provides",
-			 PLAYER_RANGER_CODE, -1, "actual") == 0) {
-    if (this->AddInterface(this->replicate_rangers) != 0) {
-      this->SetError(-1);
-    }
-  }
-
-  // Check for planner for commands to the replicas
-  memset(&(this->cmd_planner), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->cmd_planner), section, "provides",
-			   PLAYER_PLANNER_CODE, -1, "actual") == 0) {
-    if (this->AddInterface(this->cmd_planner) != 0) {
-      this->SetError(-1);
-      return;
-    }
-  }
-
   // Check for position2d for commands
   memset(&(this->cmd_out_odom), 0, sizeof(player_devaddr_t));
   if (cf->ReadDeviceAddr(&(this->cmd_out_odom), section, "provides",
@@ -154,15 +122,6 @@ BenchmarkerDriver::BenchmarkerDriver(ConfigFile* cf, int section)
   if (cf->ReadDeviceAddr(&(this->odom_addr), section, "requires",
 			 PLAYER_POSITION2D_CODE, -1, "original") != 0) {
     PLAYER_ERROR("Could not find required position2d device!");
-    this->SetError(-1);
-    return;
-  }
-
-  // Check for position2d to the voter
-  this->odom_voter = NULL;
-  if (cf->ReadDeviceAddr(&(this->odom_voter_addr), section, "requires",
-			 PLAYER_POSITION2D_CODE, -1, "actual") != 0) {
-    PLAYER_ERROR("Could not find required position2d device: odom_voter");
     this->SetError(-1);
     return;
   }
@@ -188,11 +147,10 @@ int BenchmarkerDriver::MainSetup()
 
   puts("Benchmarker driver initialising in MainSetup");
 
+  // TODO: Is this moving player to cpu 3? Need to review
   InitTAS(3, &cpu_speed);
 
-  ranger_count = 0;
-
-  this->curr_goal_x = this->curr_goal_y = this->curr_goal_a = 0;
+  curr_goal[INDEX_X] = curr_goal[INDEX_Y] = curr_goal[INDEX_A] = 0.0;
 
   // Initialize the position device we are reading from
   if (this->SetupOdom() != 0) {
@@ -203,6 +161,11 @@ int BenchmarkerDriver::MainSetup()
   if (this->ranger_addr.interf && this->SetupRanger() != 0) {
     return -1;
   }
+
+  // Should just be one "replica": The program running (VoterB or a controller)
+  initReplicas(&repGroup, replicas, REP_COUNT);
+  forkSingleReplica(&repGroup, 0);
+  //  printf("Replica - pid: %d\tfd_in_r: %d\tfd_in_w: %d\n", repGroup.replicas[0].pid, repGroup.replicas[0].pipefd_into_rep[0], repGroup.replicas[0].pipefd_into_rep[1]);
 
   puts("Benchmarker driver ready");
 
@@ -215,8 +178,9 @@ int BenchmarkerDriver::MainShutdown()
 {
   puts("Shutting Benchmarker driver down");
 
-  if(this->ranger)
+  if(this->ranger) {
     this->ShutdownRanger();
+  }
 
   ShutdownOdom();
 
@@ -236,7 +200,7 @@ int BenchmarkerDriver::ProcessMessage(QueuePointer & resp_queue,
 			   PLAYER_POSITION2D_DATA_STATE, this->odom_addr)) {
     // Message from underlying position device; update state
     assert(hdr->size == sizeof(player_position2d_data_t));
-    ProcessOdom(hdr, *reinterpret_cast<player_position2d_data_t *> (data));
+    ProcessOdom(*reinterpret_cast<player_position2d_data_t *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 				  PLAYER_RANGER_DATA_RANGE, this->ranger_addr)) {
@@ -252,19 +216,7 @@ int BenchmarkerDriver::ProcessMessage(QueuePointer & resp_queue,
 				  PLAYER_POSITION2D_CMD_POS,
 				  this->cmd_out_odom)) {
     assert(hdr->size == sizeof(player_position2d_cmd_pos_t));
-    ProcessCommand(hdr, *reinterpret_cast<player_position2d_cmd_pos_t *> (data));
-  } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
-			     PLAYER_POSITION2D_CMD_VEL,
-			     this->replicate_odom)) {
-    // New command velocity from voter
-    assert(hdr->size == sizeof(player_position2d_cmd_vel_t));
-    ProcessVelCmdFromVoter(hdr, *reinterpret_cast<player_position2d_cmd_vel_t *> (data), index);
-    return 0;
-  } else if (Message::MatchMessage(hdr, PLAYER_MSGTYPE_REQ,
-				   PLAYER_PLANNER_REQ_GET_WAYPOINTS,
-				   this->cmd_planner)) {
-    SendWaypoints(resp_queue);
-    return(0);
+    ProcessCommand(*reinterpret_cast<player_position2d_cmd_pos_t *> (data));
   } else {
     puts("Benchmarker: I don't know what to do with that.");
     // Message not dealt with with
@@ -272,32 +224,49 @@ int BenchmarkerDriver::ProcessMessage(QueuePointer & resp_queue,
   }
 }
 
-void BenchmarkerDriver::SendWaypoints(QueuePointer & resp_queue) {
-  player_planner_waypoints_req_t reply;
+void BenchmarkerDriver::SendWaypoints() {
+  struct comm_header hdr;
 
-  reply.waypoints_count = 1;
-  reply.waypoints = (player_pose2d_t*)malloc(sizeof(reply.waypoints[0]));
-  reply.waypoints[0].px = curr_goal_x;
-  reply.waypoints[0].py = curr_goal_y;
-  reply.waypoints[0].pa = curr_goal_a;
+  hdr.type = COMM_WAY_RES;
+  hdr.byte_count = 3 * sizeof(double);
 
-  this->Publish(this->cmd_planner, resp_queue,
-		PLAYER_MSGTYPE_RESP_ACK,
-		PLAYER_PLANNER_REQ_GET_WAYPOINTS,
-		(void*)&reply);
-  free(reply.waypoints);
+  write(replicas[0].pipefd_into_rep[1], (void*)(&hdr), sizeof(struct comm_header));
+  write(replicas[0].pipefd_into_rep[1], (void*)(curr_goal), hdr.byte_count);
 }
 
 void BenchmarkerDriver::Main() {
   for(;;) {
-    Wait(0.0001);
+    //    Wait(0.0001);
     this->DoOneUpdate();
-    pthread_testcancel();
+    //    pthread_testcancel();
   }
 }
 
 // Called by player for each non-threaded driver.
 void BenchmarkerDriver::DoOneUpdate() {
+  int retval;
+  struct comm_header hdr;
+  double cmd_vel[2];
+
+  // This read is non-blocking
+  retval = read(replicas[0].pipefd_outof_rep[0], &hdr, sizeof(struct comm_header));
+  if (retval > 0) {
+    assert(retval == sizeof(struct comm_header));
+    switch(hdr.type) {
+    case COMM_WAY_REQ:
+      this->SendWaypoints();
+      break;
+    case COMM_MOV_CMD:
+      // This read is non-blocking... could it fail? (EAGAIN)
+      retval = read(replicas[0].pipefd_outof_rep[0], cmd_vel, hdr.byte_count);
+      assert(retval == hdr.byte_count);
+      this->PutCommand(cmd_vel[0], cmd_vel[1]);
+      break;
+    default:
+      printf("ERROR: Benchmarker can't handle comm type: %d\n", hdr.type);
+    }
+  }
+
   if (this->InQueue->Empty()) {
     return;
   }
@@ -328,7 +297,6 @@ int BenchmarkerDriver::ShutdownOdom()
   this->PutCommand(0, 0);
 
   this->odom->Unsubscribe(this->InQueue);
-  this->odom_voter->Unsubscribe(this->InQueue);
   return 0;
 }
 
@@ -355,19 +323,6 @@ int BenchmarkerDriver::SetupOdom()
     return -1;
   }
 
-  if(!(this->odom_voter = deviceTable->GetDevice(this->odom_voter_addr)))
-  {
-    PLAYER_ERROR("ODOM_VOTER: unable to locate suitable position device");
-    //    return -1;
-    // art pot controller uses planner instead of odom_voter
-  }
-  if(this->odom_voter->Subscribe(this->InQueue) != 0)
-  {
-    PLAYER_ERROR("ODOM_VOTER: unable to subscribe to position device");
-    //    return -1;
-  }
-
-
   return 0;
 }
 
@@ -389,22 +344,30 @@ int BenchmarkerDriver::SetupRanger()
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process new odometry data
-void BenchmarkerDriver::ProcessOdom(player_msghdr_t* hdr, player_position2d_data_t &data)
+void BenchmarkerDriver::ProcessOdom(player_position2d_data_t &data)
 {
-  // Also change this info out for use by others
-  //  player_msghdr_t newhdr = *hdr;
-  //  newhdr.addr = this->replicate_odom;
-  //  this->Publish(&newhdr, (void*)&data);
+  struct comm_header hdr;
+  double pose[3];
 
-  this->Publish(this->replicate_odom,
-		PLAYER_MSGTYPE_DATA, PLAYER_POSITION2D_DATA_STATE,
-		(void*)&data, 0, NULL, true);
+  pose[INDEX_X] = data.pos.px;
+  pose[INDEX_Y] = data.pos.py;
+  pose[INDEX_A] = data.pos.pa;
+
+  // Need to publish to the replica
+  hdr.type = COMM_POS_DATA;
+  hdr.byte_count = 3 * sizeof(double);
+  write(replicas[0].pipefd_into_rep[1], (void*)(&hdr), sizeof(struct comm_header));
+
+  write(replicas[0].pipefd_into_rep[1], (void*)(pose), hdr.byte_count);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process ranger data
 void BenchmarkerDriver::ProcessRanger(player_ranger_data_range_t &data)
 {
+  int index = 0;
+  struct comm_header hdr;
+
 #ifdef _STATS_RANGER_BENCH_OUT_
   timestamp_t current;
   current = generate_timestamp();
@@ -414,33 +377,15 @@ void BenchmarkerDriver::ProcessRanger(player_ranger_data_range_t &data)
   last = generate_timestamp();
 #endif // _STATS_BENCH_ROUND_TRIP_
 
-  this->Publish(this->replicate_rangers,
-		PLAYER_MSGTYPE_DATA, PLAYER_RANGER_DATA_RANGE,
-		(void*)&data, 0, NULL, true);
+  hdr.type = COMM_RANGE_DATA;
+  hdr.byte_count = data.ranges_count * sizeof(double);
+  write(replicas[0].pipefd_into_rep[1], (void*)(&hdr), sizeof(struct comm_header));
+
+  write(replicas[0].pipefd_into_rep[1], (void*)(data.ranges), hdr.byte_count);
+
 #ifdef _STATS_RANGER_BENCH_OUT_
   printf("RANGER left bench at: %lf\n", timestamp_to_realtime(current, cpu_speed));
 #endif
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Process velocity command from replica
-// This is the output from the replicas, so vote on it.
-void BenchmarkerDriver::ProcessVelCmdFromVoter(player_msghdr_t* hdr, player_position2d_cmd_vel_t &cmd, int replica_num) {
-  double cmd_vel = 0.0;
-  double cmd_rot_vel = 0.0;
-  timestamp_t current;
-
-  // Stop timer and report
-#ifdef _STATS_BENCH_ROUND_TRIP_
-  current = generate_timestamp();
-  //  printf("TIME: %lf\n", timestamp_to_realtime(current - last, cpu_speed));
-  printf("%lf\n", timestamp_to_realtime(current - last, cpu_speed));
-#endif // _STATS_BENCH_ROUND_TRIP_
-
-  cmd_vel = cmd.vel.px;
-  cmd_rot_vel = cmd.vel.pa;
-
-  this->PutCommand(cmd_vel, cmd_rot_vel);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -448,7 +393,12 @@ void BenchmarkerDriver::ProcessVelCmdFromVoter(player_msghdr_t* hdr, player_posi
 void BenchmarkerDriver::PutCommand(double cmd_speed, double cmd_turnrate)
 {
   player_position2d_cmd_vel_t cmd;
+#ifdef _STATS_BENCH_ROUND_TRIP_
+  timestamp_t current;
+  current = generate_timestamp();
 
+  printf("%lf\n", timestamp_to_realtime(current - last, cpu_speed));
+#endif
   memset(&cmd, 0, sizeof(cmd));
 
   cmd.vel.px = cmd_speed;
@@ -461,15 +411,8 @@ void BenchmarkerDriver::PutCommand(double cmd_speed, double cmd_turnrate)
 		     (void*)&cmd, sizeof(cmd), NULL);
 }
 
-void BenchmarkerDriver::ProcessCommand(player_msghdr_t* hdr, player_position2d_cmd_pos_t &cmd) {
-  curr_goal_x = cmd.pos.px;
-  curr_goal_y = cmd.pos.py;
-  curr_goal_a = cmd.pos.pa;
-
-  if (this->odom_voter != NULL) {
-    this->odom_voter->PutMsg(this->InQueue,
-			     PLAYER_MSGTYPE_CMD,
-			     PLAYER_POSITION2D_CMD_POS,
-			     (void*)&cmd, sizeof(cmd), NULL);
-  }
+void BenchmarkerDriver::ProcessCommand(player_position2d_cmd_pos_t &cmd) {
+  curr_goal[INDEX_X] = cmd.pos.px;
+  curr_goal[INDEX_Y] = cmd.pos.py;
+  curr_goal[INDEX_A] = cmd.pos.pa;
 }

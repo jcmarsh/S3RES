@@ -17,6 +17,8 @@
 //#define _STATS_CMD_VOTE_OUT_
 //#define _STATS_CMD_BENCH_IN_
 
-#define _STATS_BENCH_ROUND_TRIP_
+#define _STATS_CONT_COMMAND_
+// TODO: UPDATE THIS ONE
+//#define _STATS_BENCH_ROUND_TRIP_
 
 #endif // _STATS_TIME_H

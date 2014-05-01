@@ -78,7 +78,6 @@ private:
 
   // Replica related methods
   int ForkReplicas(struct replica_group* rg);
-  int ForkSingle(struct replica_group* rg, int number);
 
   // Replica related data
   struct replica_group repGroup;
@@ -123,46 +122,12 @@ private:
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-int VoterBDriver::ForkSingle(struct replica_group* rg, int number) {
-  pid_t currentPID = 0;
-  char rep_num[3];
-  char write_out[3]; // File descriptor rep will write to. Should survive exec()
-  char read_in[3];
-  char* rep_argv[] = {"art_pot_p", "127.0.0.1", "6666", rep_num, read_in, write_out, NULL};
-
-  // Fork child
-  sprintf(rep_num, "%02d", 2 + number);
-  rep_argv[3] = rep_num;
-  currentPID = fork();
-
-  if (currentPID >= 0) { // Successful fork
-    if (currentPID == 0) { // Child process
-      // art_pot expects something like: ./art_pot 127.0.0.1 6666 2
-      // 2 matches the interface index in the .cfg file
-      sprintf(read_in, "%02d", rg->replicas[number].pipefd_into_rep[0]);
-      rep_argv[4] = read_in;
-      sprintf(write_out, "%02d", rg->replicas[number].pipefd_outof_rep[1]);
-      rep_argv[5] = write_out;
-      if (-1 == execv("art_pot_p", rep_argv)) {
-	perror("EXEC ERROR!");
-	exit(-1);
-      }
-    } else { // Parent Process
-      rg->replicas[number].pid = currentPID;
-    }
-  } else {
-    printf("Fork error!\n");
-    return -1;
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////
 int VoterBDriver::ForkReplicas(struct replica_group* rg) {
   int index = 0;
 
   // Fork children
   for (index = 0; index < rg->num; index++) {
-    this->ForkSingle(rg, index);
+    forkSingleReplica(rg, index);
     // TODO: Handle possible errors
   }
 

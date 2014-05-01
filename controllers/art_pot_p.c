@@ -1,6 +1,8 @@
 /*
- * Artificial Potential controller (instead of Threaded Driver)
+ * Artificial Potential controller stand alone.
  * This variation uses file descriptors for I/O (for now just ranger and command out).
+ *
+ * James Marshall
  */
 
 #include <libplayerc/playerc.h>
@@ -32,9 +34,6 @@ double pos[3];
 int ranger_count;
 double ranger_ranges[365]; // 365 comes from somewhere in Player as the max.
 
-char ip_address[17];
-char port_number[10];
-int id_number;
 int read_in_fd;
 int write_out_fd;
 
@@ -43,7 +42,7 @@ cpu_speed_t cpu_speed;
 
 void enterLoop();
 void command();
-int createConnections(char * ip, char * port, int id);
+int initReplica();
 
 // Need to restart a replica with (id + 1) % REP_COUNT
 void restartHandler(int signo) {
@@ -56,11 +55,8 @@ void restartHandler(int signo) {
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
       // child sets new id, recreates connects, loops?
-      id_number = id_number - 2; // This is ugly. For 3 reps, ids should be 2, 3, and 4
-      id_number = (id_number + 1) % 3;
-      id_number = id_number + 2;
       // TODO: The pid is not known to the voter
-      createConnections(ip_address, port_number, id_number);
+      initReplica();
       command(); // recalculate missed command
       enterLoop(); // return to normal
     } else {   // Parent just returns
@@ -75,23 +71,20 @@ void restartHandler(int signo) {
 int parseArgs(int argc, const char **argv) {
   int i;
 
-  if (argc < 6) {
-    puts("Usage: art_pot <ip_address> <port> <position2d id> <read_in_fd> <write_out_fd>");
+  if (argc < 3) {
+    puts("Usage: art_pot_p <read_in_fd> <write_out_fd>");
     return -1;
   }
 
-  id_number = atoi(argv[3]);
-  read_in_fd = atoi(argv[4]);
-  write_out_fd = atoi(argv[5]);
-  strncpy(ip_address, argv[1], sizeof(ip_address));
-  strncpy(port_number, argv[2], sizeof(port_number));
+  read_in_fd = atoi(argv[1]);
+  write_out_fd = atoi(argv[2]);
 
   return 0;
 }
 
 // Should probably separate this out correctly
 // Basically the init function
-int createConnections(char * ip, char * port, int id) {
+int initReplica() {
   InitTAS(DEFAULT_CPU, &cpu_speed);
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
@@ -103,11 +96,15 @@ int createConnections(char * ip, char * port, int id) {
 }
 
 void command() {
+  timestamp_t start_time;
+  timestamp_t end_time;
   double dist, theta, delta_x, delta_y, v, tao, obs_x, obs_y;
   double vel_cmd[2];
   int total_factors, i;
   struct comm_header hdr;
-
+#ifdef _STATS_CONT_COMMAND_
+  start_time = generate_timestamp();
+#endif
   hdr.type = COMM_MOV_CMD;
   hdr.byte_count = 2 * sizeof(double);
 
@@ -159,18 +156,20 @@ void command() {
     vel_cmd[1] = atan2(delta_y, delta_x);
     vel_cmd[0] = VEL_SCALE * vel_cmd[0] * (abs(M_PI - vel_cmd[1]) / M_PI);
     vel_cmd[1] = VEL_SCALE * vel_cmd[1];
-
-    // Write move command
-    write(write_out_fd, &hdr, sizeof(struct comm_header));
-
-    write(write_out_fd, vel_cmd, hdr.byte_count);
   } else { // within distance epsilon. Give it up, man.
     vel_cmd[0] = 0.0;
     vel_cmd[1] = 0.0;
-    write(write_out_fd, &hdr, sizeof(struct comm_header));
-
-    write(write_out_fd, vel_cmd, hdr.byte_count);
   }
+
+#ifdef _STATS_CONT_COMMAND_
+  end_time = generate_timestamp();
+  printf("ArtPot - Command Func Time: %lf\n", timestamp_to_realtime(end_time - start_time, cpu_speed));  
+#endif
+
+  // Write move command
+  write(write_out_fd, &hdr, sizeof(struct comm_header));
+
+  write(write_out_fd, vel_cmd, hdr.byte_count);
 }
 
 void requestWaypoints() {
@@ -198,6 +197,7 @@ void enterLoop() {
       assert(read_ret == sizeof(struct comm_header));
       switch (hdr.type) {
       case COMM_RANGE_DATA:
+	//	printf("\tRecieved Range Data\n");
 	read_ret = read(read_in_fd, ranger_ranges, hdr.byte_count);
 	ranger_count = read_ret / sizeof(double);      
 	assert(read_ret == hdr.byte_count);
@@ -206,12 +206,12 @@ void enterLoop() {
 	command();
 	break;
       case COMM_POS_DATA:
-	//	printf("Recieved Position Data\n");
+	//	printf("\tRecieved Position Data\n");
 	read_ret = read(read_in_fd, pos, hdr.byte_count);
 	assert(read_ret == hdr.byte_count);
 	break;
       case COMM_WAY_RES:
-	//	printf("Recieved Waypoint Response\n");
+	//	printf("\tRecieved Waypoint Response\n");
 	read_ret = read(read_in_fd, goal, hdr.byte_count);
 	assert(read_ret == hdr.byte_count);
 	break;
@@ -228,12 +228,13 @@ void enterLoop() {
 }
 
 int main(int argc, const char **argv) {
+  
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");
     return -1;
   }
 
-  if (createConnections(ip_address, port_number, id_number) < 0) {
+  if (initReplica < 0) {
     puts("ERROR: failure in setup function.");
     return -1;
   }
