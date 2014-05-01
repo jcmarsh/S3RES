@@ -47,11 +47,11 @@ int initReplicas(struct replica_group* rg, struct replica* reps, int num) {
 }
 
 // TODO: name of program!
-int forkSingleReplica(struct replica_group* rg, int num) {
+int forkSingleReplica(struct replica_group* rg, int num, char* prog_name) {
   pid_t currentPID = 0;
   char write_out[3]; // File descriptor rep will write to. Should survive exec()
   char read_in[3];
-  char* rep_argv[] = {"art_pot_p", read_in, write_out, NULL};
+  char* rep_argv[] = {prog_name, read_in, write_out, NULL};
 
   // Fork child
   currentPID = fork();
@@ -64,7 +64,7 @@ int forkSingleReplica(struct replica_group* rg, int num) {
       rep_argv[1] = read_in;
       sprintf(write_out, "%02d", rg->replicas[num].pipefd_outof_rep[1]);
       rep_argv[2] = write_out;
-      if (-1 == execv("art_pot_p", rep_argv)) {
+      if (-1 == execv(prog_name, rep_argv)) {
 	perror("EXEC ERROR!");
 	return -1;
       }

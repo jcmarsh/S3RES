@@ -5,7 +5,7 @@
  * James Marshall
  */
 
-#include <libplayerc/playerc.h>
+#include <assert.h>
 #include <math.h>
 #include <signal.h>
 #include <stdbool.h>

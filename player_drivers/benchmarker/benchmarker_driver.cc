@@ -164,7 +164,9 @@ int BenchmarkerDriver::MainSetup()
 
   // Should just be one "replica": The program running (VoterB or a controller)
   initReplicas(&repGroup, replicas, REP_COUNT);
-  forkSingleReplica(&repGroup, 0);
+  // TODO: Will need to set this parameter correctly
+  //  forkSingleReplica(&repGroup, 0, "art_pot_p");
+  forkSingleReplica(&repGroup, 0, "VoterB");
   //  printf("Replica - pid: %d\tfd_in_r: %d\tfd_in_w: %d\n", repGroup.replicas[0].pid, repGroup.replicas[0].pipefd_into_rep[0], repGroup.replicas[0].pipefd_into_rep[1]);
 
   puts("Benchmarker driver ready");
