@@ -14,6 +14,7 @@
 
 #include "../include/taslimited.h"
 #include "../include/commtypes.h"
+#include "../include/statstime.h"
 
 // Configuration parameters
 #define VEL_SCALE 1
@@ -163,7 +164,8 @@ void command() {
 
 #ifdef _STATS_CONT_COMMAND_
   end_time = generate_timestamp();
-  printf("ArtPot - Command Func Time: %lf\n", timestamp_to_realtime(end_time - start_time, cpu_speed));  
+  printf("ArtPot - Start, End: (%llu, %llu)\t cpu_speed: %llu\n", start_time, end_time, cpu_speed);
+  printf("ArtPot - Command Func Time: %09lf\n", timestamp_to_realtime(end_time - start_time, cpu_speed));  
 #endif
 
   // Write move command
@@ -228,13 +230,13 @@ void enterLoop() {
 }
 
 int main(int argc, const char **argv) {
-  
+  printf("SANITY? Sanity.\n");
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");
     return -1;
   }
 
-  if (initReplica < 0) {
+  if (initReplica() < 0) {
     puts("ERROR: failure in setup function.");
     return -1;
   }

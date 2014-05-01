@@ -86,11 +86,6 @@ private:
   // Devices provided
   player_devaddr_t position_id;
   // Redundant devices provided, one for each of the three replicas
-  const char* rep_names[REP_COUNT];
-  player_devaddr_t replicate_rangers;
-  player_devaddr_t cmd_to_rep_planners[REP_COUNT];
-  player_devaddr_t data_to_cmd_from_rep_position2ds[REP_COUNT];
-
 
   // Required devices (odometry and ranger)
   // Odometry Device info
@@ -162,10 +157,6 @@ VoterBDriver::VoterBDriver(ConfigFile* cf, int section)
 {
   int index = 0;
 
-  this->rep_names[0] = "rep_1";
-  this->rep_names[1] = "rep_2";
-  this->rep_names[2] = "rep_3";
-
   // Check for position2d (we provide)
   memset(&(this->position_id), 0, sizeof(player_devaddr_t));
   if (cf->ReadDeviceAddr(&(this->position_id), section, "provides",
@@ -173,39 +164,6 @@ VoterBDriver::VoterBDriver(ConfigFile* cf, int section)
     if (this->AddInterface(this->position_id) != 0) {
       this->SetError(-1);
       return;
-    }
-  }
-
-  // Check for provided ranger
-  memset(&(this->replicate_rangers), 0, sizeof(player_devaddr_t));
-  if (cf->ReadDeviceAddr(&(this->replicate_rangers), section, "provides",
-			 PLAYER_RANGER_CODE, -1, NULL) == 0) {
-    if (this->AddInterface(this->replicate_rangers) != 0) {
-      this->SetError(-1);
-    }
-  }
-
-  // Check for planner for commands to the replicas
-  for (index = 0; index < REP_COUNT; index++) { 
-    memset(&(this->cmd_to_rep_planners[index]), 0, sizeof(player_devaddr_t));
-    if (cf->ReadDeviceAddr(&(this->cmd_to_rep_planners[index]), section, "provides",
-			   PLAYER_PLANNER_CODE, -1, this->rep_names[index]) == 0) {
-      if (this->AddInterface(this->cmd_to_rep_planners[index]) != 0) {
-	this->SetError(-1);
-	return;
-      }
-    }
-  }
-
-  // Check for 3 position2d for commands from the replicas
-  for (index = 0; index < REP_COUNT; index++) {
-    memset(&(this->data_to_cmd_from_rep_position2ds[index]), 0, sizeof(player_devaddr_t));
-    if (cf->ReadDeviceAddr(&(this->data_to_cmd_from_rep_position2ds[index]), section, "provides",
-			   PLAYER_POSITION2D_CODE, -1, this->rep_names[index]) == 0) {
-      if (this->AddInterface(this->data_to_cmd_from_rep_position2ds[index]) != 0) {
-	this->SetError(-1);
-	return;
-      }
     }
   }
 
