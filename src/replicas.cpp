@@ -53,6 +53,7 @@ int forkSingleReplica(struct replica_group* rg, int num, char* prog_name) {
   char read_in[3];
   char* rep_argv[] = {prog_name, read_in, write_out, NULL};
 
+  // TODO: Check if replica_group has been inited.
   // Fork child
   currentPID = fork();
 

@@ -72,10 +72,6 @@ private:
   // TAS Stuff
   cpu_speed_t cpu_speed;
 
-  // timing
-  timestamp_t last;
-  //  realtime_t elapsed_time_seconds;
-
   // Replica related data
   struct replica_group repGroup;
   struct replica replicas[REP_COUNT];
@@ -148,9 +144,7 @@ int TranslatorDriver::MainSetup()
 
   puts("Translator driver initialising in MainSetup");
 
-  // TODO: Is this moving player to cpu 3? Need to review
   InitTAS(3, &cpu_speed);
-
   curr_goal[INDEX_X] = curr_goal[INDEX_Y] = curr_goal[INDEX_A] = 0.0;
 
   // Initialize the position device we are reading from
@@ -166,9 +160,7 @@ int TranslatorDriver::MainSetup()
   // Should just be one "replica": The program running (VoterB or a controller)
   initReplicas(&repGroup, replicas, REP_COUNT);
   // TODO: Will need to set this parameter correctly
-  //forkSingleReplica(&repGroup, 0, "art_pot_p");
-  forkSingleReplica(&repGroup, 0, "VoterB");
-  //  printf("Replica - pid: %d\tfd_in_r: %d\tfd_in_w: %d\n", repGroup.replicas[0].pid, repGroup.replicas[0].pipefd_into_rep[0], repGroup.replicas[0].pipefd_into_rep[1]);
+  forkSingleReplica(&repGroup, 0, "BenchMarker");
 
   puts("Translator driver ready");
 
@@ -243,9 +235,7 @@ void TranslatorDriver::SendWaypoints() {
 
 void TranslatorDriver::Main() {
   for(;;) {
-    //    Wait(0.0001);
     this->DoOneUpdate();
-    //    pthread_testcancel();
   }
 }
 
@@ -375,12 +365,6 @@ void TranslatorDriver::ProcessRanger(player_ranger_data_range_t &data)
   struct comm_header hdr;
   struct comm_range_data_msg message;
 
-#ifdef _STATS_BENCH_ROUND_TRIP_
-  last = generate_timestamp();
-#endif // _STATS_BENCH_ROUND_TRIP_
-#ifdef _STATS_BENCH_TO_CONT_
-  printf("Benc\t%lf\n", timestamp_to_realtime(generate_timestamp(), cpu_speed));
-#endif
   hdr.type = COMM_RANGE_DATA;
   hdr.byte_count = data.ranges_count * sizeof(double);
   message.hdr = hdr;
@@ -396,15 +380,7 @@ void TranslatorDriver::ProcessRanger(player_ranger_data_range_t &data)
 void TranslatorDriver::PutCommand(double cmd_speed, double cmd_turnrate)
 {
   player_position2d_cmd_vel_t cmd;
-#ifdef _STATS_BENCH_ROUND_TRIP_
-  timestamp_t current;
-  current = generate_timestamp();
 
-  printf("%lf\n", timestamp_to_realtime(current - last, cpu_speed));
-#endif
-#ifdef _STATS_CONT_TO_BENCH_
-  printf("Benc\t%lf\n", timestamp_to_realtime(generate_timestamp(), cpu_speed));
-#endif
   memset(&cmd, 0, sizeof(cmd));
 
   cmd.vel.px = cmd_speed;
