@@ -28,7 +28,6 @@ typedef enum {
   WAITING
 } voting_status;
 
-
 // Replica related data
 struct replica_group repGroup;
 struct replica replicas[REP_COUNT];
@@ -169,6 +168,11 @@ void doOneUpdate() {
   struct comm_header hdr;
   double cmd_vel[2];
 
+  struct timeval select_timeout;
+  fd_set select_set;
+  int max_fd;
+  int rep_pipe_r;
+
   if (vote_stat == VOTING) {
     current = generate_timestamp();
     elapsed_time_seconds += timestamp_to_realtime(current - last, cpu_speed);
@@ -198,32 +202,54 @@ void doOneUpdate() {
     vote_stat = WAITING;
   }
 
-  // Check for data from benchmarker... this read will block... BAD
-  retval = read(read_in_fd, &hdr, sizeof(struct comm_header));;
+
+  // See if any of the read pipes have anything
+  select_timeout.tv_sec = 0;
+  select_timeout.tv_usec = 50;
+
+  FD_ZERO(&select_set);
+  max_fd = read_in_fd;
+  for (index = 0; index < REP_COUNT; index++) {
+    rep_pipe_r = replicas[index].pipefd_outof_rep[0];
+    if (rep_pipe_r > max_fd) {
+      max_fd = rep_pipe_r;
+    }
+    FD_SET(rep_pipe_r, &select_set);
+  }
+  // This will wait at least timeout until return. Returns earlier if something has data.
+  retval = select(max_fd + 1, &select_set, NULL, NULL, &select_timeout);
+
+  // Check for data from benchmarker... this read will block...
+  FD_ZERO(&select_set);
+  FD_SET(read_in_fd, &select_set);
+  retval = select(read_in_fd + 1, &select_set, NULL, NULL, &select_timeout);
   if (retval > 0) {
-    assert(retval == sizeof(struct comm_header));
-    switch (hdr.type) {
-    case COMM_RANGE_DATA:
-      // send to reps!
-      retval = read(read_in_fd, ranger_ranges, hdr.byte_count);
-      range_count = retval / sizeof(double);
-      assert(retval == hdr.byte_count);
-      processRanger();      
-      break;
-    case COMM_POS_DATA:
-      // send to reps!
-      retval = read(read_in_fd, pos, hdr.byte_count);
-      assert(retval == hdr.byte_count);
-      processOdom();
-      break;
-    case COMM_WAY_RES:
-      // New waypoints from benchmarker!
-      retval = read(read_in_fd, next_goal, hdr.byte_count);
-      assert(retval == hdr.byte_count);
-      processCommand();
-      break;
-    default:
-      printf("ERROR: VoterB can't handle comm type: %d\n", hdr.type);
+    retval = read(read_in_fd, &hdr, sizeof(struct comm_header));;
+    if (retval > 0) {
+      assert(retval == sizeof(struct comm_header));
+      switch (hdr.type) {
+      case COMM_RANGE_DATA:
+	// send to reps!
+	retval = read(read_in_fd, ranger_ranges, hdr.byte_count);
+	range_count = retval / sizeof(double);
+	assert(retval == hdr.byte_count);
+	processRanger();      
+	break;
+      case COMM_POS_DATA:
+	// send to reps!
+	retval = read(read_in_fd, pos, hdr.byte_count);
+	assert(retval == hdr.byte_count);
+	processOdom();
+	break;
+      case COMM_WAY_RES:
+	// New waypoints from benchmarker!
+	retval = read(read_in_fd, next_goal, hdr.byte_count);
+	assert(retval == hdr.byte_count);
+	processCommand();
+	break;
+      default:
+	printf("ERROR: VoterB can't handle comm type: %d\n", hdr.type);
+      }
     }
   }
 

@@ -165,7 +165,7 @@ int BenchmarkerDriver::MainSetup()
   // Should just be one "replica": The program running (VoterB or a controller)
   initReplicas(&repGroup, replicas, REP_COUNT);
   // TODO: Will need to set this parameter correctly
-  //  forkSingleReplica(&repGroup, 0, "art_pot_p");
+  //forkSingleReplica(&repGroup, 0, "art_pot_p");
   forkSingleReplica(&repGroup, 0, "VoterB");
   //  printf("Replica - pid: %d\tfd_in_r: %d\tfd_in_w: %d\n", repGroup.replicas[0].pid, repGroup.replicas[0].pipefd_into_rep[0], repGroup.replicas[0].pipefd_into_rep[1]);
 
@@ -370,11 +370,6 @@ void BenchmarkerDriver::ProcessRanger(player_ranger_data_range_t &data)
   int index = 0;
   struct comm_header hdr;
 
-#ifdef _STATS_RANGER_BENCH_OUT_
-  timestamp_t current;
-  current = generate_timestamp();
-#endif
-
 #ifdef _STATS_BENCH_ROUND_TRIP_
   last = generate_timestamp();
 #endif // _STATS_BENCH_ROUND_TRIP_
@@ -384,10 +379,6 @@ void BenchmarkerDriver::ProcessRanger(player_ranger_data_range_t &data)
   write(replicas[0].pipefd_into_rep[1], (void*)(&hdr), sizeof(struct comm_header));
 
   write(replicas[0].pipefd_into_rep[1], (void*)(data.ranges), hdr.byte_count);
-
-#ifdef _STATS_RANGER_BENCH_OUT_
-  printf("RANGER left bench at: %lf\n", timestamp_to_realtime(current, cpu_speed));
-#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////

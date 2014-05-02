@@ -8,7 +8,7 @@
 #define _STATS_TIME_H_
 
 // Half stats
-//#define _STATS_RANGER_BENCH_OUT_
+
 //#define _STATS_RANGER_VOTE_IN_
 //#define _STATS_RANGER_VOTE_OUT_
 //#define _STATS_RANGER_CONT_IN_
