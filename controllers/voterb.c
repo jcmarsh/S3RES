@@ -204,10 +204,11 @@ void doOneUpdate() {
 
 
   // See if any of the read pipes have anything
-  select_timeout.tv_sec = 0;
-  select_timeout.tv_usec = 50;
+  select_timeout.tv_sec = 1;
+  select_timeout.tv_usec = 0;
 
   FD_ZERO(&select_set);
+  FD_SET(read_in_fd, &select_set);
   max_fd = read_in_fd;
   for (index = 0; index < REP_COUNT; index++) {
     rep_pipe_r = replicas[index].pipefd_outof_rep[0];
@@ -218,6 +219,9 @@ void doOneUpdate() {
   }
   // This will wait at least timeout until return. Returns earlier if something has data.
   retval = select(max_fd + 1, &select_set, NULL, NULL, &select_timeout);
+
+  select_timeout.tv_sec = 0;
+  select_timeout.tv_usec = 0;
 
   // Check for data from benchmarker... this read will block...
   FD_ZERO(&select_set);
