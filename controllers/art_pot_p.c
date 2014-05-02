@@ -41,6 +41,8 @@ int write_out_fd;
 // TAS related
 cpu_speed_t cpu_speed;
 
+timestamp_t last;
+
 void enterLoop();
 void command();
 int initReplica();
@@ -97,15 +99,12 @@ int initReplica() {
 }
 
 void command() {
-  timestamp_t start_time;
-  timestamp_t end_time;
+  timestamp_t current;
   double dist, theta, delta_x, delta_y, v, tao, obs_x, obs_y;
   double vel_cmd[2];
   int total_factors, i;
   struct comm_header hdr;
-#ifdef _STATS_CONT_COMMAND_
-  start_time = generate_timestamp();
-#endif
+
   hdr.type = COMM_MOV_CMD;
   hdr.byte_count = 2 * sizeof(double);
 
@@ -163,11 +162,13 @@ void command() {
   }
 
 #ifdef _STATS_CONT_COMMAND_
-  end_time = generate_timestamp();
-  printf("ArtPot - Start, End: (%llu, %llu)\t cpu_speed: %llu\n", start_time, end_time, cpu_speed);
-  printf("ArtPot - Command Func Time: %09lf\n", timestamp_to_realtime(end_time - start_time, cpu_speed));  
+  current = generate_timestamp();
+  
+  printf("%lf\n", timestamp_to_realtime(current - last, cpu_speed));
 #endif
-
+#ifdef _STATS_CONT_TO_BENCH_
+  printf("Cont\t%lf\n", timestamp_to_realtime(generate_timestamp(), cpu_speed));
+#endif
   // Write move command
   write(write_out_fd, &hdr, sizeof(struct comm_header));
 
@@ -187,13 +188,12 @@ void enterLoop() {
   void * update_id;
   //  int read_ret;
   int index;
-  timestamp_t last;
-  timestamp_t current;
+
   int read_ret;
   struct comm_header hdr;
 
-  while(1) { // while something else.
-    // This is how to read the ranges_count
+  while(1) {
+    // These reads should all be blocking
     read_ret = read(read_in_fd, &hdr, sizeof(struct comm_header));
     if (read_ret > 0) {
       assert(read_ret == sizeof(struct comm_header));
@@ -203,7 +203,12 @@ void enterLoop() {
 	read_ret = read(read_in_fd, ranger_ranges, hdr.byte_count);
 	ranger_count = read_ret / sizeof(double);      
 	assert(read_ret == hdr.byte_count);
-
+#ifdef _STATS_BENCH_TO_CONT_
+	printf("Cont\t%lf\n", timestamp_to_realtime(generate_timestamp(), cpu_speed));
+#endif
+#ifdef _STATS_CONT_COMMAND_
+	last = generate_timestamp();
+#endif
 	// Calculates and sends the new command
 	command();
 	break;

@@ -165,8 +165,8 @@ int BenchmarkerDriver::MainSetup()
   // Should just be one "replica": The program running (VoterB or a controller)
   initReplicas(&repGroup, replicas, REP_COUNT);
   // TODO: Will need to set this parameter correctly
-  //forkSingleReplica(&repGroup, 0, "art_pot_p");
-  forkSingleReplica(&repGroup, 0, "VoterB");
+  forkSingleReplica(&repGroup, 0, "art_pot_p");
+  //forkSingleReplica(&repGroup, 0, "VoterB");
   //  printf("Replica - pid: %d\tfd_in_r: %d\tfd_in_w: %d\n", repGroup.replicas[0].pid, repGroup.replicas[0].pipefd_into_rep[0], repGroup.replicas[0].pipefd_into_rep[1]);
 
   puts("Benchmarker driver ready");
@@ -261,7 +261,7 @@ void BenchmarkerDriver::DoOneUpdate() {
     case COMM_MOV_CMD:
       // This read is non-blocking... could it fail? (EAGAIN)
       retval = read(replicas[0].pipefd_outof_rep[0], cmd_vel, hdr.byte_count);
-      assert(retval == hdr.byte_count);
+      assert(retval == hdr.byte_count); // Failed once here.
       this->PutCommand(cmd_vel[0], cmd_vel[1]);
       break;
     default:
@@ -373,7 +373,9 @@ void BenchmarkerDriver::ProcessRanger(player_ranger_data_range_t &data)
 #ifdef _STATS_BENCH_ROUND_TRIP_
   last = generate_timestamp();
 #endif // _STATS_BENCH_ROUND_TRIP_
-
+#ifdef _STATS_BENCH_TO_CONT_
+  printf("Benc\t%lf\n", timestamp_to_realtime(generate_timestamp(), cpu_speed));
+#endif
   hdr.type = COMM_RANGE_DATA;
   hdr.byte_count = data.ranges_count * sizeof(double);
   write(replicas[0].pipefd_into_rep[1], (void*)(&hdr), sizeof(struct comm_header));
@@ -391,6 +393,9 @@ void BenchmarkerDriver::PutCommand(double cmd_speed, double cmd_turnrate)
   current = generate_timestamp();
 
   printf("%lf\n", timestamp_to_realtime(current - last, cpu_speed));
+#endif
+#ifdef _STATS_CONT_TO_BENCH_
+  printf("Benc\t%lf\n", timestamp_to_realtime(generate_timestamp(), cpu_speed));
 #endif
   memset(&cmd, 0, sizeof(cmd));
 

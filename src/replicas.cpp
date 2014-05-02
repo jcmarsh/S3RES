@@ -64,11 +64,17 @@ int forkSingleReplica(struct replica_group* rg, int num, char* prog_name) {
       rep_argv[1] = read_in;
       sprintf(write_out, "%02d", rg->replicas[num].pipefd_outof_rep[1]);
       rep_argv[2] = write_out;
+
+      close(rg->replicas[num].pipefd_outof_rep[0]); // close read end of outof_rep pipe in child
+      close(rg->replicas[num].pipefd_into_rep[1]); // close write end of into_rep pipe in child
+
       if (-1 == execv(prog_name, rep_argv)) {
 	perror("EXEC ERROR!");
 	return -1;
       }
     } else { // Parent Process
+      close(rg->replicas[num].pipefd_into_rep[0]); // close read end of into_rep pipe in parent
+      close(rg->replicas[num].pipefd_outof_rep[1]); // close write end of outof_rep pipe in parent
       rg->replicas[num].pid = currentPID;
     }
   } else {

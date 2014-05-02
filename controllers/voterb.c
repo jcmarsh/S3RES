@@ -323,9 +323,6 @@ void processRanger() {
       // write each of the ranges
       write(replicas[index].pipefd_into_rep[1], (void*)(ranger_ranges), hdr.byte_count);
     }
-#ifdef _STATS_RANGER_VOTE_OUT_
-    printf("RANGER left vote at: %lf\n", timestamp_to_realtime(current, cpu_speed));
-#endif
   }
 }
 
