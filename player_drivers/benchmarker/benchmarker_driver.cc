@@ -165,8 +165,8 @@ int BenchmarkerDriver::MainSetup()
   // Should just be one "replica": The program running (VoterB or a controller)
   initReplicas(&repGroup, replicas, REP_COUNT);
   // TODO: Will need to set this parameter correctly
-  forkSingleReplica(&repGroup, 0, "art_pot_p");
-  //forkSingleReplica(&repGroup, 0, "VoterB");
+  //forkSingleReplica(&repGroup, 0, "art_pot_p");
+  forkSingleReplica(&repGroup, 0, "VoterB");
   //  printf("Replica - pid: %d\tfd_in_r: %d\tfd_in_w: %d\n", repGroup.replicas[0].pid, repGroup.replicas[0].pipefd_into_rep[0], repGroup.replicas[0].pipefd_into_rep[1]);
 
   puts("Benchmarker driver ready");
@@ -228,12 +228,16 @@ int BenchmarkerDriver::ProcessMessage(QueuePointer & resp_queue,
 
 void BenchmarkerDriver::SendWaypoints() {
   struct comm_header hdr;
+  struct comm_way_res_msg message;
 
   hdr.type = COMM_WAY_RES;
   hdr.byte_count = 3 * sizeof(double);
+  message.hdr = hdr;
+  message.point[INDEX_X] = curr_goal[INDEX_X];
+  message.point[INDEX_Y] = curr_goal[INDEX_Y];
+  message.point[INDEX_A] = curr_goal[INDEX_A];
 
-  write(replicas[0].pipefd_into_rep[1], (void*)(&hdr), sizeof(struct comm_header));
-  write(replicas[0].pipefd_into_rep[1], (void*)(curr_goal), hdr.byte_count);
+  write(replicas[0].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
 }
 
 void BenchmarkerDriver::Main() {
@@ -259,9 +263,9 @@ void BenchmarkerDriver::DoOneUpdate() {
       this->SendWaypoints();
       break;
     case COMM_MOV_CMD:
-      // This read is non-blocking... could it fail? (EAGAIN)
+      // This read is non-blocking... whole message should be written at once to prevent interleaving
       retval = read(replicas[0].pipefd_outof_rep[0], cmd_vel, hdr.byte_count);
-      assert(retval == hdr.byte_count); // Failed once here.
+      assert(retval == hdr.byte_count); // Shouldn't fail, art_pot writes once
       this->PutCommand(cmd_vel[0], cmd_vel[1]);
       break;
     default:
@@ -349,18 +353,17 @@ int BenchmarkerDriver::SetupRanger()
 void BenchmarkerDriver::ProcessOdom(player_position2d_data_t &data)
 {
   struct comm_header hdr;
-  double pose[3];
-
-  pose[INDEX_X] = data.pos.px;
-  pose[INDEX_Y] = data.pos.py;
-  pose[INDEX_A] = data.pos.pa;
+  struct comm_pos_data_msg message;
 
   // Need to publish to the replica
   hdr.type = COMM_POS_DATA;
   hdr.byte_count = 3 * sizeof(double);
-  write(replicas[0].pipefd_into_rep[1], (void*)(&hdr), sizeof(struct comm_header));
+  message.hdr = hdr;
+  message.pose[INDEX_X] = data.pos.px;
+  message.pose[INDEX_Y] = data.pos.py;
+  message.pose[INDEX_A] = data.pos.pa;
 
-  write(replicas[0].pipefd_into_rep[1], (void*)(pose), hdr.byte_count);
+  write(replicas[0].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -369,6 +372,7 @@ void BenchmarkerDriver::ProcessRanger(player_ranger_data_range_t &data)
 {
   int index = 0;
   struct comm_header hdr;
+  struct comm_range_data_msg message;
 
 #ifdef _STATS_BENCH_ROUND_TRIP_
   last = generate_timestamp();
@@ -378,9 +382,12 @@ void BenchmarkerDriver::ProcessRanger(player_ranger_data_range_t &data)
 #endif
   hdr.type = COMM_RANGE_DATA;
   hdr.byte_count = data.ranges_count * sizeof(double);
-  write(replicas[0].pipefd_into_rep[1], (void*)(&hdr), sizeof(struct comm_header));
+  message.hdr = hdr;
+  for (index = 0; index < data.ranges_count; index++) {
+    message.ranges[index] = data.ranges[index];
+  }
 
-  write(replicas[0].pipefd_into_rep[1], (void*)(data.ranges), hdr.byte_count);
+  write(replicas[0].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

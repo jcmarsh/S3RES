@@ -103,10 +103,9 @@ void command() {
   double dist, theta, delta_x, delta_y, v, tao, obs_x, obs_y;
   double vel_cmd[2];
   int total_factors, i;
+  
+  struct comm_mov_cmd_msg message;
   struct comm_header hdr;
-
-  hdr.type = COMM_MOV_CMD;
-  hdr.byte_count = 2 * sizeof(double);
 
   // Head towards the goal! odom_pose: 0-x, 1-y, 2-theta
   dist = sqrt(pow(goal[INDEX_X] - pos[INDEX_X], 2)  + pow(goal[INDEX_Y] - pos[INDEX_Y], 2));
@@ -161,6 +160,12 @@ void command() {
     vel_cmd[1] = 0.0;
   }
 
+  hdr.type = COMM_MOV_CMD;
+  hdr.byte_count = 2 * sizeof(double);
+  message.hdr = hdr;
+  message.vel_cmd[0] = vel_cmd[0];
+  message.vel_cmd[1] = vel_cmd[1];
+
 #ifdef _STATS_CONT_COMMAND_
   current = generate_timestamp();
   
@@ -170,9 +175,7 @@ void command() {
   printf("Cont\t%lf\n", timestamp_to_realtime(generate_timestamp(), cpu_speed));
 #endif
   // Write move command
-  write(write_out_fd, &hdr, sizeof(struct comm_header));
-
-  write(write_out_fd, vel_cmd, hdr.byte_count);
+  write(write_out_fd, &message, sizeof(struct comm_header) + hdr.byte_count);
 }
 
 void requestWaypoints() {

@@ -286,14 +286,18 @@ void doOneUpdate() {
 void processOdom() {
   int index = 0;
   struct comm_header hdr;
+  struct comm_pos_data_msg message;
+
+  hdr.type = COMM_POS_DATA;
+  hdr.byte_count = 3 * sizeof(double);
+  message.hdr = hdr;
+  message.pose[INDEX_X] = pos[INDEX_X];
+  message.pose[INDEX_Y] = pos[INDEX_Y];
+  message.pose[INDEX_A] = pos[INDEX_A];
 
   // Need to publish to the replicas
   for (index = 0; index < REP_COUNT; index++) {
-    hdr.type = COMM_POS_DATA;
-    hdr.byte_count = 3 * sizeof(double);
-    write(replicas[index].pipefd_into_rep[1], (void*)(&hdr), sizeof(struct comm_header));
-
-    write(replicas[index].pipefd_into_rep[1], (void*)(pos), hdr.byte_count);
+    write(replicas[index].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
   }
 }
 
@@ -303,6 +307,14 @@ void processRanger() {
   int index = 0;
   timestamp_t current;
   struct comm_header hdr;
+  struct comm_range_data_msg message;
+
+  hdr.type = COMM_RANGE_DATA;
+  hdr.byte_count = range_count * sizeof(double);
+  message.hdr = hdr;
+  for (index = 0; index < range_count; index++) {
+    message.ranges[index] = ranger_ranges[index];
+  }
 
   // Ignore first ranger update (to give everything a chance to init)
   if (ranger_cmds_count < INIT_ROUNDS) {
@@ -313,15 +325,9 @@ void processRanger() {
     current = generate_timestamp();
     last = current;
     
-    //
     for (index = 0; index < REP_COUNT; index++) {
-      // Write header
-      hdr.type = COMM_RANGE_DATA;
-      hdr.byte_count = range_count * sizeof(double);
-      write(replicas[index].pipefd_into_rep[1], (void*)(&hdr), sizeof(struct comm_header));
-
-      // write each of the ranges
-      write(replicas[index].pipefd_into_rep[1], (void*)(ranger_ranges), hdr.byte_count);
+      // Write range data
+      write(replicas[index].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
     }
   }
 }
@@ -347,7 +353,8 @@ void sendWaypoints(int replica_num) {
   int index = 0;
   bool all_sent = true;
   struct comm_header hdr;
-
+  struct comm_way_res_msg message;
+  
   // For now only one waypoint at a time (it's Art Pot, so fine.)
  
   // if replica already has latest... errors
@@ -359,26 +366,13 @@ void sendWaypoints(int replica_num) {
 
     hdr.type = COMM_WAY_RES;
     hdr.byte_count = 3 * sizeof(double);
+    message.hdr = hdr;
+    message.point[INDEX_X] = curr_goal[INDEX_X];
+    message.point[INDEX_Y] = curr_goal[INDEX_Y];
+    message.point[INDEX_A] = curr_goal[INDEX_A];
 
-    write(replicas[replica_num].pipefd_into_rep[1], (void*)(&hdr), sizeof(struct comm_header));
-
-    write(replicas[replica_num].pipefd_into_rep[1], (void*)(curr_goal), hdr.byte_count);
+    write(replicas[replica_num].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
   }
-
-  // if all 3 sent, reset and move next to current
-  /* Isn't this taken care of in processCommand()?
-  for (index = 0; index < REP_COUNT; index++) {
-    all_sent = all_sent && sent[index];
-  }
-  if (all_sent) {
-    curr_goal[INDEX_X] = next_goal[INDEX_X];
-    curr_goal[INDEX_Y] = next_goal[INDEX_Y];
-    curr_goal[INDEX_A] = next_goal[INDEX_A];
-    for (index = 0; index < REP_COUNT; index++) {
-      sent[index] = false;
-    }
-  }
-  */
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -437,16 +431,15 @@ void processVelCmdFromRep(double cmd_vel_x, double cmd_vel_a, int replica_num) {
 // Send commands to underlying position device
 void putCommand(double cmd_speed, double cmd_turnrate) {
   struct comm_header hdr;
-  double cmd_vel[2];
-
-  cmd_vel[0] = cmd_speed;
-  cmd_vel[1] = cmd_turnrate;
+  struct comm_mov_cmd_msg message;
 
   hdr.type = COMM_MOV_CMD;
   hdr.byte_count = 2 * sizeof(double);
+  message.hdr = hdr;
+  message.vel_cmd[0] = cmd_speed;
+  message.vel_cmd[1] = cmd_turnrate;
 
-  write(write_out_fd, &hdr, sizeof(struct comm_header));
-  write(write_out_fd, cmd_vel, hdr.byte_count);
+  write(write_out_fd, (void*)&message, sizeof(struct comm_header) + hdr.byte_count);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
