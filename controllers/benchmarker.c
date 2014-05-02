@@ -47,11 +47,10 @@ void processCommand();
 
 int initBenchMarker() {
   InitTAS(3, &cpu_speed);
-  printf("Bench TASED\n");
 
   initReplicas(&repGroup, replicas, REP_COUNT);
-  forkSingleReplica(&repGroup, 0, "art_pot_p");
-  //  forkSingleReplica(&repGroup, 0, "VoterB");
+  //forkSingleReplica(&repGroup, 0, "art_pot_p");
+  forkSingleReplica(&repGroup, 0, "VoterB");
 
   return 0;
 }
@@ -66,14 +65,12 @@ int parseArgs(int argc, const char **argv) {
 
   read_in_fd = atoi(argv[1]);
   write_out_fd = atoi(argv[2]);
-  printf("Bench fds: %d, %d\n", read_in_fd, write_out_fd);
 
   return 0;
 }
 
 int main(int argc, const char **argv) {
   printf("Hello darkness my old friend.\n");
-
 
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");
@@ -85,7 +82,6 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
-  printf("Bench: Init done.\n");
   while(1) {
     doOneUpdate();
   }
@@ -157,20 +153,29 @@ void doOneUpdate() {
   hdr.type = -1;
   hdr.byte_count = -1;
 
-  // Check replica for data
-  retval = read(replicas[0].pipefd_outof_rep[0], &hdr, sizeof(struct comm_header));
+  select_timeout.tv_sec = 0;
+  select_timeout.tv_usec = 0;
+
+  // Check for data from translator...
+  FD_ZERO(&select_set);
+  FD_SET(replicas[0].pipefd_outof_rep[0], &select_set);
+  retval = select(replicas[0].pipefd_outof_rep[0] + 1, &select_set, NULL, NULL, &select_timeout);
   if (retval > 0) {
-    switch (hdr.type) {
-    case COMM_WAY_REQ:
-      requestWaypoints();
-      break;
-    case COMM_MOV_CMD:
-      retval = read(replicas[0].pipefd_outof_rep[0], mov_cmd_msg.vel_cmd, hdr.byte_count);
-      assert(retval == hdr.byte_count);
-      processCommand();
-      break;
-    default:
-      printf("ERROR: VoterB can't handle comm type: %d\n", hdr.type);
+    // Check replica for data
+    retval = read(replicas[0].pipefd_outof_rep[0], &hdr, sizeof(struct comm_header));
+    if (retval > 0) {
+      switch (hdr.type) {
+      case COMM_WAY_REQ:
+	requestWaypoints();
+	break;
+      case COMM_MOV_CMD:
+	retval = read(replicas[0].pipefd_outof_rep[0], mov_cmd_msg.vel_cmd, hdr.byte_count);
+	assert(retval == hdr.byte_count);
+	processCommand();
+	break;
+      default:
+	printf("ERROR: VoterB can't handle comm type: %d\n", hdr.type);
+      }
     }
   }
 }
@@ -206,16 +211,17 @@ void processRanger() {
   int index = 0;
   struct comm_header hdr;
 
+  hdr.type = COMM_RANGE_DATA;
+  hdr.byte_count = 16 * sizeof(double);
+  range_data_msg.hdr = hdr;
+  // msg data set by read in
+
 #ifdef _STATS_BENCH_ROUND_TRIP_
   last = generate_timestamp();
 #endif // _STATS_BENCH_ROUND_TRIP_
 #ifdef _STATS_BENCH_TO_CONT_
   printf("Benc\t%lf\n", timestamp_to_realtime(generate_timestamp(), cpu_speed));
 #endif
-  hdr.type = COMM_RANGE_DATA;
-  hdr.byte_count = 16 * sizeof(double);
-  range_data_msg.hdr = hdr;
-  // msg data set by read in
 
   write(replicas[0].pipefd_into_rep[1], (void*)(&range_data_msg), sizeof(struct comm_header) + hdr.byte_count);
 }
@@ -238,7 +244,7 @@ void processCommand() {
   timestamp_t current;
   current = generate_timestamp();
 
-  printf("%lf\n", timestamp_to_realtime(current - last, cpu_speed));
+  printf("%lld\n", current - last);
 #endif
 #ifdef _STATS_CONT_TO_BENCH_
   printf("Benc\t%lf\n", timestamp_to_realtime(generate_timestamp(), cpu_speed));

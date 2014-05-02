@@ -5,9 +5,9 @@ INC=-I$(PLAYERC)/ -I$(PLAYERC)/client_libs/ -I$(PLAYERC)/build/
 all: regular
 
 regular:
-	g++ $(INC) -o art_pot_p art_pot_p.c ../src/cpu.cpp ../src/time.cpp ../src/scheduler.cpp ../src/force.cpp ../src/taslimited.cpp -lrt
-	g++ $(INC) -o VoterB voterb.c ../src/cpu.cpp ../src/time.cpp ../src/scheduler.cpp ../src/force.cpp ../src/taslimited.cpp ../src/replicas.cpp -lrt
-	g++ $(INC) -o BenchMarker benchmarker.c ../src/cpu.cpp ../src/time.cpp ../src/scheduler.cpp ../src/force.cpp ../src/taslimited.cpp ../src/replicas.cpp -lrt
+	g++ $(INC) -O3 -o art_pot_p art_pot_p.c ../src/cpu.cpp ../src/time.cpp ../src/scheduler.cpp ../src/force.cpp ../src/taslimited.cpp -lrt
+	g++ $(INC) -O3 -o VoterB voterb.c ../src/cpu.cpp ../src/time.cpp ../src/scheduler.cpp ../src/force.cpp ../src/taslimited.cpp ../src/replicas.cpp -lrt
+	g++ $(INC) -O3 -o BenchMarker benchmarker.c ../src/cpu.cpp ../src/time.cpp ../src/scheduler.cpp ../src/force.cpp ../src/taslimited.cpp ../src/replicas.cpp -lrt
 	gcc $(INC) -o redundant_test redundant_test.c -lplayerc
 
 copy: regular
