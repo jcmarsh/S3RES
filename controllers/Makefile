@@ -8,7 +8,6 @@ regular:
 	g++ $(INC) -O3 -o art_pot_p art_pot_p.c ../src/cpu.cpp ../src/time.cpp ../src/scheduler.cpp ../src/force.cpp ../src/taslimited.cpp -lrt
 	g++ $(INC) -O3 -o VoterB voterb.c ../src/cpu.cpp ../src/time.cpp ../src/scheduler.cpp ../src/force.cpp ../src/taslimited.cpp ../src/replicas.cpp -lrt
 	g++ $(INC) -O3 -o BenchMarker benchmarker.c ../src/cpu.cpp ../src/time.cpp ../src/scheduler.cpp ../src/force.cpp ../src/taslimited.cpp ../src/replicas.cpp -lrt
-	gcc $(INC) -o redundant_test redundant_test.c -lplayerc
 
 copy: regular
 	cp art_pot_p ../../stage/experiments/
@@ -19,4 +18,3 @@ clean:
 	rm -f art_pot_p
 	rm -f VoterB
 	rm -f BenchMarker
-	rm -f redundant_test
