@@ -12,10 +12,10 @@
 
 #include <libplayercore/playercore.h>
 
-#include "../../include/taslimited.h"
-#include "../../include/statstime.h"
-#include "../../include/replicas.h"
-#include "../../include/commtypes.h"
+#include "../include/taslimited.h"
+#include "../include/statstime.h"
+#include "../include/replicas.h"
+#include "../include/commtypes.h"
 
 #define REP_COUNT 1
 
