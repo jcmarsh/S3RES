@@ -15,6 +15,7 @@
 #include "../include/statstime.h"
 #include "../include/replicas.h"
 #include "../include/commtypes.h"
+#include "../include/fd_server.h"
 
 #define REP_COUNT 3
 #define INIT_ROUNDS 4
@@ -50,6 +51,9 @@ cpu_speed_t cpu_speed;
 timestamp_t last;
 realtime_t elapsed_time_seconds;
 
+// FD server
+struct server_data sd;
+
 // FDs to the benchmarker
 int read_in_fd;
 int write_out_fd;
@@ -82,8 +86,13 @@ int forkReplicas(struct replica_group* rg) {
 
   // Fork children
   for (index = 0; index < rg->num; index++) {
-    forkSingleReplica(rg, index, "art_pot_p");
+    forkSingleReplicaNoFD(rg, index, "art_pot_p");
     // TODO: Handle possible errors
+
+    // send fds
+    acceptSendFDS(&sd, rg->replicas[index].pipefd_into_rep[0], rg->replicas[index].pipefd_outof_rep[1]);
+    close(rg->replicas[index].pipefd_into_rep[0]);
+    close(rg->replicas[index].pipefd_outof_rep[1]);
   }
 
   return 1;
@@ -105,6 +114,9 @@ int initVoterB() {
   }
 
   resetVotingState();
+
+  // Setup fd server
+  createFDS(&sd);
 
   // Let's try to launch the replicas
   initReplicas(&repGroup, replicas, REP_COUNT);

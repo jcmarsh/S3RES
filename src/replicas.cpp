@@ -46,7 +46,30 @@ int initReplicas(struct replica_group* rg, struct replica* reps, int num) {
   return 1;
 }
 
-// TODO: name of program!
+int forkSingleReplicaNoFD(struct replica_group* rg, int num, char* prog_name) {
+  pid_t currentPID = 0;
+  char* rep_argv[] = {prog_name, NULL};
+
+  // TODO: Check if replica_group has been inited.
+  // Fork child
+  currentPID = fork();
+
+  if (currentPID >= 0) { // Successful fork
+    if (currentPID == 0) { // Child process
+      if (-1 == execv(prog_name, rep_argv)) {
+	perror("EXEC ERROR!");
+	return -1;
+      }
+    } else { // Parent Process
+      rg->replicas[num].pid = currentPID;
+    }
+  } else {
+    printf("Fork error!\n");
+    return -1;
+  }
+}
+
+
 int forkSingleReplica(struct replica_group* rg, int num, char* prog_name) {
   pid_t currentPID = 0;
   char write_out[3]; // File descriptor rep will write to. Should survive exec()
@@ -59,8 +82,7 @@ int forkSingleReplica(struct replica_group* rg, int num, char* prog_name) {
 
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
-      // art_pot expects something like: ./art_pot 127.0.0.1 6666 2
-      // 2 matches the interface index in the .cfg file
+      // art_pot expects something like: ./art_pot read_fd write_fd
       sprintf(read_in, "%02d", rg->replicas[num].pipefd_into_rep[0]);
       rep_argv[1] = read_in;
       sprintf(write_out, "%02d", rg->replicas[num].pipefd_outof_rep[1]);

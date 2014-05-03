@@ -15,6 +15,7 @@
 #include "../include/taslimited.h"
 #include "../include/commtypes.h"
 #include "../include/statstime.h"
+#include "../include/fd_client.h"
 
 // Configuration parameters
 #define VEL_SCALE 1
@@ -74,13 +75,13 @@ void restartHandler(int signo) {
 int parseArgs(int argc, const char **argv) {
   int i;
 
-  if (argc < 3) {
-    puts("Usage: art_pot_p <read_in_fd> <write_out_fd>");
-    return -1;
+  // TODO: error checking
+  if (argc < 3) { // Must request fds
+    connectRecvFDS(&read_in_fd, &write_out_fd);
+  } else {
+    read_in_fd = atoi(argv[1]);
+    write_out_fd = atoi(argv[2]);
   }
-
-  read_in_fd = atoi(argv[1]);
-  write_out_fd = atoi(argv[2]);
 
   return 0;
 }

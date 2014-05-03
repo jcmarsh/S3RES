@@ -45,6 +45,11 @@ int initReplicas(struct replica_group* rg, struct replica* reps, int num);
 /*
  *
  */
+int forkSingleReplicaNoFD(struct replica_group* rg, int num, char* prog_name);
+
+/*
+ *
+ */
 int forkSingleReplica(struct replica_group* rg, int num, char* prog_name);
 
 /*
