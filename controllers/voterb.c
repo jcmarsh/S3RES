@@ -232,14 +232,8 @@ void doOneUpdate() {
   // This will wait at least timeout until return. Returns earlier if something has data.
   retval = select(max_fd + 1, &select_set, NULL, NULL, &select_timeout);
 
-  select_timeout.tv_sec = 0;
-  select_timeout.tv_usec = 0;
-
-  // Check for data from benchmarker... this read will block...
-  FD_ZERO(&select_set);
-  FD_SET(read_in_fd, &select_set);
-  retval = select(read_in_fd + 1, &select_set, NULL, NULL, &select_timeout);
-  if (retval > 0) {
+  // Check for data from the benchmarker
+  if (FD_ISSET(read_in_fd, &select_set)) {
     retval = read(read_in_fd, &hdr, sizeof(struct comm_header));;
     if (retval > 0) {
       assert(retval == sizeof(struct comm_header));
@@ -269,25 +263,27 @@ void doOneUpdate() {
     }
   }
 
-  // clear comm_header for next message
-  hdr.type = -1;
-  hdr.byte_count = -1;
-
   // Check all replicas for data
   for (index = 0; index < REP_COUNT; index++) {
-    retval = read(replicas[index].pipefd_outof_rep[0], &hdr, sizeof(struct comm_header));
-    if (retval > 0) {
-      switch (hdr.type) {
-      case COMM_WAY_REQ:
-	sendWaypoints(index);
-	break;
-      case COMM_MOV_CMD:
-	retval = read(replicas[index].pipefd_outof_rep[0], cmd_vel, hdr.byte_count);
-	assert(retval == hdr.byte_count);
-	processVelCmdFromRep(cmd_vel[0], cmd_vel[1], index);
-	break;
-      default:
-	printf("ERROR: VoterB can't handle comm type: %d\n", hdr.type);
+    // clear comm_header for next message
+    hdr.type = -1;
+    hdr.byte_count = -1;
+    
+    if (FD_ISSET(replicas[index].pipefd_outof_rep[0], &select_set)) {
+      retval = read(replicas[index].pipefd_outof_rep[0], &hdr, sizeof(struct comm_header));
+      if (retval > 0) {
+	switch (hdr.type) {
+	case COMM_WAY_REQ:
+	  sendWaypoints(index);
+	  break;
+	case COMM_MOV_CMD:
+	  retval = read(replicas[index].pipefd_outof_rep[0], cmd_vel, hdr.byte_count);
+	  assert(retval == hdr.byte_count);
+	  processVelCmdFromRep(cmd_vel[0], cmd_vel[1], index);
+	  break;
+	default:
+	  printf("ERROR: VoterB can't handle comm type: %d\n", hdr.type);
+	}
       }
     }
   }
