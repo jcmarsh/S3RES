@@ -13,12 +13,12 @@ int initReplicas(struct replica_group* rg, struct replica* reps, int num) {
   for (index = 0; index < rg->num; index++) {
     //    printf("Initing index: %d\n", index);
     if (pipe(rg->replicas[index].pipefd_into_rep) == -1) {
-      printf("Pipe error!\n");
+      perror("replicas pipe error!");
       return 0;
     }
 
     if (pipe(rg->replicas[index].pipefd_outof_rep) == -1) {
-      printf("Pipe error!\n");
+      printf("replicas pipe error!");
       return 0;
     }
 
