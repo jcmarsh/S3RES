@@ -6,8 +6,6 @@ int initReplicas(struct replica_group* rg, struct replica* reps, int num) {
 
   rg->replicas = reps;
   rg->num = num;
-  rg->nfds = 0;
-  FD_ZERO((&rg->read_fds));
   
   // Init three replicas
   for (index = 0; index < rg->num; index++) {
@@ -21,14 +19,6 @@ int initReplicas(struct replica_group* rg, struct replica* reps, int num) {
       printf("replicas pipe error!");
       return 0;
     }
-
-    // nfds should be the highest file descriptor, plus 1
-    // TODO: This may have to be changed for when signal fd is added
-    if (rg->replicas[index].pipefd_outof_rep[0] >= rg->nfds) {
-      rg->nfds = rg->replicas[index].pipefd_outof_rep[0] + 1;
-    }
-    // Set to select on pipe's file descriptor
-    FD_SET(rg->replicas[index].pipefd_outof_rep[0], &(rg->read_fds));
 
     rg->replicas[index].pid = -1;
     rg->replicas[index].priority = -1;

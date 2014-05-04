@@ -33,8 +33,6 @@ struct replica {
 struct replica_group {
   struct replica* replicas;
   int num;
-  int nfds; // Highest value fd in the read pipes
-  fd_set read_fds;
 }; 
 
 /*

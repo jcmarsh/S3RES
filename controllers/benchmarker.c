@@ -49,8 +49,8 @@ int initBenchMarker() {
   InitTAS(3, &cpu_speed);
 
   initReplicas(&repGroup, replicas, REP_COUNT);
-  //forkSingleReplica(&repGroup, 0, "art_pot_p");
-  forkSingleReplica(&repGroup, 0, "VoterB");
+  forkSingleReplica(&repGroup, 0, "art_pot_p");
+  //forkSingleReplica(&repGroup, 0, "VoterB");
 
   return 0;
 }

@@ -105,9 +105,7 @@ int initReplica() {
     perror("art_pot_p pipe error");
     return -1;
   }
-  // Need to set to be non-blocking for reading.
-  flags = fcntl(restart_fd[0], F_GETFL, 0);
-  //  fcntl(restart_fd[0], F_SETFL, flags | O_NONBLOCK);
+
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     puts("Failed to register the restart handler");
     return -1;
@@ -274,7 +272,7 @@ void enterLoop() {
 	} else if (read_ret == -1) {
 	  perror("Blocking, eh?");
 	} else {
-	  puts("WHAT THE HELL DOES THIS MEAN?");
+	  puts("ArtPot read_ret == 0?");
 	}
       }
     }

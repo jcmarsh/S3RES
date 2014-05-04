@@ -17,9 +17,10 @@
 #include "../include/commtypes.h"
 #include "../include/fd_server.h"
 
+#define SIG SIGRTMIN + 7
 #define REP_COUNT 3
 #define INIT_ROUNDS 4
-#define MAX_TIME_SECONDS 0.005 // Max time for voting in seconds (50 ms)
+#define PERIOD_NSEC 100000 // Max time for voting in nanoseconds
 
 // Either waiting for replicas to vote or waiting for the next round (next ranger input).
 // Or a replica has failed and recovery is needed
@@ -47,16 +48,18 @@ double cmds[REP_COUNT][2];
 // TAS Stuff
 cpu_speed_t cpu_speed;
 
-// timing
-timestamp_t last;
-realtime_t elapsed_time_seconds;
-
 // FD server
 struct server_data sd;
 
 // FDs to the benchmarker
 int read_in_fd;
 int write_out_fd;
+
+// restart timer fd
+char timeout_byte[1] = {'*'};
+int timeout_fd[2];
+timer_t timerid;
+struct itimerspec its;
 
 int ranger_cmds_count;
 
@@ -80,6 +83,49 @@ void processVelCmdFromRep(double cmd_vel_x, double cmd_vel_a, int replica_num);
 void putCommand(double cmd_speed, double cmd_turnrate);
 void processCommand();
 
+void timeout_sighandler(int signum) {//, siginfo_t *si, void *data) {
+  if (vote_stat == VOTING) {
+    write(timeout_fd[1], timeout_byte, 1);
+  }
+}
+
+void restartReplica() {
+  int restart_id;
+  int index;
+
+  for (index = 0; index < REP_COUNT; index++) {
+    if (reporting[index] == false) {
+      // This is the failed replica, restart it
+      // Send a signal to the rep's friend
+      restart_id = (index + (REP_COUNT - 1)) % REP_COUNT; // Plus 2 is minus 1!
+      // printf("Restarting %d, %d now!\n", index, restart_id);
+      kill(repGroup.replicas[restart_id].pid, SIGUSR1);
+      
+      // clean up old data about dearly departed
+      // TODO: migrate to replicas.cpp in a sane fashion
+      close(repGroup.replicas[index].pipefd_into_rep[0]);
+      close(repGroup.replicas[index].pipefd_into_rep[1]);
+      close(repGroup.replicas[index].pipefd_outof_rep[0]);
+      close(repGroup.replicas[index].pipefd_outof_rep[1]);
+      
+      if (pipe(repGroup.replicas[index].pipefd_into_rep) == -1) {
+	perror("replicas pipe error!");
+      }
+      
+      if (pipe(repGroup.replicas[index].pipefd_outof_rep) == -1) {
+	printf("replicas pipe error!");
+      }
+
+      repGroup.replicas[index].pid = -1; // Should be set correctly!
+      repGroup.replicas[index].priority = -1;
+      repGroup.replicas[index].status = RUNNING;
+      
+      // send new pipe through fd server (should have a request)
+      acceptSendFDS(&sd, repGroup.replicas[index].pipefd_into_rep[0], repGroup.replicas[index].pipefd_outof_rep[1]);
+    }
+  }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 int forkReplicas(struct replica_group* rg) {
   int index = 0;
@@ -102,8 +148,45 @@ int forkReplicas(struct replica_group* rg) {
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
 int initVoterB() {
   int index = 0;
+  struct sigevent sev;
+  struct sigaction sa;
+  sigset_t mask;
 
   InitTAS(DEFAULT_CPU, &cpu_speed);
+
+  // timeout_fd
+  if (pipe(timeout_fd) == -1) {
+    perror("voterb time out pipe fail");
+    return -1;
+  }
+
+  // create timer
+  /* Establish handler for timer signal */
+  //  sa.sa_flags = SA_SIGINFO;
+  //sa.sa_sigaction = timeout_sighandler;
+  //sigemptyset(&sa.sa_mask);
+  //if (sigaction(SIG, &sa, NULL) == -1) {
+  if (signal(SIG, timeout_sighandler) == SIG_ERR) {
+    perror("VoterB sigaction failed");
+    return -1;
+  }
+
+  sigemptyset(&mask);
+  sigaddset(&mask, SIG);
+  if (sigprocmask(SIG_UNBLOCK, &mask, NULL) == -1) {
+    perror("VoterB sigprockmask failed");
+    return -1;
+  }
+
+  /* Create the timer */
+  sev.sigev_notify = SIGEV_SIGNAL;
+  sev.sigev_signo = SIG;
+  sev.sigev_value.sival_ptr = &timerid;
+  if (timer_create(CLOCK_REALTIME, &sev, &timerid) == -1) {
+    perror("VoterB timer_create failed");
+    return -1;
+  }
+  printf("timer ID is 0x%lx\n", (long) timerid);
 
   ranger_cmds_count = 0;
 
@@ -185,35 +268,9 @@ void doOneUpdate() {
   int max_fd;
   int rep_pipe_r;
 
-  if (vote_stat == VOTING) {
-    current = generate_timestamp();
-    elapsed_time_seconds += timestamp_to_realtime(current - last, cpu_speed);
-  }
-
   if (ranger_cmds_count < INIT_ROUNDS) {
     // Have not started running yet
-  } else if ((elapsed_time_seconds > MAX_TIME_SECONDS) && (vote_stat == VOTING)) {
-    // Shit has gone down. Trigger a restart as needed.
-    puts("ERROR replica has missed a deadline!");
-    printf("elapsed_seconds: %lf\n", elapsed_time_seconds);
-    vote_stat = RECOVERY;
   }
-  last = current;
-
-  if (vote_stat == RECOVERY) {
-    for (index = 0; index < REP_COUNT; index++) {
-      if (reporting[index] == false) {
-	// This is the failed replica, restart it
-	// Send a signal to the rep's friend
-	restart_id = (index + (REP_COUNT - 1)) % REP_COUNT; // Plus 2 is minus 1!
-	// printf("Restarting %d, %d now!\n", index, restart_id);
-	kill(repGroup.replicas[restart_id].pid, SIGUSR1);
-      }
-    }
-    elapsed_time_seconds = 0.0;
-    vote_stat = WAITING;
-  }
-
 
   // See if any of the read pipes have anything
   select_timeout.tv_sec = 1;
@@ -222,6 +279,10 @@ void doOneUpdate() {
   FD_ZERO(&select_set);
   FD_SET(read_in_fd, &select_set);
   max_fd = read_in_fd;
+  FD_SET(timeout_fd[0], &select_set);
+  if (timeout_fd[0] > max_fd) {
+    max_fd = timeout_fd[0];
+  }
   for (index = 0; index < REP_COUNT; index++) {
     rep_pipe_r = replicas[index].pipefd_outof_rep[0];
     if (rep_pipe_r > max_fd) {
@@ -229,60 +290,74 @@ void doOneUpdate() {
     }
     FD_SET(rep_pipe_r, &select_set);
   }
+
   // This will wait at least timeout until return. Returns earlier if something has data.
   retval = select(max_fd + 1, &select_set, NULL, NULL, &select_timeout);
 
-  // Check for data from the benchmarker
-  if (FD_ISSET(read_in_fd, &select_set)) {
-    retval = read(read_in_fd, &hdr, sizeof(struct comm_header));;
-    if (retval > 0) {
-      assert(retval == sizeof(struct comm_header));
-      switch (hdr.type) {
-      case COMM_RANGE_DATA:
-	// send to reps!
-	retval = read(read_in_fd, ranger_ranges, hdr.byte_count);
-	range_count = retval / sizeof(double);
-	assert(retval == hdr.byte_count);
-	processRanger();      
-	break;
-      case COMM_POS_DATA:
-	// send to reps!
-	retval = read(read_in_fd, pos, hdr.byte_count);
-	assert(retval == hdr.byte_count);
-	processOdom();
-	break;
-      case COMM_WAY_RES:
-	// New waypoints from benchmarker!
-	retval = read(read_in_fd, next_goal, hdr.byte_count);
-	assert(retval == hdr.byte_count);
-	processCommand();
-	break;
-      default:
-	printf("ERROR: VoterB can't handle comm type: %d\n", hdr.type);
+  if (retval > 0) {
+    // Check for failed replica (time out)
+    if (FD_ISSET(timeout_fd[0], &select_set)) {
+      retval = read(timeout_fd[0], timeout_byte, 1);
+      if (retval > 0) {
+	printf("VoterB restarting replica\n");
+	restartReplica();
+      } else {
+	// TODO: Do I care about this?
       }
     }
-  }
-
-  // Check all replicas for data
-  for (index = 0; index < REP_COUNT; index++) {
-    // clear comm_header for next message
-    hdr.type = -1;
-    hdr.byte_count = -1;
     
-    if (FD_ISSET(replicas[index].pipefd_outof_rep[0], &select_set)) {
-      retval = read(replicas[index].pipefd_outof_rep[0], &hdr, sizeof(struct comm_header));
+    // Check for data from the benchmarker
+    if (FD_ISSET(read_in_fd, &select_set)) {
+      retval = read(read_in_fd, &hdr, sizeof(struct comm_header));;
       if (retval > 0) {
+	assert(retval == sizeof(struct comm_header));
 	switch (hdr.type) {
-	case COMM_WAY_REQ:
-	  sendWaypoints(index);
-	  break;
-	case COMM_MOV_CMD:
-	  retval = read(replicas[index].pipefd_outof_rep[0], cmd_vel, hdr.byte_count);
+	case COMM_RANGE_DATA:
+	  // send to reps!
+	  retval = read(read_in_fd, ranger_ranges, hdr.byte_count);
+	  range_count = retval / sizeof(double);
 	  assert(retval == hdr.byte_count);
-	  processVelCmdFromRep(cmd_vel[0], cmd_vel[1], index);
+	  processRanger();      
+	  break;
+	case COMM_POS_DATA:
+	  // send to reps!
+	  retval = read(read_in_fd, pos, hdr.byte_count);
+	  assert(retval == hdr.byte_count);
+	  processOdom();
+	  break;
+	case COMM_WAY_RES:
+	  // New waypoints from benchmarker!
+	  retval = read(read_in_fd, next_goal, hdr.byte_count);
+	  assert(retval == hdr.byte_count);
+	  processCommand();
 	  break;
 	default:
 	  printf("ERROR: VoterB can't handle comm type: %d\n", hdr.type);
+	}
+      }
+    }
+    
+    // Check all replicas for data
+    for (index = 0; index < REP_COUNT; index++) {
+      // clear comm_header for next message
+      hdr.type = -1;
+      hdr.byte_count = -1;
+      
+      if (FD_ISSET(replicas[index].pipefd_outof_rep[0], &select_set)) {
+	retval = read(replicas[index].pipefd_outof_rep[0], &hdr, sizeof(struct comm_header));
+	if (retval > 0) {
+	  switch (hdr.type) {
+	  case COMM_WAY_REQ:
+	    sendWaypoints(index);
+	    break;
+	  case COMM_MOV_CMD:
+	    retval = read(replicas[index].pipefd_outof_rep[0], cmd_vel, hdr.byte_count);
+	    assert(retval == hdr.byte_count);
+	    processVelCmdFromRep(cmd_vel[0], cmd_vel[1], index);
+	    break;
+	  default:
+	    printf("ERROR: VoterB can't handle comm type: %d\n", hdr.type);
+	  }
 	}
       }
     }
@@ -330,9 +405,17 @@ void processRanger() {
     ranger_cmds_count++;
   } else {
     vote_stat = VOTING;
-    current = generate_timestamp();
-    last = current;
-    
+
+    // Arm timer
+    its.it_interval.tv_sec = 0;
+    its.it_interval.tv_nsec = 0;
+    its.it_value.tv_sec = 0;
+    its.it_value.tv_nsec = PERIOD_NSEC;
+
+    if (timer_settime(timerid, 0, &its, NULL) == -1) {
+      perror("VoterB timer_settime failed");
+    }
+
     for (index = 0; index < REP_COUNT; index++) {
       // Write range data
       write(replicas[index].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
@@ -345,7 +428,6 @@ void processRanger() {
 void resetVotingState() {
   int i = 0;
   vote_stat = WAITING;
-  elapsed_time_seconds = 0.0;
 
   for (i = 0; i < REP_COUNT; i++) {
     reporting[i] = false;
