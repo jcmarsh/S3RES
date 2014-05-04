@@ -74,8 +74,9 @@ int createFDS(struct server_data * sd) {
 }
 
 // Blocks on accept: You better know a client is about to connect!
-int acceptSendFDS(struct server_data * sd, int read_in, int write_out) {
+int acceptSendFDS(struct server_data * sd, pid_t *pid, int read_in, int write_out) {
   int connection_fd;
+  int retval;
 
   if ((connection_fd = accept(sd->sock_fd, (struct sockaddr *) &(sd->address), &(sd->address_length))) > -1) {
     sendFDS(connection_fd, read_in, write_out); // send read end to client
@@ -83,5 +84,12 @@ int acceptSendFDS(struct server_data * sd, int read_in, int write_out) {
     perror("FD_Server failed to accept");
     return -1;
   }
+
+  // read pid
+  retval = read(connection_fd, pid, sizeof(pid_t));
+  if (retval != sizeof(pid_t)) {
+    perror("FD_Server failed to read pid");
+  }
+
   return 0;
 }

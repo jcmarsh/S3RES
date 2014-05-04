@@ -67,7 +67,9 @@ void restart() {
       // child sets new id, recreates connects, loops?
       // TODO: The pid is not known to the voter
       initReplica();
-      connectRecvFDS(&read_in_fd, &write_out_fd);
+      // Get own pid, send to voter
+      currentPID = getpid();
+      connectRecvFDS(currentPID, &read_in_fd, &write_out_fd);
       command(); // recalculate missed command
       enterLoop(); // return to normal
     } else {   // Parent just returns
@@ -81,10 +83,12 @@ void restart() {
 
 int parseArgs(int argc, const char **argv) {
   int i;
+  pid_t pid;
 
   // TODO: error checking
   if (argc < 3) { // Must request fds
-    connectRecvFDS(&read_in_fd, &write_out_fd);
+    pid = getpid();
+    connectRecvFDS(pid, &read_in_fd, &write_out_fd);
   } else {
     read_in_fd = atoi(argv[1]);
     write_out_fd = atoi(argv[2]);

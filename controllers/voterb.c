@@ -121,7 +121,7 @@ void restartReplica() {
       repGroup.replicas[index].status = RUNNING;
       
       // send new pipe through fd server (should have a request)
-      acceptSendFDS(&sd, repGroup.replicas[index].pipefd_into_rep[0], repGroup.replicas[index].pipefd_outof_rep[1]);
+      acceptSendFDS(&sd, &(repGroup.replicas[index].pid), repGroup.replicas[index].pipefd_into_rep[0], repGroup.replicas[index].pipefd_outof_rep[1]);
     }
   }
 }
@@ -136,7 +136,8 @@ int forkReplicas(struct replica_group* rg) {
     // TODO: Handle possible errors
 
     // send fds
-    acceptSendFDS(&sd, rg->replicas[index].pipefd_into_rep[0], rg->replicas[index].pipefd_outof_rep[1]);
+    acceptSendFDS(&sd, &(rg->replicas[index].pid), rg->replicas[index].pipefd_into_rep[0], rg->replicas[index].pipefd_outof_rep[1]);
+
     close(rg->replicas[index].pipefd_into_rep[0]);
     close(rg->replicas[index].pipefd_outof_rep[1]);
   }

@@ -41,12 +41,11 @@ int requestFDS(int sock, int * read_in, int * write_out) {
   return 0;
 }
 
-int connectRecvFDS(int *read_in, int *write_out) {
+int connectRecvFDS(pid_t pid, int *read_in, int *write_out) {
   int sock_fd;
   int retval;
   struct sockaddr_un address;
   struct msghdr hdr;
-  struct iovec data;
 
   sock_fd = socket(PF_UNIX, SOCK_STREAM, 0);
   if(sock_fd < 0) {
@@ -67,6 +66,9 @@ int connectRecvFDS(int *read_in, int *write_out) {
 
   retval = requestFDS(sock_fd, read_in, write_out);
   // TODO: check retval
+
+  // Send pid
+  write(sock_fd, &pid, sizeof(pid_t));
 
   close(sock_fd);
 
