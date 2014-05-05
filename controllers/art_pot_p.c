@@ -39,9 +39,6 @@ double ranger_ranges[365]; // 365 comes from somewhere in Player as the max.
 int read_in_fd;
 int write_out_fd;
 
-char restart_byte[1] = {'*'};
-int restart_fd[2];
-
 // TAS related
 cpu_speed_t cpu_speed;
 
@@ -52,12 +49,6 @@ void command();
 int initReplica();
 
 void restartHandler(int signo) {
-  // write a byte to the restart pipe
-  write(restart_fd[1], restart_byte, 1);
-}
-
-// Need to restart a replica
-void restart() {
   pid_t currentPID = 0;
   // fork
   currentPID = fork();
@@ -99,15 +90,7 @@ int parseArgs(int argc, const char **argv) {
 // Should probably separate this out correctly
 // Basically the init function
 int initReplica() {
-  int flags = 0;
-
   InitTAS(DEFAULT_CPU, &cpu_speed);
-
-  //  restart_byte = ;
-  if (pipe(restart_fd) == -1) {
-    perror("art_pot_p pipe error");
-    return -1;
-  }
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     puts("Failed to register the restart handler");
@@ -212,69 +195,41 @@ void enterLoop() {
   int read_ret;
   struct comm_header hdr;
 
-  struct timeval select_timeout;
-  fd_set select_set;
-  int max_fd;
-
   while(1) {
-    select_timeout.tv_sec = 1;
-    select_timeout.tv_usec = 0;
-
-    max_fd = read_in_fd;
-    FD_ZERO(&select_set);
-    FD_SET(read_in_fd, &select_set);
-    FD_SET(restart_fd[0], &select_set);
-    if (restart_fd[0] > read_in_fd) {
-      max_fd = restart_fd[0];
-    }
-
-    read_ret = select(max_fd + 1, &select_set, NULL, NULL, &select_timeout);
+    // Blocking, but that's okay with me
+    read_ret = read(read_in_fd, &hdr, sizeof(struct comm_header));
     if (read_ret > 0) {
-      if (FD_ISSET(restart_fd[0], &select_set)) {
-	read_ret = read(restart_fd[0], restart_byte, 1);
-	if (read_ret > 0) {
-	  // if it has something, restart  and exit loop (will get other read on next select
-	  restart();
-	} else if (read_ret < 0) {
-	  // TODO: Can I ignore this error?
-	}
-      }
-      if (FD_ISSET(read_in_fd, &select_set)) {
-	read_ret = read(read_in_fd, &hdr, sizeof(struct comm_header));
-	if (read_ret > 0) {
-	  assert(read_ret == sizeof(struct comm_header));
-	  switch (hdr.type) {
-	  case COMM_RANGE_DATA:
-	    read_ret = read(read_in_fd, ranger_ranges, hdr.byte_count);
-	    ranger_count = read_ret / sizeof(double);      
-	    assert(read_ret == hdr.byte_count);
+      assert(read_ret == sizeof(struct comm_header));
+      switch (hdr.type) {
+      case COMM_RANGE_DATA:
+	read_ret = read(read_in_fd, ranger_ranges, hdr.byte_count);
+	ranger_count = read_ret / sizeof(double);      
+	assert(read_ret == hdr.byte_count);
 #ifdef _STATS_BENCH_TO_CONT_
-	    printf("Cont\t%lf\n", timestamp_to_realtime(generate_timestamp(), cpu_speed));
+	printf("Cont\t%lf\n", timestamp_to_realtime(generate_timestamp(), cpu_speed));
 #endif
 #ifdef _STATS_CONT_COMMAND_
-	    last = generate_timestamp();
+	last = generate_timestamp();
 #endif
-	    // Calculates and sends the new command
-	    command();
-	    break;
-	  case COMM_POS_DATA:
-	    read_ret = read(read_in_fd, pos, hdr.byte_count);
-	    assert(read_ret == hdr.byte_count);
-	    break;
-	  case COMM_WAY_RES:
-	    read_ret = read(read_in_fd, goal, hdr.byte_count);
-	    assert(read_ret == hdr.byte_count);
-	    break;
-	  default:
-	    // TODO: Fail? or drop data?
-	    printf("ERROR: art_pot_p can't handle comm type: %d\n", hdr.type);
-	  }
-	} else if (read_ret == -1) {
-	  perror("Blocking, eh?");
-	} else {
-	  puts("ArtPot read_ret == 0?");
-	}
+	// Calculates and sends the new command
+	command();
+	break;
+      case COMM_POS_DATA:
+	read_ret = read(read_in_fd, pos, hdr.byte_count);
+	assert(read_ret == hdr.byte_count);
+	break;
+      case COMM_WAY_RES:
+	read_ret = read(read_in_fd, goal, hdr.byte_count);
+	assert(read_ret == hdr.byte_count);
+	break;
+      default:
+	// TODO: Fail? or drop data?
+	printf("ERROR: art_pot_p can't handle comm type: %d\n", hdr.type);
       }
+    } else if (read_ret == -1) {
+      perror("Blocking, eh?");
+    } else {
+      puts("ArtPot read_ret == 0?");
     }
   }
 }
