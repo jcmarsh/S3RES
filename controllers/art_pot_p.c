@@ -64,8 +64,7 @@ void restart() {
 
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
-      // child sets new id, recreates connects, loops?
-      // TODO: The pid is not known to the voter
+      // child sets new id, recreates connects, loops
       initReplica();
       // Get own pid, send to voter
       currentPID = getpid();
@@ -246,7 +245,6 @@ void enterLoop() {
 	  assert(read_ret == sizeof(struct comm_header));
 	  switch (hdr.type) {
 	  case COMM_RANGE_DATA:
-	    //	printf("\tRecieved Range Data\n");
 	    read_ret = read(read_in_fd, ranger_ranges, hdr.byte_count);
 	    ranger_count = read_ret / sizeof(double);      
 	    assert(read_ret == hdr.byte_count);
@@ -260,12 +258,10 @@ void enterLoop() {
 	    command();
 	    break;
 	  case COMM_POS_DATA:
-	    //	printf("\tRecieved Position Data\n");
 	    read_ret = read(read_in_fd, pos, hdr.byte_count);
 	    assert(read_ret == hdr.byte_count);
 	    break;
 	  case COMM_WAY_RES:
-	    //	printf("\tRecieved Waypoint Response\n");
 	    read_ret = read(read_in_fd, goal, hdr.byte_count);
 	    assert(read_ret == hdr.byte_count);
 	    break;
@@ -284,7 +280,6 @@ void enterLoop() {
 }
 
 int main(int argc, const char **argv) {
-  printf("SANITY? Sanity.\n");
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");
     return -1;

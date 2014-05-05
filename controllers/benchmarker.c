@@ -49,8 +49,8 @@ int initBenchMarker() {
   InitTAS(3, &cpu_speed);
 
   initReplicas(&repGroup, replicas, REP_COUNT);
-  forkSingleReplica(&repGroup, 0, "art_pot_p");
-  //forkSingleReplica(&repGroup, 0, "VoterB");
+  //forkSingleReplica(&repGroup, 0, "ArtPot");
+  forkSingleReplica(&repGroup, 0, "VoterB");
 
   return 0;
 }
@@ -59,7 +59,7 @@ int parseArgs(int argc, const char **argv) {
   int i;
 
   if (argc < 3) {
-    puts("Usage: VoterB <read_in_fd> <write_out_fd>");
+    puts("Usage: BenchMarker <read_in_fd> <write_out_fd>");
     return -1;
   }
 
@@ -70,8 +70,6 @@ int parseArgs(int argc, const char **argv) {
 }
 
 int main(int argc, const char **argv) {
-  printf("Hello darkness my old friend.\n");
-
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");
     return -1;
@@ -115,66 +113,51 @@ void doOneUpdate() {
 
   // This will wait at least timeout until return. Returns earlier if something has data.
   retval = select(max_fd + 1, &select_set, NULL, NULL, &select_timeout);
-
-  select_timeout.tv_sec = 0;
-  select_timeout.tv_usec = 0;
-
-  // Check for data from translator...
-  FD_ZERO(&select_set);
-  FD_SET(read_in_fd, &select_set);
-  retval = select(read_in_fd + 1, &select_set, NULL, NULL, &select_timeout);
   if (retval > 0) {
-    retval = read(read_in_fd, &hdr, sizeof(struct comm_header));;
-    if (retval > 0) {
-      assert(retval == sizeof(struct comm_header));
-      switch (hdr.type) {
-      case COMM_RANGE_DATA:
-	retval = read(read_in_fd, range_data_msg.ranges, hdr.byte_count);
-	assert(retval == hdr.byte_count);
-	processRanger();      
-	break;
-      case COMM_POS_DATA:
-	retval = read(read_in_fd, pos_data_msg.pose, hdr.byte_count);
-	assert(retval == hdr.byte_count);
-	processOdom();
-	break;
-      case COMM_WAY_RES:
-	retval = read(read_in_fd, way_res_msg.point, hdr.byte_count);
-	assert(retval == hdr.byte_count);
-	sendWaypoints();
-	break;
-      default:
-	printf("ERROR: VoterB can't handle comm type: %d\n", hdr.type);
+    if (FD_ISSET(read_in_fd, &select_set)) { // something from translator
+      retval = read(read_in_fd, &hdr, sizeof(struct comm_header));
+      if (retval > 0) {
+	assert(retval == sizeof(struct comm_header));
+	switch (hdr.type) {
+	case COMM_RANGE_DATA:
+	  retval = read(read_in_fd, range_data_msg.ranges, hdr.byte_count);
+	  assert(retval == hdr.byte_count);
+	  processRanger();      
+	  break;
+	case COMM_POS_DATA:
+	  retval = read(read_in_fd, pos_data_msg.pose, hdr.byte_count);
+	  assert(retval == hdr.byte_count);
+	  processOdom();
+	  break;
+	case COMM_WAY_RES:
+	  retval = read(read_in_fd, way_res_msg.point, hdr.byte_count);
+	  assert(retval == hdr.byte_count);
+	  sendWaypoints();
+	  break;
+	default:
+	  printf("ERROR: BenchMarker can't handle comm type: %d\n", hdr.type);
+	}
+      } else {
+	perror("Bench: read should have worked, failed."); // EINTR?
       }
     }
-  }
-
-  // clear comm_header for next message
-  hdr.type = -1;
-  hdr.byte_count = -1;
-
-  select_timeout.tv_sec = 0;
-  select_timeout.tv_usec = 0;
-
-  // Check for data from translator...
-  FD_ZERO(&select_set);
-  FD_SET(replicas[0].pipefd_outof_rep[0], &select_set);
-  retval = select(replicas[0].pipefd_outof_rep[0] + 1, &select_set, NULL, NULL, &select_timeout);
-  if (retval > 0) {
-    // Check replica for data
-    retval = read(replicas[0].pipefd_outof_rep[0], &hdr, sizeof(struct comm_header));
-    if (retval > 0) {
-      switch (hdr.type) {
-      case COMM_WAY_REQ:
-	requestWaypoints();
-	break;
-      case COMM_MOV_CMD:
-	retval = read(replicas[0].pipefd_outof_rep[0], mov_cmd_msg.vel_cmd, hdr.byte_count);
-	assert(retval == hdr.byte_count);
-	processCommand();
-	break;
-      default:
-	printf("ERROR: VoterB can't handle comm type: %d\n", hdr.type);
+    if (FD_ISSET(rep_pipe_r, &select_set)) { // Check replica for data
+      retval = read(replicas[0].pipefd_outof_rep[0], &hdr, sizeof(struct comm_header));
+      if (retval > 0) {
+	switch (hdr.type) {
+	case COMM_WAY_REQ:
+	  requestWaypoints();
+	  break;
+	case COMM_MOV_CMD:
+	  retval = read(replicas[0].pipefd_outof_rep[0], mov_cmd_msg.vel_cmd, hdr.byte_count);
+	  assert(retval == hdr.byte_count);
+	  processCommand();
+	  break;
+	default:
+	  printf("ERROR: BenchMarker can't handle comm type: %d\n", hdr.type);
+	}
+      } else {
+	perror("Bench: read should have worked, failed."); // EINTR?
       }
     }
   }

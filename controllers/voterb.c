@@ -20,7 +20,7 @@
 #define SIG SIGRTMIN + 7
 #define REP_COUNT 3
 #define INIT_ROUNDS 4
-#define PERIOD_NSEC 100000 // Max time for voting in nanoseconds
+#define PERIOD_NSEC 120000 // Max time for voting in nanoseconds (120 micro seconds)
 
 // Either waiting for replicas to vote or waiting for the next round (next ranger input).
 // Or a replica has failed and recovery is needed
@@ -85,7 +85,7 @@ void processCommand();
 
 void timeout_sighandler(int signum) {//, siginfo_t *si, void *data) {
   if (vote_stat == VOTING) {
-    write(timeout_fd[1], timeout_byte, 1);
+    assert(write(timeout_fd[1], timeout_byte, 1) == 1);
   }
 }
 
@@ -113,10 +113,10 @@ void restartReplica() {
       }
       
       if (pipe(repGroup.replicas[index].pipefd_outof_rep) == -1) {
-	printf("replicas pipe error!");
+	perror("replicas pipe error!");
       }
 
-      repGroup.replicas[index].pid = -1; // Should be set correctly!
+      repGroup.replicas[index].pid = -1;
       repGroup.replicas[index].priority = -1;
       repGroup.replicas[index].status = RUNNING;
       
@@ -129,17 +129,16 @@ void restartReplica() {
 ////////////////////////////////////////////////////////////////////////////////
 int forkReplicas(struct replica_group* rg) {
   int index = 0;
+  pid_t new_pid;
 
   // Fork children
   for (index = 0; index < rg->num; index++) {
-    forkSingleReplicaNoFD(rg, index, "art_pot_p");
+    forkSingleReplicaNoFD(rg, index, "ArtPot");
     // TODO: Handle possible errors
 
     // send fds
-    acceptSendFDS(&sd, &(rg->replicas[index].pid), rg->replicas[index].pipefd_into_rep[0], rg->replicas[index].pipefd_outof_rep[1]);
-
-    close(rg->replicas[index].pipefd_into_rep[0]);
-    close(rg->replicas[index].pipefd_outof_rep[1]);
+    acceptSendFDS(&sd, &new_pid, rg->replicas[index].pipefd_into_rep[0], rg->replicas[index].pipefd_outof_rep[1]);
+    assert(new_pid == rg->replicas[index].pid);
   }
 
   return 1;
@@ -187,7 +186,6 @@ int initVoterB() {
     perror("VoterB timer_create failed");
     return -1;
   }
-  printf("timer ID is 0x%lx\n", (long) timerid);
 
   ranger_cmds_count = 0;
 
@@ -211,11 +209,13 @@ int initVoterB() {
 
 void requestWaypoints() {
   struct comm_header hdr;
-  
+  int retval;
+
   hdr.type = COMM_WAY_REQ;
   hdr.byte_count = 0;
 
-  write(write_out_fd, &hdr, sizeof(struct comm_header));
+  retval = write(write_out_fd, &hdr, sizeof(struct comm_header));
+  assert(retval == sizeof(struct comm_header) + hdr.byte_count);
 }
 
 int parseArgs(int argc, const char **argv) {
@@ -233,8 +233,6 @@ int parseArgs(int argc, const char **argv) {
 }
 
 int main(int argc, const char **argv) {
-  printf("I'm not calling this sanity.\n");
-
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");
     return -1;
@@ -369,6 +367,7 @@ void doOneUpdate() {
 // Process new odometry data
 void processOdom() {
   int index = 0;
+  int retval;
   struct comm_header hdr;
   struct comm_pos_data_msg message;
 
@@ -381,7 +380,8 @@ void processOdom() {
 
   // Need to publish to the replicas
   for (index = 0; index < REP_COUNT; index++) {
-    write(replicas[index].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
+    retval = write(replicas[index].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
+    assert(retval == sizeof(struct comm_header) + hdr.byte_count);
   }
 }
 
@@ -389,6 +389,7 @@ void processOdom() {
 // Process ranger data
 void processRanger() {
   int index = 0;
+  int retval;
   timestamp_t current;
   struct comm_header hdr;
   struct comm_range_data_msg message;
@@ -402,7 +403,6 @@ void processRanger() {
 
   // Ignore first ranger update (to give everything a chance to init)
   if (ranger_cmds_count < INIT_ROUNDS) {
-    //    puts("Ignore first few rangers");
     ranger_cmds_count++;
   } else {
     vote_stat = VOTING;
@@ -419,7 +419,8 @@ void processRanger() {
 
     for (index = 0; index < REP_COUNT; index++) {
       // Write range data
-      write(replicas[index].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
+      retval = write(replicas[index].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
+      assert(retval == sizeof(struct comm_header) + hdr.byte_count);
     }
   }
 }
@@ -442,6 +443,7 @@ void resetVotingState() {
 // This is the primary input to the replicas, so make sure it is duplicated
 void sendWaypoints(int replica_num) {
   int index = 0;
+  int retval;
   bool all_sent = true;
   struct comm_header hdr;
   struct comm_way_res_msg message;
@@ -462,7 +464,8 @@ void sendWaypoints(int replica_num) {
     message.point[INDEX_Y] = curr_goal[INDEX_Y];
     message.point[INDEX_A] = curr_goal[INDEX_A];
 
-    write(replicas[replica_num].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
+    retval = write(replicas[replica_num].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
+    assert(retval == sizeof(struct comm_header) + hdr.byte_count);
   }
 }
 
@@ -476,8 +479,6 @@ void processVelCmdFromRep(double cmd_vel_x, double cmd_vel_a, int replica_num) {
   double cmd_vel = 0.0;
   double cmd_rot_vel = 0.0;
 
-  //  printf("VOTE rep: %d - %f\t%f\n", replica_num, cmd_vel_x, cmd_vel_a);
-  
   if (reporting[replica_num] == true) {
     // If vote is same as previous, then ignore.
     if ((cmds[replica_num][0] == cmd_vel_x) &&
@@ -511,16 +512,18 @@ void processVelCmdFromRep(double cmd_vel_x, double cmd_vel_a, int replica_num) {
     putCommand(cmd_vel, cmd_rot_vel);
     resetVotingState();
   } else if (all_reporting) {
-    puts("VOTING ERROR: Not all votes agree");
-    for (index = 0; index < REP_COUNT; index++) {
-      printf("\t Vote %d: (%f, %f)\n", index, cmds[index][0], cmds[index][1]);
-    }
+    // Should put the correct command
+    // restart failed rep
+    // reset voting state.
+
+    // For now the timer will go off and trigger a recovery.
   }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Send commands to underlying position device
 void putCommand(double cmd_speed, double cmd_turnrate) {
+  int retval;
   struct comm_header hdr;
   struct comm_mov_cmd_msg message;
 
@@ -530,7 +533,8 @@ void putCommand(double cmd_speed, double cmd_turnrate) {
   message.vel_cmd[0] = cmd_speed;
   message.vel_cmd[1] = cmd_turnrate;
 
-  write(write_out_fd, (void*)&message, sizeof(struct comm_header) + hdr.byte_count);
+  retval = write(write_out_fd, (void*)&message, sizeof(struct comm_header) + hdr.byte_count);
+  assert(retval == sizeof(struct comm_header) + hdr.byte_count);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

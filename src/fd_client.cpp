@@ -13,7 +13,6 @@ int requestFDS(int sock, int * read_in, int * write_out) {
   int retval;
   
   char dummy = '*';
-
   data.iov_base = &dummy;
   data.iov_len = sizeof(dummy);
 

@@ -141,6 +141,7 @@ TranslatorDriver::TranslatorDriver(ConfigFile* cf, int section)
 int TranslatorDriver::MainSetup()
 {   
   int index = 0;
+  int flags = 0;
 
   puts("Translator driver initialising in MainSetup");
 
@@ -161,6 +162,10 @@ int TranslatorDriver::MainSetup()
   initReplicas(&repGroup, replicas, REP_COUNT);
   // TODO: Will need to set this parameter correctly
   forkSingleReplica(&repGroup, 0, "BenchMarker");
+
+  // Need this pipe not to block so that player and the outside world play nice
+  flags = fcntl(replicas[index].pipefd_outof_rep[0], F_GETFL, 0);
+  fcntl(replicas[index].pipefd_outof_rep[0], F_SETFL, flags | O_NONBLOCK);
 
   puts("Translator driver ready");
 

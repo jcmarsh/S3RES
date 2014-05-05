@@ -2,7 +2,6 @@
 
 int initReplicas(struct replica_group* rg, struct replica* reps, int num) {
   int index = 0;
-  int flags = 0;
 
   rg->replicas = reps;
   rg->num = num;
