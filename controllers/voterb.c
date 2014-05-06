@@ -150,7 +150,7 @@ int initVoterB() {
   struct sigaction sa;
   sigset_t mask;
 
-  InitTAS(DEFAULT_CPU, &cpu_speed);
+  InitTAS(DEFAULT_CPU, &cpu_speed, 3);
 
   // timeout_fd
   if (pipe(timeout_fd) == -1) {
@@ -255,7 +255,7 @@ void doOneUpdate() {
 
   int retval = 0;
 
-  struct comm_range_data_msg recv_msg;
+  struct comm_range_pose_data_msg recv_msg;
   double cmd_vel[2];
 
   struct timeval select_timeout;
@@ -299,23 +299,19 @@ void doOneUpdate() {
     
     // Check for data from the benchmarker
     if (FD_ISSET(read_in_fd, &select_set)) {
-      retval = read(read_in_fd, &recv_msg, sizeof(struct comm_range_data_msg));;
+      retval = read(read_in_fd, &recv_msg, sizeof(struct comm_range_pose_data_msg));;
       if (retval > 0) {
 	switch (recv_msg.hdr.type) {
-	case COMM_RANGE_DATA:
+	case COMM_RANGE_POSE_DATA:
 	  // send to reps!
 	  range_count = 16;
 	  for (index = 0; index < range_count; index++) {
 	    ranger_ranges[index] = recv_msg.ranges[index];
 	  }
-	  processRanger();      
-	  break;
-	case COMM_POS_DATA:
-	  // send to reps!
 	  for (index = 0; index < 3; index++) {
-	    pos[index] =  ((struct comm_pos_data_msg*) (&recv_msg))->pose[index];
+	    pos[index] =  recv_msg.pose[index];
 	  }
-	  processOdom();
+	  processRanger();      
 	  break;
 	case COMM_WAY_RES:
 	  // New waypoints from benchmarker!
@@ -336,7 +332,7 @@ void doOneUpdate() {
       recv_msg.hdr.type = -1;
       
       if (FD_ISSET(replicas[index].pipefd_outof_rep[0], &select_set)) {
-	retval = read(replicas[index].pipefd_outof_rep[0], &recv_msg, sizeof(struct comm_range_data_msg));
+	retval = read(replicas[index].pipefd_outof_rep[0], &recv_msg, sizeof(struct comm_range_pose_data_msg));
 	if (retval > 0) {
 	  switch (recv_msg.hdr.type) {
 	  case COMM_WAY_REQ:
@@ -357,41 +353,21 @@ void doOneUpdate() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Process new odometry data
-void processOdom() {
-  int index = 0;
-  int retval;
-  struct comm_header hdr;
-  struct comm_pos_data_msg message;
-
-  hdr.type = COMM_POS_DATA;
-  hdr.byte_count = 3 * sizeof(double);
-  message.hdr = hdr;
-  message.pose[INDEX_X] = pos[INDEX_X];
-  message.pose[INDEX_Y] = pos[INDEX_Y];
-  message.pose[INDEX_A] = pos[INDEX_A];
-
-  // Need to publish to the replicas
-  for (index = 0; index < REP_COUNT; index++) {
-    retval = write(replicas[index].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_pos_data_msg));
-    assert(retval == sizeof(struct comm_pos_data_msg));
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // Process ranger data
 void processRanger() {
   int index = 0;
   int retval;
-  timestamp_t current;
-  struct comm_header hdr;
-  struct comm_range_data_msg message;
+  struct comm_range_pose_data_msg send_msg;
 
-  hdr.type = COMM_RANGE_DATA;
-  hdr.byte_count = range_count * sizeof(double);
-  message.hdr = hdr;
+  send_msg.hdr.type = COMM_RANGE_POSE_DATA;
+  send_msg.hdr.byte_count = 19 * sizeof(double);
+
   for (index = 0; index < range_count; index++) {
-    message.ranges[index] = ranger_ranges[index];
+    send_msg.ranges[index] = ranger_ranges[index];
+  }
+
+  for (index = 0; index < 3; index++) {
+    send_msg.pose[index] = pos[index];
   }
 
   vote_stat = VOTING;
@@ -408,8 +384,8 @@ void processRanger() {
 
   for (index = 0; index < REP_COUNT; index++) {
     // Write range data
-    retval = write(replicas[index].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_range_data_msg));
-    assert(retval == sizeof(struct comm_range_data_msg));
+    retval = write(replicas[index].pipefd_into_rep[1], (void*)(&send_msg), sizeof(struct comm_range_pose_data_msg));
+    assert(retval == sizeof(struct comm_range_pose_data_msg));
   }
 }
 

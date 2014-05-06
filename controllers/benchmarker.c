@@ -18,6 +18,10 @@
 
 #define REP_COUNT 1
 
+#define TARGET_ROW 17
+#define TARGET_COL 3
+
+
 // Replica related data
 struct replica_group repGroup;
 struct replica replicas[REP_COUNT];
@@ -29,9 +33,11 @@ int read_in_fd; // These are to your parent (Translator)
 int write_out_fd;
 
 timestamp_t last;
+long timer_interrupts;
+FILE* proc_interrupts;
+char i_buffer[256];
 
-struct comm_range_data_msg range_data_msg;
-struct comm_pos_data_msg pos_data_msg;
+struct comm_range_pose_data_msg range_pose_data_msg;
 struct comm_way_req_msg way_req_msg;
 struct comm_way_res_msg way_res_msg;
 struct comm_mov_cmd_msg mov_cmd_msg;
@@ -45,19 +51,58 @@ void processOdom();
 void processRanger();
 void requestWaypoints();
 void processCommand();
+long parseInterrupts();
+
+int initParser() {
+  proc_interrupts = fopen("/proc/interrupts", "r");
+}
+
+long parseInterrupts() {
+  int cpus_check[] = {2, 3};
+  int inte_check[] = {14,15,17,19,20,21,25};
+  int iindex = 0;
+  const char token[2] = " ";
+  int row_num = 0;
+  int col_num = 0;
+  char *cell_value;
+  long total = 0;
+
+  rewind(proc_interrupts);
+
+  while(fgets(i_buffer, 256, proc_interrupts) > 0) {
+    if (row_num == inte_check[iindex] and row_num < 25) {
+      cell_value = strtok(i_buffer, token);
+      while (cell_value != NULL) {
+	cell_value = strtok(NULL, token);
+	if (col_num == cpus_check[0] || col_num == cpus_check[1]) {
+	  total += atol(cell_value);
+	}
+	col_num++;
+      }
+      col_num = 0;
+      iindex++;
+    }
+    row_num++;
+  }
+  return total;
+}
+
 
 int initBenchMarker() {
   int scheduler;
+  int p_offset = 0;
 
-  InitTAS(3, &cpu_speed);
+  InitTAS(3, &cpu_speed, 0);
 
   scheduler = sched_getscheduler(0);
   printf("BenchMarker Scheduler: %d\n", scheduler);
 
+  initParser();
+
   initReplicas(&repGroup, replicas, REP_COUNT);
+  forkSingleReplica(&repGroup, 0, "Empty");
   //forkSingleReplica(&repGroup, 0, "ArtPot");
-  //forkSingleReplica(&repGroup, 0, "Empty");
-  forkSingleReplica(&repGroup, 0, "VoterB");
+  //forkSingleReplica(&repGroup, 0, "VoterB");
 
   return 0;
 }
@@ -97,77 +142,62 @@ int main(int argc, const char **argv) {
 void doOneUpdate() {
   int retval = 0;
   int index;
-  struct comm_range_data_msg recv_msg;
+  struct comm_range_pose_data_msg recv_msg;
 
-  struct timeval select_timeout;
-  fd_set select_set;
-  int max_fd;
   int rep_pipe_r;
 
-  // See if any of the read pipes have anything
-  select_timeout.tv_sec = 1;
-  select_timeout.tv_usec = 0;
+  // Message comes in from translator
+  // Message goes out from replica
+  // That is it. Except for those waypoint request / responses
 
-  FD_ZERO(&select_set);
-  FD_SET(read_in_fd, &select_set);
-  max_fd = read_in_fd;
-  rep_pipe_r = replicas[0].pipefd_outof_rep[0];
-  if (rep_pipe_r > max_fd) {
-    max_fd = rep_pipe_r;
-  }
-  FD_SET(rep_pipe_r, &select_set);
-
-  // This will wait at least timeout until return. Returns earlier if something has data.
-  retval = select(max_fd + 1, &select_set, NULL, NULL, &select_timeout);
+  // Translator driven, check first. This call blocks.
+  retval = read(read_in_fd, &recv_msg, sizeof(struct comm_range_pose_data_msg));
   if (retval > 0) {
-    if (FD_ISSET(read_in_fd, &select_set)) { // something from translator
-      retval = read(read_in_fd, &recv_msg, sizeof(struct comm_range_data_msg));
-      if (retval > 0) {
-	switch (recv_msg.hdr.type) {
-	case COMM_RANGE_DATA:
-	  for (index = 0; index < 16; index++) {
-	    range_data_msg.ranges[index] = recv_msg.ranges[index];
-	  }
-	  processRanger();      
-	  break;
-	case COMM_POS_DATA:
-	  for (index = 0; index < 3; index++) {
-	    pos_data_msg.pose[index] =  ((struct comm_pos_data_msg*) (&recv_msg))->pose[index];
-	  }
-	  processOdom();
-	  break;
-	case COMM_WAY_RES:
-	  for (index = 0; index < 3; index++) {
-	    way_res_msg.point[index] = ((struct comm_way_res_msg*) (&recv_msg))->point[index];
-	  }
-	  sendWaypoints();
-	  break;
-	default:
-	  printf("ERROR: BenchMarker can't handle comm type: %d\n", recv_msg.hdr.type);
-	}
-      } else {
-	perror("Bench: read should have worked, failed."); // EINTR?
+    switch (recv_msg.hdr.type) {
+    case COMM_RANGE_POSE_DATA:
+      for (index = 0; index < 16; index++) {
+	range_pose_data_msg.ranges[index] = recv_msg.ranges[index];
       }
-    }
-    if (FD_ISSET(rep_pipe_r, &select_set)) { // Check replica for data
-      retval = read(replicas[0].pipefd_outof_rep[0], &recv_msg, sizeof(struct comm_range_data_msg));
-      if (retval > 0) {
-	switch (recv_msg.hdr.type) {
-	case COMM_WAY_REQ:
-	  requestWaypoints();
-	  break;
-	case COMM_MOV_CMD:
-	  mov_cmd_msg.vel_cmd[0] = ((struct comm_mov_cmd_msg*) (&recv_msg))->vel_cmd[0];
-	  mov_cmd_msg.vel_cmd[1] = ((struct comm_mov_cmd_msg*) (&recv_msg))->vel_cmd[1];
-	  processCommand();
-	  break;
-	default:
-	  printf("ERROR: BenchMarker can't handle comm type: %d\n", recv_msg.hdr.type);
-	}
-      } else {
-	perror("Bench: read should have worked, failed."); // EINTR?
+      for (index = 0; index < 3; index++) {
+	range_pose_data_msg.pose[index] = recv_msg.ranges[index];
       }
+      //	  puts("Bench: Range / Pose Data");
+      processRanger();      
+      break;
+    case COMM_WAY_RES:
+      // TODO: Figure this out
+      puts("DANGER WILL ROBINSON!");
+      for (index = 0; index < 3; index++) {
+	way_res_msg.point[index] = ((struct comm_way_res_msg*) (&recv_msg))->point[index];
+      }
+      sendWaypoints();
+      break;
+    default:
+      printf("ERROR: BenchMarker can't handle comm type: %d\n", recv_msg.hdr.type);
     }
+  } else {
+    perror("Bench: read should have worked, failed."); // EINTR?
+  }
+
+  // Second part of the cycle: response from replica
+  retval = read(replicas[0].pipefd_outof_rep[0], &recv_msg, sizeof(struct comm_range_pose_data_msg));
+  if (retval > 0) {
+    switch (recv_msg.hdr.type) {
+    case COMM_WAY_REQ:
+      puts("THIS IS NOT ACCEPTABLE");
+      requestWaypoints();
+      break;
+    case COMM_MOV_CMD:
+      mov_cmd_msg.vel_cmd[0] = ((struct comm_mov_cmd_msg*) (&recv_msg))->vel_cmd[0];
+      mov_cmd_msg.vel_cmd[1] = ((struct comm_mov_cmd_msg*) (&recv_msg))->vel_cmd[1];
+      //	  puts("\tBench: Command Recv.");
+      processCommand();
+      break;
+    default:
+      printf("ERROR: BenchMarker can't handle comm type: %d\n", recv_msg.hdr.type);
+    }
+  } else {
+    perror("Bench: read should have worked, failed."); // EINTR?
   }
 }
 
@@ -182,36 +212,21 @@ void sendWaypoints() {
   write(replicas[0].pipefd_into_rep[1], (void*)(&way_res_msg), sizeof(struct comm_way_res_msg));
 }
 
-
-////////////////////////////////////////////////////////////////////////////////
-// Process new odometry data
-void processOdom() {
-  struct comm_header hdr;
-
-  hdr.type = COMM_POS_DATA;
-  hdr.byte_count = 3 * sizeof(double);
-  pos_data_msg.hdr = hdr;
-  // data set by read
-
-  write(replicas[0].pipefd_into_rep[1], (void*)(&pos_data_msg), sizeof(struct comm_pos_data_msg));
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // Process ranger data
 void processRanger() {
   int index = 0;
-  struct comm_header hdr;
 
-  hdr.type = COMM_RANGE_DATA;
-  hdr.byte_count = 16 * sizeof(double);
-  range_data_msg.hdr = hdr;
+  range_pose_data_msg.hdr.type = COMM_RANGE_POSE_DATA;
+  range_pose_data_msg.hdr.byte_count = 19 * sizeof(double);
   // msg data set by read in
 
 #ifdef _STATS_BENCH_ROUND_TRIP_
   last = generate_timestamp();
+  timer_interrupts = parseInterrupts();
 #endif // _STATS_BENCH_ROUND_TRIP_
 
-  write(replicas[0].pipefd_into_rep[1], (void*)(&range_data_msg), sizeof(struct comm_range_data_msg));
+  write(replicas[0].pipefd_into_rep[1], (void*)(&range_pose_data_msg), sizeof(struct comm_range_pose_data_msg));
 }
 
 // To translator
@@ -228,17 +243,20 @@ void requestWaypoints() {
 ////////////////////////////////////////////////////////////////////////////////
 // Send commands to underlying position device
 void processCommand() {
-  struct comm_header hdr;
 #ifdef _STATS_BENCH_ROUND_TRIP_
   timestamp_t current;
-  current = generate_timestamp();
+  long new_interrupts;
 
-  printf("%lld\n", current - last);
+  new_interrupts = parseInterrupts();
+  current = generate_timestamp();
+  // check against previous interrupt count
+
+  //  printf("%ld\t%lld\n", 42, current - last);
+  printf("%ld\t%lld\n", new_interrupts - timer_interrupts, current - last);
 #endif
 
-  hdr.type = COMM_MOV_CMD;
-  hdr.byte_count = 2 * sizeof(double);
-  mov_cmd_msg.hdr = hdr;
+  mov_cmd_msg.hdr.type = COMM_MOV_CMD;
+  mov_cmd_msg.hdr.byte_count = 2 * sizeof(double);
   // data was set by read
 
   write(write_out_fd, (void*)(&mov_cmd_msg), sizeof(struct comm_mov_cmd_msg));

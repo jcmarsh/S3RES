@@ -23,7 +23,7 @@ void call_setrlimit(int id, rlim_t c, rlim_t m)
   }
 }
 
-int InitTAS(cpu_id_t cpu, cpu_speed_t *cpu_speed) {
+int InitTAS(cpu_id_t cpu, cpu_speed_t *cpu_speed, int prio_offset) {
   pid_t pid;
   int priority;
 
@@ -41,10 +41,10 @@ int InitTAS(cpu_id_t cpu, cpu_speed_t *cpu_speed) {
 
   // Set Realtime Scheduling
   // set the process to be scheduled with realtime policy and max priority              
-  if( scheduler_c::set_realtime_policy( pid, priority ) != scheduler_c::ERROR_NONE ) {
-    printf("(voter_b_driver) InitTAS() failed calling schedule_set_realtime_max(pid,priority).\n" );
+  if( scheduler_c::set_realtime_policy( pid, priority, prio_offset) != scheduler_c::ERROR_NONE ) {
+    perror("(voter_b_driver) InitTAS() failed calling schedule_set_realtime_max(pid,priority)." );
   }
-  //  printf( "process priority: %d\n", priority );
+  printf( "process priority: %d\n", priority );
 
 
   // * get the cpu speed *

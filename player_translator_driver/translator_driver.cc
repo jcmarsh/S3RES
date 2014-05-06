@@ -61,7 +61,7 @@ private:
   // Odometry Device info
   Device *odom;
   player_devaddr_t odom_addr; // "original:localhost:6666:position2d:0"
-  struct comm_pos_data_msg pos_data_msg;
+  double pose[3];
 
   // Ranger Device info
   int ranger_countdown;
@@ -147,15 +147,13 @@ int TranslatorDriver::MainSetup()
 
   puts("Translator driver initialising in MainSetup");
 
-  InitTAS(3, &cpu_speed);
+  InitTAS(3, &cpu_speed, 10);
   curr_goal[INDEX_X] = curr_goal[INDEX_Y] = curr_goal[INDEX_A] = 0.0;
 
   // Initial starting position
-  pos_data_msg.pose[INDEX_X] = -7.0;
-  pos_data_msg.pose[INDEX_Y] = -7.0;
-  pos_data_msg.pose[INDEX_A] = 0.0;
-  pos_data_msg.hdr.type = COMM_POS_DATA;
-  pos_data_msg.hdr.byte_count = 3 * sizeof(double);
+  pose[INDEX_X] = -7.0;
+  pose[INDEX_Y] = -7.0;
+  pose[INDEX_A] = 0.0;
 
   // Initialize the position device we are reading from
   if (this->SetupOdom() != 0) {
@@ -353,12 +351,9 @@ int TranslatorDriver::SetupRanger()
 // Process new odometry data
 void TranslatorDriver::ProcessOdom(player_position2d_data_t &data)
 {
-  // Need to publish to the replica
-  pos_data_msg.pose[INDEX_X] = data.pos.px;
-  pos_data_msg.pose[INDEX_Y] = data.pos.py;
-  pos_data_msg.pose[INDEX_A] = data.pos.pa;
-
-  //  write(replicas[0].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_pos_data_msg));
+  pose[INDEX_X] = data.pos.px;
+  pose[INDEX_Y] = data.pos.py;
+  pose[INDEX_A] = data.pos.pa;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -366,21 +361,21 @@ void TranslatorDriver::ProcessOdom(player_position2d_data_t &data)
 void TranslatorDriver::ProcessRanger(player_ranger_data_range_t &data)
 {
   int index = 0;
-  struct comm_header hdr;
-  struct comm_range_data_msg message;
-
-  // We write the new odom data here... so that the order is consistent
-  write(replicas[0].pipefd_into_rep[1], (void*)(&pos_data_msg), sizeof(struct comm_pos_data_msg));
+  struct comm_range_pose_data_msg send_msg;
 
   if (ranger_countdown-- < 0) {
-    hdr.type = COMM_RANGE_DATA;
-    hdr.byte_count = data.ranges_count * sizeof(double);
-    message.hdr = hdr;
-    for (index = 0; index < data.ranges_count; index++) {
-      message.ranges[index] = data.ranges[index];
+    send_msg.hdr.type = COMM_RANGE_POSE_DATA;
+    send_msg.hdr.byte_count = 19 * sizeof(double);
+
+    for (index = 0; index < 16; index++) {
+      send_msg.ranges[index] = data.ranges[index];
     }
 
-    write(replicas[0].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_range_data_msg));
+    for (index = 0; index < 3; index++) {
+      send_msg.pose[index] = pose[index];
+    }
+
+    write(replicas[0].pipefd_into_rep[1], (void*)(&send_msg), sizeof(struct comm_range_pose_data_msg));
   } else {
     printf("Skipping this one.\n");
   }

@@ -70,7 +70,7 @@ int initReplica() {
   int scheduler;
   struct sched_param param;
 
-  InitTAS(DEFAULT_CPU, &cpu_speed);
+  InitTAS(DEFAULT_CPU, &cpu_speed, 5);
 
   scheduler = sched_getscheduler(0);
   printf("Empty Scheduler: %d\n", scheduler);
@@ -94,29 +94,21 @@ void enterLoop() {
 
   int read_ret;
   struct comm_header hdr;
-  struct comm_range_data_msg recv_msg; // largest message
+  struct comm_range_pose_data_msg recv_msg; // largest message
   struct comm_mov_cmd_msg send_msg;
  
   while(1) {
     // Blocking, but that's okay with me
-    read_ret = read(read_in_fd, &recv_msg, sizeof(struct comm_range_data_msg));
+    read_ret = read(read_in_fd, &recv_msg, sizeof(struct comm_range_pose_data_msg));
     if (read_ret > 0) {
       switch (recv_msg.hdr.type) {
-      case COMM_RANGE_DATA:
-
-	hdr.type = COMM_MOV_CMD;
-	hdr.byte_count = 2 * sizeof(double);
-	send_msg.hdr = hdr;
+      case COMM_RANGE_POSE_DATA:
+	send_msg.hdr.type = COMM_MOV_CMD;
+	send_msg.hdr.byte_count = 2 * sizeof(double);
 	send_msg.vel_cmd[0] = 0.1;
 	send_msg.vel_cmd[1] = 0.0;
-	//	last = generate_timestamp(); // DELME
-	write(write_out_fd, &send_msg, sizeof(struct comm_header) + hdr.byte_count);
-	//	current = generate_timestamp();
-	//	printf("%lld to write %d bytes\n", current - last, sizeof(struct comm_header) + hdr.byte_count); // DELME
-	
-	break;
-      case COMM_POS_DATA:
 
+	write(write_out_fd, &send_msg, sizeof(struct comm_range_pose_data_msg));
 	break;
       case COMM_WAY_RES:
 
@@ -128,7 +120,7 @@ void enterLoop() {
     } else if (read_ret == -1) {
       perror("Blocking, eh?");
     } else {
-      puts("ArtPot read_ret == 0?");
+      puts("Empty read_ret == 0?");
     }
   }
 }

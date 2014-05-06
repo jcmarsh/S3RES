@@ -91,7 +91,7 @@ int initReplica() {
   int scheduler;
   struct sched_param param;
 
-  InitTAS(DEFAULT_CPU, &cpu_speed);
+  InitTAS(DEFAULT_CPU, &cpu_speed, 5);
 
   scheduler = sched_getscheduler(0);
   printf("Art_Pot Scheduler: %d\n", scheduler);
@@ -188,25 +188,23 @@ void enterLoop() {
   int index;
 
   int read_ret;
-  struct comm_range_data_msg recv_msg;
+  struct comm_range_pose_data_msg recv_msg;
 
   while(1) {
     // Blocking, but that's okay with me
-    read_ret = read(read_in_fd, &recv_msg, sizeof(struct comm_range_data_msg));
+    read_ret = read(read_in_fd, &recv_msg, sizeof(struct comm_range_pose_data_msg));
     if (read_ret > 0) {
       switch (recv_msg.hdr.type) {
-      case COMM_RANGE_DATA:
+      case COMM_RANGE_POSE_DATA:
 	ranger_count = 16;      
 	for (index = 0; index < ranger_count; index++) {
 	  ranges[index] = recv_msg.ranges[index];
 	}
+	for (index = 0; index < 3; index++) {
+	  pos[index] = recv_msg.pose[index];
+	}
 	// Calculates and sends the new command
 	command();
-	break;
-      case COMM_POS_DATA:
-	for (index = 0; index < 3; index++) {
-	  pos[index] = ((struct comm_pos_data_msg*) (&recv_msg))->pose[index];
-	}
 	break;
       case COMM_WAY_RES:
 	for (index = 0; index < 3; index++) {
