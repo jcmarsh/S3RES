@@ -34,15 +34,13 @@ double goal[3];
 // Position
 double pos[3];
 int ranger_count;
-double ranger_ranges[365]; // 365 comes from somewhere in Player as the max.
+double ranges[16]; // 16 is the size in commtypes.h
 
 int read_in_fd;
 int write_out_fd;
 
 // TAS related
 cpu_speed_t cpu_speed;
-
-timestamp_t last; //DELME
 
 void enterLoop();
 void command();
@@ -106,7 +104,6 @@ int initReplica() {
 }
 
 void command() {
-  timestamp_t current;
   double dist, theta, delta_x, delta_y, v, tao, obs_x, obs_y;
   double vel_cmd[2];
   int total_factors, i;
@@ -142,8 +139,8 @@ void command() {
     for (i = 0; i < ranger_count; i++) {
       // figure out location of the obstacle...
       tao = (2 * M_PI * i) / ranger_count;
-      obs_x = ranger_ranges[i] * cos(tao);
-      obs_y = ranger_ranges[i] * sin(tao);
+      obs_x = ranges[i] * cos(tao);
+      obs_y = ranges[i] * sin(tao);
       // obs.x and obs.y are relative to the robot, and I'm okay with that.
       dist = sqrt(pow(obs_x, 2) + pow(obs_y, 2));
       theta = atan2(obs_y, obs_x);
@@ -174,17 +171,16 @@ void command() {
   message.vel_cmd[1] = vel_cmd[1];
 
   // Write move command
-  write(write_out_fd, &message, sizeof(struct comm_header) + hdr.byte_count);
-  printf("%lld\n", generate_timestamp() - last); // DELME
+  write(write_out_fd, &message, sizeof(struct comm_mov_cmd_msg));
 }
 
 void requestWaypoints() {
-  struct comm_header hdr;
+  struct comm_way_req_msg send_msg;
   
-  hdr.type = COMM_WAY_REQ;
-  hdr.byte_count = 0;
+  send_msg.hdr.type = COMM_WAY_REQ;
+  send_msg.hdr.byte_count = 0;
 
-  write(write_out_fd, &hdr, sizeof(struct comm_header));
+  write(write_out_fd, &send_msg, sizeof(struct comm_way_req_msg));
 }
 
 void enterLoop() {
@@ -192,33 +188,34 @@ void enterLoop() {
   int index;
 
   int read_ret;
-  struct comm_header hdr;
+  struct comm_range_data_msg recv_msg;
 
   while(1) {
     // Blocking, but that's okay with me
-    read_ret = read(read_in_fd, &hdr, sizeof(struct comm_header));
+    read_ret = read(read_in_fd, &recv_msg, sizeof(struct comm_range_data_msg));
     if (read_ret > 0) {
-      assert(read_ret == sizeof(struct comm_header));
-      switch (hdr.type) {
+      switch (recv_msg.hdr.type) {
       case COMM_RANGE_DATA:
-	last = generate_timestamp(); // DELME
-	read_ret = read(read_in_fd, ranger_ranges, hdr.byte_count);
-	ranger_count = read_ret / sizeof(double);      
-	//	assert(read_ret == hdr.byte_count);
+	ranger_count = 16;      
+	for (index = 0; index < ranger_count; index++) {
+	  ranges[index] = recv_msg.ranges[index];
+	}
 	// Calculates and sends the new command
 	command();
 	break;
       case COMM_POS_DATA:
-	read_ret = read(read_in_fd, pos, hdr.byte_count);
-	//	assert(read_ret == hdr.byte_count);
+	for (index = 0; index < 3; index++) {
+	  pos[index] = ((struct comm_pos_data_msg*) (&recv_msg))->pose[index];
+	}
 	break;
       case COMM_WAY_RES:
-	read_ret = read(read_in_fd, goal, hdr.byte_count);
-	//	assert(read_ret == hdr.byte_count);
+	for (index = 0; index < 3; index++) {
+	  goal[index] = ((struct comm_way_res_msg*) (&recv_msg))->point[index];
+	}
 	break;
       default:
 	// TODO: Fail? or drop data?
-	printf("ERROR: art_pot_p can't handle comm type: %d\n", hdr.type);
+	printf("ERROR: art_pot_p can't handle comm type: %d\n", recv_msg.hdr.type);
       }
     } else if (read_ret == -1) {
       perror("Blocking, eh?");

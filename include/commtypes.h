@@ -28,18 +28,24 @@ struct comm_range_data_msg {
 struct comm_pos_data_msg {
   struct comm_header hdr;
   double pose[3];
+  double padding[13];
 };
 
-// no struct need for comm_way_req: carries no data
+struct comm_way_req_msg {
+  struct comm_header hdr;
+  double padding[16];
+};
 
 struct comm_way_res_msg {
   struct comm_header hdr;
   double point[3];
+  double padding[13];
 };
 
 struct comm_mov_cmd_msg {
   struct comm_header hdr;
   double vel_cmd[2];
+  double padding[14];
 };
 
 #endif // _COMM_TYPES_H_

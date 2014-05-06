@@ -61,8 +61,6 @@ int timeout_fd[2];
 timer_t timerid;
 struct itimerspec its;
 
-int ranger_cmds_count;
-
 // Data buffers
 double pos[3];
 int range_count;
@@ -187,8 +185,6 @@ int initVoterB() {
     return -1;
   }
 
-  ranger_cmds_count = 0;
-
   curr_goal[INDEX_X] = curr_goal[INDEX_Y] = curr_goal[INDEX_A] = 0.0;
   next_goal[INDEX_X] = next_goal[INDEX_Y] = next_goal[INDEX_A] = 0.0;
   for (index = 0; index < REP_COUNT; index++) {
@@ -208,14 +204,14 @@ int initVoterB() {
 }
 
 void requestWaypoints() {
-  struct comm_header hdr;
+  struct comm_way_req_msg send_msg;
   int retval;
 
-  hdr.type = COMM_WAY_REQ;
-  hdr.byte_count = 0;
+  send_msg.hdr.type = COMM_WAY_REQ;
+  send_msg.hdr.byte_count = 0;
 
-  retval = write(write_out_fd, &hdr, sizeof(struct comm_header));
-  assert(retval == sizeof(struct comm_header) + hdr.byte_count);
+  retval = write(write_out_fd, &send_msg, sizeof(struct comm_way_req_msg));
+  assert(retval == sizeof(struct comm_way_req_msg));
 }
 
 int parseArgs(int argc, const char **argv) {
@@ -259,17 +255,13 @@ void doOneUpdate() {
 
   int retval = 0;
 
-  struct comm_header hdr;
+  struct comm_range_data_msg recv_msg;
   double cmd_vel[2];
 
   struct timeval select_timeout;
   fd_set select_set;
   int max_fd;
   int rep_pipe_r;
-
-  if (ranger_cmds_count < INIT_ROUNDS) {
-    // Have not started running yet
-  }
 
   // See if any of the read pipes have anything
   select_timeout.tv_sec = 1;
@@ -307,31 +299,33 @@ void doOneUpdate() {
     
     // Check for data from the benchmarker
     if (FD_ISSET(read_in_fd, &select_set)) {
-      retval = read(read_in_fd, &hdr, sizeof(struct comm_header));;
+      retval = read(read_in_fd, &recv_msg, sizeof(struct comm_range_data_msg));;
       if (retval > 0) {
-	assert(retval == sizeof(struct comm_header));
-	switch (hdr.type) {
+	switch (recv_msg.hdr.type) {
 	case COMM_RANGE_DATA:
 	  // send to reps!
-	  retval = read(read_in_fd, ranger_ranges, hdr.byte_count);
-	  range_count = retval / sizeof(double);
-	  assert(retval == hdr.byte_count);
+	  range_count = 16;
+	  for (index = 0; index < range_count; index++) {
+	    ranger_ranges[index] = recv_msg.ranges[index];
+	  }
 	  processRanger();      
 	  break;
 	case COMM_POS_DATA:
 	  // send to reps!
-	  retval = read(read_in_fd, pos, hdr.byte_count);
-	  assert(retval == hdr.byte_count);
+	  for (index = 0; index < 3; index++) {
+	    pos[index] =  ((struct comm_pos_data_msg*) (&recv_msg))->pose[index];
+	  }
 	  processOdom();
 	  break;
 	case COMM_WAY_RES:
 	  // New waypoints from benchmarker!
-	  retval = read(read_in_fd, next_goal, hdr.byte_count);
-	  assert(retval == hdr.byte_count);
+	  for (index = 0; index < 3; index++) {
+	    next_goal[index] = ((struct comm_way_res_msg*) (&recv_msg))->point[index];
+	  }
 	  processCommand();
 	  break;
 	default:
-	  printf("ERROR: VoterB can't handle comm type: %d\n", hdr.type);
+	  printf("ERROR: VoterB can't handle comm type: %d\n", recv_msg.hdr.type);
 	}
       }
     }
@@ -339,23 +333,22 @@ void doOneUpdate() {
     // Check all replicas for data
     for (index = 0; index < REP_COUNT; index++) {
       // clear comm_header for next message
-      hdr.type = -1;
-      hdr.byte_count = -1;
+      recv_msg.hdr.type = -1;
       
       if (FD_ISSET(replicas[index].pipefd_outof_rep[0], &select_set)) {
-	retval = read(replicas[index].pipefd_outof_rep[0], &hdr, sizeof(struct comm_header));
+	retval = read(replicas[index].pipefd_outof_rep[0], &recv_msg, sizeof(struct comm_range_data_msg));
 	if (retval > 0) {
-	  switch (hdr.type) {
+	  switch (recv_msg.hdr.type) {
 	  case COMM_WAY_REQ:
 	    sendWaypoints(index);
 	    break;
 	  case COMM_MOV_CMD:
-	    retval = read(replicas[index].pipefd_outof_rep[0], cmd_vel, hdr.byte_count);
-	    assert(retval == hdr.byte_count);
+	    cmd_vel[0] = ((struct comm_mov_cmd_msg*) (&recv_msg))->vel_cmd[0];
+	    cmd_vel[1] = ((struct comm_mov_cmd_msg*) (&recv_msg))->vel_cmd[1];
 	    processVelCmdFromRep(cmd_vel[0], cmd_vel[1], index);
 	    break;
 	  default:
-	    printf("ERROR: VoterB can't handle comm type: %d\n", hdr.type);
+	    printf("ERROR: VoterB can't handle comm type: %d\n", recv_msg.hdr.type);
 	  }
 	}
       }
@@ -380,8 +373,8 @@ void processOdom() {
 
   // Need to publish to the replicas
   for (index = 0; index < REP_COUNT; index++) {
-    retval = write(replicas[index].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
-    assert(retval == sizeof(struct comm_header) + hdr.byte_count);
+    retval = write(replicas[index].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_pos_data_msg));
+    assert(retval == sizeof(struct comm_pos_data_msg));
   }
 }
 
@@ -401,27 +394,22 @@ void processRanger() {
     message.ranges[index] = ranger_ranges[index];
   }
 
-  // Ignore first ranger update (to give everything a chance to init)
-  if (ranger_cmds_count < INIT_ROUNDS) {
-    ranger_cmds_count++;
-  } else {
-    vote_stat = VOTING;
+  vote_stat = VOTING;
 
-    // Arm timer
-    its.it_interval.tv_sec = 0;
-    its.it_interval.tv_nsec = 0;
-    its.it_value.tv_sec = 0;
-    its.it_value.tv_nsec = PERIOD_NSEC;
+  // Arm timer
+  its.it_interval.tv_sec = 0;
+  its.it_interval.tv_nsec = 0;
+  its.it_value.tv_sec = 0;
+  its.it_value.tv_nsec = PERIOD_NSEC;
 
-    if (timer_settime(timerid, 0, &its, NULL) == -1) {
-      perror("VoterB timer_settime failed");
-    }
+  if (timer_settime(timerid, 0, &its, NULL) == -1) {
+    perror("VoterB timer_settime failed");
+  }
 
-    for (index = 0; index < REP_COUNT; index++) {
-      // Write range data
-      retval = write(replicas[index].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
-      assert(retval == sizeof(struct comm_header) + hdr.byte_count);
-    }
+  for (index = 0; index < REP_COUNT; index++) {
+    // Write range data
+    retval = write(replicas[index].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_range_data_msg));
+    assert(retval == sizeof(struct comm_range_data_msg));
   }
 }
 
@@ -464,8 +452,8 @@ void sendWaypoints(int replica_num) {
     message.point[INDEX_Y] = curr_goal[INDEX_Y];
     message.point[INDEX_A] = curr_goal[INDEX_A];
 
-    retval = write(replicas[replica_num].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
-    assert(retval == sizeof(struct comm_header) + hdr.byte_count);
+    retval = write(replicas[replica_num].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_way_res_msg));
+    assert(retval == sizeof(struct comm_way_res_msg));
   }
 }
 
@@ -533,8 +521,8 @@ void putCommand(double cmd_speed, double cmd_turnrate) {
   message.vel_cmd[0] = cmd_speed;
   message.vel_cmd[1] = cmd_turnrate;
 
-  retval = write(write_out_fd, (void*)&message, sizeof(struct comm_header) + hdr.byte_count);
-  assert(retval == sizeof(struct comm_header) + hdr.byte_count);
+  retval = write(write_out_fd, (void*)&message, sizeof(struct comm_mov_cmd_msg));
+  assert(retval == sizeof(struct comm_mov_cmd_msg));
 }
 
 ////////////////////////////////////////////////////////////////////////////////

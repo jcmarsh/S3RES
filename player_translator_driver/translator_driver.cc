@@ -61,6 +61,7 @@ private:
   // Odometry Device info
   Device *odom;
   player_devaddr_t odom_addr; // "original:localhost:6666:position2d:0"
+  struct comm_pos_data_msg pos_data_msg;
 
   // Ranger Device info
   int ranger_countdown;
@@ -149,6 +150,13 @@ int TranslatorDriver::MainSetup()
   InitTAS(3, &cpu_speed);
   curr_goal[INDEX_X] = curr_goal[INDEX_Y] = curr_goal[INDEX_A] = 0.0;
 
+  // Initial starting position
+  pos_data_msg.pose[INDEX_X] = -7.0;
+  pos_data_msg.pose[INDEX_Y] = -7.0;
+  pos_data_msg.pose[INDEX_A] = 0.0;
+  pos_data_msg.hdr.type = COMM_POS_DATA;
+  pos_data_msg.hdr.byte_count = 3 * sizeof(double);
+
   // Initialize the position device we are reading from
   if (this->SetupOdom() != 0) {
     return -1;
@@ -236,7 +244,7 @@ void TranslatorDriver::SendWaypoints() {
   message.point[INDEX_Y] = curr_goal[INDEX_Y];
   message.point[INDEX_A] = curr_goal[INDEX_A];
 
-  write(replicas[0].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
+  write(replicas[0].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_way_res_msg));
 }
 
 void TranslatorDriver::Main() {
@@ -248,25 +256,21 @@ void TranslatorDriver::Main() {
 // Called by player for each non-threaded driver.
 void TranslatorDriver::DoOneUpdate() {
   int retval;
-  struct comm_header hdr;
-  double cmd_vel[2];
+  struct comm_mov_cmd_msg recv_msg;
 
   // This read is non-blocking
-  retval = read(replicas[0].pipefd_outof_rep[0], &hdr, sizeof(struct comm_header));
+  retval = read(replicas[0].pipefd_outof_rep[0], &recv_msg, sizeof(struct comm_mov_cmd_msg));
   if (retval > 0) {
-    assert(retval == sizeof(struct comm_header));
-    switch(hdr.type) {
+    switch(recv_msg.hdr.type) {
     case COMM_WAY_REQ:
       this->SendWaypoints();
       break;
     case COMM_MOV_CMD:
       // This read is non-blocking... whole message should be written at once to prevent interleaving
-      retval = read(replicas[0].pipefd_outof_rep[0], cmd_vel, hdr.byte_count);
-      assert(retval == hdr.byte_count); // Shouldn't fail, art_pot writes once
-      this->PutCommand(cmd_vel[0], cmd_vel[1]);
+	this->PutCommand(recv_msg.vel_cmd[0], recv_msg.vel_cmd[1]);
       break;
     default:
-      printf("ERROR: Translator can't handle comm type: %d\n", hdr.type);
+      printf("ERROR: Translator can't handle comm type: %d\n", recv_msg.hdr.type);
     }
   }
 
@@ -349,18 +353,12 @@ int TranslatorDriver::SetupRanger()
 // Process new odometry data
 void TranslatorDriver::ProcessOdom(player_position2d_data_t &data)
 {
-  struct comm_header hdr;
-  struct comm_pos_data_msg message;
-
   // Need to publish to the replica
-  hdr.type = COMM_POS_DATA;
-  hdr.byte_count = 3 * sizeof(double);
-  message.hdr = hdr;
-  message.pose[INDEX_X] = data.pos.px;
-  message.pose[INDEX_Y] = data.pos.py;
-  message.pose[INDEX_A] = data.pos.pa;
+  pos_data_msg.pose[INDEX_X] = data.pos.px;
+  pos_data_msg.pose[INDEX_Y] = data.pos.py;
+  pos_data_msg.pose[INDEX_A] = data.pos.pa;
 
-  write(replicas[0].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
+  //  write(replicas[0].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_pos_data_msg));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -371,6 +369,9 @@ void TranslatorDriver::ProcessRanger(player_ranger_data_range_t &data)
   struct comm_header hdr;
   struct comm_range_data_msg message;
 
+  // We write the new odom data here... so that the order is consistent
+  write(replicas[0].pipefd_into_rep[1], (void*)(&pos_data_msg), sizeof(struct comm_pos_data_msg));
+
   if (ranger_countdown-- < 0) {
     hdr.type = COMM_RANGE_DATA;
     hdr.byte_count = data.ranges_count * sizeof(double);
@@ -379,7 +380,7 @@ void TranslatorDriver::ProcessRanger(player_ranger_data_range_t &data)
       message.ranges[index] = data.ranges[index];
     }
 
-    write(replicas[0].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
+    write(replicas[0].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_range_data_msg));
   } else {
     printf("Skipping this one.\n");
   }
