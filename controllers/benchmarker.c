@@ -46,11 +46,17 @@ void requestWaypoints();
 void processCommand();
 
 int initBenchMarker() {
+  int scheduler;
+
   InitTAS(3, &cpu_speed);
 
+  scheduler = sched_getscheduler(0);
+  printf("BenchMarker Scheduler: %d\n", scheduler);
+
   initReplicas(&repGroup, replicas, REP_COUNT);
-  //forkSingleReplica(&repGroup, 0, "ArtPot");
-  forkSingleReplica(&repGroup, 0, "VoterB");
+  //  forkSingleReplica(&repGroup, 0, "ArtPot");
+  forkSingleReplica(&repGroup, 0, "Empty");
+  //forkSingleReplica(&repGroup, 0, "VoterB");
 
   return 0;
 }
@@ -202,9 +208,6 @@ void processRanger() {
 #ifdef _STATS_BENCH_ROUND_TRIP_
   last = generate_timestamp();
 #endif // _STATS_BENCH_ROUND_TRIP_
-#ifdef _STATS_BENCH_TO_CONT_
-  printf("Benc\t%lf\n", timestamp_to_realtime(generate_timestamp(), cpu_speed));
-#endif
 
   write(replicas[0].pipefd_into_rep[1], (void*)(&range_data_msg), sizeof(struct comm_header) + hdr.byte_count);
 }
@@ -228,9 +231,6 @@ void processCommand() {
   current = generate_timestamp();
 
   printf("%lld\n", current - last);
-#endif
-#ifdef _STATS_CONT_TO_BENCH_
-  printf("Benc\t%lf\n", timestamp_to_realtime(generate_timestamp(), cpu_speed));
 #endif
 
   hdr.type = COMM_MOV_CMD;

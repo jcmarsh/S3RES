@@ -42,7 +42,7 @@ int write_out_fd;
 // TAS related
 cpu_speed_t cpu_speed;
 
-timestamp_t last;
+timestamp_t last; //DELME
 
 void enterLoop();
 void command();
@@ -60,7 +60,7 @@ void restartHandler(int signo) {
       // Get own pid, send to voter
       currentPID = getpid();
       connectRecvFDS(currentPID, &read_in_fd, &write_out_fd);
-      command(); // recalculate missed command
+      command(); // recalculate missed command TODO DON"T NEED
       enterLoop(); // return to normal
     } else {   // Parent just returns
       return;
@@ -90,7 +90,13 @@ int parseArgs(int argc, const char **argv) {
 // Should probably separate this out correctly
 // Basically the init function
 int initReplica() {
+  int scheduler;
+  struct sched_param param;
+
   InitTAS(DEFAULT_CPU, &cpu_speed);
+
+  scheduler = sched_getscheduler(0);
+  printf("Art_Pot Scheduler: %d\n", scheduler);
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     puts("Failed to register the restart handler");
@@ -167,16 +173,9 @@ void command() {
   message.vel_cmd[0] = vel_cmd[0];
   message.vel_cmd[1] = vel_cmd[1];
 
-#ifdef _STATS_CONT_COMMAND_
-  current = generate_timestamp();
-  
-  printf("%lf\n", timestamp_to_realtime(current - last, cpu_speed));
-#endif
-#ifdef _STATS_CONT_TO_BENCH_
-  printf("Cont\t%lf\n", timestamp_to_realtime(generate_timestamp(), cpu_speed));
-#endif
   // Write move command
   write(write_out_fd, &message, sizeof(struct comm_header) + hdr.byte_count);
+  printf("%lld\n", generate_timestamp() - last); // DELME
 }
 
 void requestWaypoints() {
@@ -202,25 +201,20 @@ void enterLoop() {
       assert(read_ret == sizeof(struct comm_header));
       switch (hdr.type) {
       case COMM_RANGE_DATA:
+	last = generate_timestamp(); // DELME
 	read_ret = read(read_in_fd, ranger_ranges, hdr.byte_count);
 	ranger_count = read_ret / sizeof(double);      
-	assert(read_ret == hdr.byte_count);
-#ifdef _STATS_BENCH_TO_CONT_
-	printf("Cont\t%lf\n", timestamp_to_realtime(generate_timestamp(), cpu_speed));
-#endif
-#ifdef _STATS_CONT_COMMAND_
-	last = generate_timestamp();
-#endif
+	//	assert(read_ret == hdr.byte_count);
 	// Calculates and sends the new command
 	command();
 	break;
       case COMM_POS_DATA:
 	read_ret = read(read_in_fd, pos, hdr.byte_count);
-	assert(read_ret == hdr.byte_count);
+	//	assert(read_ret == hdr.byte_count);
 	break;
       case COMM_WAY_RES:
 	read_ret = read(read_in_fd, goal, hdr.byte_count);
-	assert(read_ret == hdr.byte_count);
+	//	assert(read_ret == hdr.byte_count);
 	break;
       default:
 	// TODO: Fail? or drop data?

@@ -13,7 +13,6 @@
 #include <libplayercore/playercore.h>
 
 #include "../include/taslimited.h"
-#include "../include/statstime.h"
 #include "../include/replicas.h"
 #include "../include/commtypes.h"
 
@@ -64,6 +63,7 @@ private:
   player_devaddr_t odom_addr; // "original:localhost:6666:position2d:0"
 
   // Ranger Device info
+  int ranger_countdown;
   Device *ranger;
   player_devaddr_t ranger_addr; // "original:localhost:6666:ranger:0"
 
@@ -124,6 +124,7 @@ TranslatorDriver::TranslatorDriver(ConfigFile* cf, int section)
   }
 
   // RANGER!
+  ranger_countdown = 5;
   this->ranger = NULL;
   memset(&(this->ranger_addr), 0, sizeof(player_devaddr_t));
   if (cf->ReadDeviceAddr(&(this->ranger_addr), section, "requires",
@@ -370,14 +371,18 @@ void TranslatorDriver::ProcessRanger(player_ranger_data_range_t &data)
   struct comm_header hdr;
   struct comm_range_data_msg message;
 
-  hdr.type = COMM_RANGE_DATA;
-  hdr.byte_count = data.ranges_count * sizeof(double);
-  message.hdr = hdr;
-  for (index = 0; index < data.ranges_count; index++) {
-    message.ranges[index] = data.ranges[index];
-  }
+  if (ranger_countdown-- < 0) {
+    hdr.type = COMM_RANGE_DATA;
+    hdr.byte_count = data.ranges_count * sizeof(double);
+    message.hdr = hdr;
+    for (index = 0; index < data.ranges_count; index++) {
+      message.ranges[index] = data.ranges[index];
+    }
 
-  write(replicas[0].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
+    write(replicas[0].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_header) + hdr.byte_count);
+  } else {
+    printf("Skipping this one.\n");
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
