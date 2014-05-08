@@ -37,10 +37,10 @@ long timer_interrupts;
 FILE* proc_interrupts;
 char i_buffer[256];
 
-struct comm_range_pose_data_msg range_pose_data_msg;
-struct comm_way_req_msg way_req_msg;
-struct comm_way_res_msg way_res_msg;
-struct comm_mov_cmd_msg mov_cmd_msg;
+struct comm_message range_pose_data_msg;
+struct comm_message way_req_msg;
+struct comm_message way_res_msg;
+struct comm_message mov_cmd_msg;
 
 // FUNCTIONS!
 int initBenchMarker();
@@ -99,6 +99,11 @@ int initBenchMarker() {
 
   initParser();
 
+  way_req_msg.type = COMM_WAY_REQ;
+  way_res_msg.type = COMM_WAY_RES;
+  mov_cmd_msg.type = COMM_MOV_CMD;
+  range_pose_data_msg.type = COMM_RANGE_POSE_DATA;  
+
   initReplicas(&repGroup, replicas, REP_COUNT);
   forkSingleReplica(&repGroup, 0, "Empty");
   //forkSingleReplica(&repGroup, 0, "ArtPot");
@@ -142,24 +147,22 @@ int main(int argc, const char **argv) {
 void doOneUpdate() {
   int retval = 0;
   int index;
-  struct comm_range_pose_data_msg recv_msg;
-
-  int rep_pipe_r;
+  struct comm_message recv_msg;
 
   // Message comes in from translator
   // Message goes out from replica
   // That is it. Except for those waypoint request / responses
 
   // Translator driven, check first. This call blocks.
-  retval = read(read_in_fd, &recv_msg, sizeof(struct comm_range_pose_data_msg));
+  retval = read(read_in_fd, &recv_msg, sizeof(struct comm_message));
   if (retval > 0) {
-    switch (recv_msg.hdr.type) {
+    switch (recv_msg.type) {
     case COMM_RANGE_POSE_DATA:
       for (index = 0; index < 16; index++) {
-	range_pose_data_msg.ranges[index] = recv_msg.ranges[index];
+	range_pose_data_msg.data.rp_data.ranges[index] = recv_msg.data.rp_data.ranges[index];
       }
       for (index = 0; index < 3; index++) {
-	range_pose_data_msg.pose[index] = recv_msg.ranges[index];
+	range_pose_data_msg.data.rp_data.pose[index] = recv_msg.data.rp_data.pose[index];
       }
       //	  puts("Bench: Range / Pose Data");
       processRanger();      
@@ -168,33 +171,33 @@ void doOneUpdate() {
       // TODO: Figure this out
       puts("DANGER WILL ROBINSON!");
       for (index = 0; index < 3; index++) {
-	way_res_msg.point[index] = ((struct comm_way_res_msg*) (&recv_msg))->point[index];
+	way_res_msg.data.w_res.point[index] = recv_msg.data.w_res.point[index];
       }
       sendWaypoints();
       break;
     default:
-      printf("ERROR: BenchMarker can't handle comm type: %d\n", recv_msg.hdr.type);
+      printf("ERROR: BenchMarker can't handle comm type: %d\n", recv_msg.type);
     }
   } else {
     perror("Bench: read should have worked, failed."); // EINTR?
   }
 
   // Second part of the cycle: response from replica
-  retval = read(replicas[0].pipefd_outof_rep[0], &recv_msg, sizeof(struct comm_range_pose_data_msg));
+  retval = read(replicas[0].fd_outof_rep[0], &recv_msg, sizeof(struct comm_message));
   if (retval > 0) {
-    switch (recv_msg.hdr.type) {
+    switch (recv_msg.type) {
     case COMM_WAY_REQ:
       puts("THIS IS NOT ACCEPTABLE");
       requestWaypoints();
       break;
     case COMM_MOV_CMD:
-      mov_cmd_msg.vel_cmd[0] = ((struct comm_mov_cmd_msg*) (&recv_msg))->vel_cmd[0];
-      mov_cmd_msg.vel_cmd[1] = ((struct comm_mov_cmd_msg*) (&recv_msg))->vel_cmd[1];
+      mov_cmd_msg.data.m_cmd.vel_cmd[0] = recv_msg.data.m_cmd.vel_cmd[0];
+      mov_cmd_msg.data.m_cmd.vel_cmd[1] = recv_msg.data.m_cmd.vel_cmd[1];
       //	  puts("\tBench: Command Recv.");
       processCommand();
       break;
     default:
-      printf("ERROR: BenchMarker can't handle comm type: %d\n", recv_msg.hdr.type);
+      printf("ERROR: BenchMarker can't handle comm type: %d\n", recv_msg.type);
     }
   } else {
     perror("Bench: read should have worked, failed."); // EINTR?
@@ -202,42 +205,27 @@ void doOneUpdate() {
 }
 
 void sendWaypoints() {
-  struct comm_header hdr;
-
-  hdr.type = COMM_WAY_RES;
-  hdr.byte_count = 3 * sizeof(double);
-  way_res_msg.hdr = hdr;
   // data set by read
 
-  write(replicas[0].pipefd_into_rep[1], (void*)(&way_res_msg), sizeof(struct comm_way_res_msg));
+  write(replicas[0].fd_into_rep[1], &way_res_msg, sizeof(struct comm_message));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process ranger data
 void processRanger() {
-  int index = 0;
-
-  range_pose_data_msg.hdr.type = COMM_RANGE_POSE_DATA;
-  range_pose_data_msg.hdr.byte_count = 19 * sizeof(double);
-  // msg data set by read in
+  // msg data set by read in (TODO: Change?)
 
 #ifdef _STATS_BENCH_ROUND_TRIP_
   last = generate_timestamp();
   timer_interrupts = parseInterrupts();
 #endif // _STATS_BENCH_ROUND_TRIP_
 
-  write(replicas[0].pipefd_into_rep[1], (void*)(&range_pose_data_msg), sizeof(struct comm_range_pose_data_msg));
+  write(replicas[0].fd_into_rep[1], &range_pose_data_msg, sizeof(struct comm_message));
 }
 
 // To translator
 void requestWaypoints() {
-  struct comm_header hdr;
-  
-  hdr.type = COMM_WAY_REQ;
-  hdr.byte_count = 0;
-  way_req_msg.hdr = hdr;
-
-  write(write_out_fd, (void*)(&way_req_msg), sizeof(struct comm_way_req_msg));
+  write(write_out_fd, &way_req_msg, sizeof(struct comm_message));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -255,9 +243,7 @@ void processCommand() {
   printf("%ld\t%lld\n", new_interrupts - timer_interrupts, current - last);
 #endif
 
-  mov_cmd_msg.hdr.type = COMM_MOV_CMD;
-  mov_cmd_msg.hdr.byte_count = 2 * sizeof(double);
   // data was set by read
 
-  write(write_out_fd, (void*)(&mov_cmd_msg), sizeof(struct comm_mov_cmd_msg));
+  write(write_out_fd, &mov_cmd_msg, sizeof(struct comm_message));
 }

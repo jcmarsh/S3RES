@@ -23,8 +23,8 @@ typedef enum {
 struct replica {
   pid_t pid; // The pid of the thread
   int priority; // Not yet implemented
-  int pipefd_into_rep[2]; // pipe to communicate with controller
-  int pipefd_outof_rep[2];
+  int fd_into_rep[2]; // pipe to communicate with controller
+  int fd_outof_rep[2];
   // Possibly put a pointer to entry function
   replica_status status;
   //  unsigned long last_result; // TODO: Usefull comment.

@@ -9,12 +9,12 @@ int initReplicas(struct replica_group* rg, struct replica* reps, int num) {
   // Init three replicas
   for (index = 0; index < rg->num; index++) {
     //    printf("Initing index: %d\n", index);
-    if (pipe(rg->replicas[index].pipefd_into_rep) == -1) {
+    if (pipe(rg->replicas[index].fd_into_rep) == -1) {
       perror("replicas pipe error!");
       return 0;
     }
 
-    if (pipe(rg->replicas[index].pipefd_outof_rep) == -1) {
+    if (pipe(rg->replicas[index].fd_outof_rep) == -1) {
       printf("replicas pipe error!");
       return 0;
     }
@@ -66,21 +66,21 @@ int forkSingleReplica(struct replica_group* rg, int num, char* prog_name) {
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
       // art_pot expects something like: ./art_pot read_fd write_fd
-      sprintf(read_in, "%02d", rg->replicas[num].pipefd_into_rep[0]);
+      sprintf(read_in, "%02d", rg->replicas[num].fd_into_rep[0]);
       rep_argv[1] = read_in;
-      sprintf(write_out, "%02d", rg->replicas[num].pipefd_outof_rep[1]);
+      sprintf(write_out, "%02d", rg->replicas[num].fd_outof_rep[1]);
       rep_argv[2] = write_out;
 
-      close(rg->replicas[num].pipefd_outof_rep[0]); // close read end of outof_rep pipe in child
-      close(rg->replicas[num].pipefd_into_rep[1]); // close write end of into_rep pipe in child
+      close(rg->replicas[num].fd_outof_rep[0]); // close read end of outof_rep pipe in child
+      close(rg->replicas[num].fd_into_rep[1]); // close write end of into_rep pipe in child
 
       if (-1 == execv(prog_name, rep_argv)) {
 	perror("EXEC ERROR!");
 	return -1;
       }
     } else { // Parent Process
-      close(rg->replicas[num].pipefd_into_rep[0]); // close read end of into_rep pipe in parent
-      close(rg->replicas[num].pipefd_outof_rep[1]); // close write end of outof_rep pipe in parent
+      close(rg->replicas[num].fd_into_rep[0]); // close read end of into_rep pipe in parent
+      close(rg->replicas[num].fd_outof_rep[1]); // close write end of outof_rep pipe in parent
       rg->replicas[num].pid = currentPID;
     }
   } else {

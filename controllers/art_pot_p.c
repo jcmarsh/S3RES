@@ -108,9 +108,6 @@ void command() {
   double vel_cmd[2];
   int total_factors, i;
   
-  struct comm_mov_cmd_msg message;
-  struct comm_header hdr;
-
   // Head towards the goal! odom_pose: 0-x, 1-y, 2-theta
   dist = sqrt(pow(goal[INDEX_X] - pos[INDEX_X], 2)  + pow(goal[INDEX_Y] - pos[INDEX_Y], 2));
   theta = atan2(goal[INDEX_Y] - pos[INDEX_Y], goal[INDEX_X] - pos[INDEX_X]) - pos[INDEX_A];
@@ -164,23 +161,12 @@ void command() {
     vel_cmd[1] = 0.0;
   }
 
-  hdr.type = COMM_MOV_CMD;
-  hdr.byte_count = 2 * sizeof(double);
-  message.hdr = hdr;
-  message.vel_cmd[0] = vel_cmd[0];
-  message.vel_cmd[1] = vel_cmd[1];
-
   // Write move command
-  write(write_out_fd, &message, sizeof(struct comm_mov_cmd_msg));
+  commSendMoveCommand(write_out_fd, vel_cmd[0], vel_cmd[1]);
 }
 
 void requestWaypoints() {
-  struct comm_way_req_msg send_msg;
-  
-  send_msg.hdr.type = COMM_WAY_REQ;
-  send_msg.hdr.byte_count = 0;
-
-  write(write_out_fd, &send_msg, sizeof(struct comm_way_req_msg));
+  commSendWaypointRequest(write_out_fd);
 }
 
 void enterLoop() {
@@ -188,32 +174,24 @@ void enterLoop() {
   int index;
 
   int read_ret;
-  struct comm_range_pose_data_msg recv_msg;
+  struct comm_message recv_msg;
 
   while(1) {
     // Blocking, but that's okay with me
-    read_ret = read(read_in_fd, &recv_msg, sizeof(struct comm_range_pose_data_msg));
+    read_ret = read(read_in_fd, &recv_msg, sizeof(struct comm_message));
     if (read_ret > 0) {
-      switch (recv_msg.hdr.type) {
+      switch (recv_msg.type) {
       case COMM_RANGE_POSE_DATA:
-	ranger_count = 16;      
-	for (index = 0; index < ranger_count; index++) {
-	  ranges[index] = recv_msg.ranges[index];
-	}
-	for (index = 0; index < 3; index++) {
-	  pos[index] = recv_msg.pose[index];
-	}
+	commCopyRanger(&recv_msg, ranges, pos);
 	// Calculates and sends the new command
 	command();
 	break;
       case COMM_WAY_RES:
-	for (index = 0; index < 3; index++) {
-	  goal[index] = ((struct comm_way_res_msg*) (&recv_msg))->point[index];
-	}
+	commCopyWaypoints(&recv_msg, goal);
 	break;
       default:
 	// TODO: Fail? or drop data?
-	printf("ERROR: art_pot_p can't handle comm type: %d\n", recv_msg.hdr.type);
+	printf("ERROR: art_pot_p can't handle comm type: %d\n", recv_msg.type);
       }
     } else if (read_ret == -1) {
       perror("Blocking, eh?");

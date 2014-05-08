@@ -168,11 +168,11 @@ int TranslatorDriver::MainSetup()
   // Should just be one "replica": The program running (VoterB or a controller)
   initReplicas(&repGroup, replicas, REP_COUNT);
   // TODO: Will need to set this parameter correctly
-  forkSingleReplica(&repGroup, 0, "BenchMarker");
+  //  forkSingleReplica(&repGroup, 0, "BenchMarker"); // TODO uncomment
 
   // Need this pipe not to block so that player and the outside world play nice
-  flags = fcntl(replicas[index].pipefd_outof_rep[0], F_GETFL, 0);
-  fcntl(replicas[index].pipefd_outof_rep[0], F_SETFL, flags | O_NONBLOCK);
+  //  flags = fcntl(replicas[index].fd_outof_rep[0], F_GETFL, 0);
+  //  fcntl(replicas[index].fd_outof_rep[0], F_SETFL, flags | O_NONBLOCK);
 
   puts("Translator driver ready");
 
@@ -232,17 +232,7 @@ int TranslatorDriver::ProcessMessage(QueuePointer & resp_queue,
 }
 
 void TranslatorDriver::SendWaypoints() {
-  struct comm_header hdr;
-  struct comm_way_res_msg message;
-
-  hdr.type = COMM_WAY_RES;
-  hdr.byte_count = 3 * sizeof(double);
-  message.hdr = hdr;
-  message.point[INDEX_X] = curr_goal[INDEX_X];
-  message.point[INDEX_Y] = curr_goal[INDEX_Y];
-  message.point[INDEX_A] = curr_goal[INDEX_A];
-
-  write(replicas[0].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_way_res_msg));
+  commSendWaypoints(replicas[0].fd_into_rep[1], curr_goal[INDEX_X], curr_goal[INDEX_Y], curr_goal[INDEX_A]);
 }
 
 void TranslatorDriver::Main() {
@@ -254,21 +244,21 @@ void TranslatorDriver::Main() {
 // Called by player for each non-threaded driver.
 void TranslatorDriver::DoOneUpdate() {
   int retval;
-  struct comm_mov_cmd_msg recv_msg;
+  struct comm_message recv_msg;
 
   // This read is non-blocking
-  retval = read(replicas[0].pipefd_outof_rep[0], &recv_msg, sizeof(struct comm_mov_cmd_msg));
+  retval = read(replicas[0].fd_outof_rep[0], &recv_msg, sizeof(struct comm_message));
   if (retval > 0) {
-    switch(recv_msg.hdr.type) {
+    switch(recv_msg.type) {
     case COMM_WAY_REQ:
-      this->SendWaypoints();
+      //      this->SendWaypoints(); uncomment
       break;
     case COMM_MOV_CMD:
       // This read is non-blocking... whole message should be written at once to prevent interleaving
-	this->PutCommand(recv_msg.vel_cmd[0], recv_msg.vel_cmd[1]);
+      //	this->PutCommand(recv_msg.data.m_cmd.vel_cmd[0], recv_msg.data.m_cmd.vel_cmd[1]);
       break;
     default:
-      printf("ERROR: Translator can't handle comm type: %d\n", recv_msg.hdr.type);
+      printf("ERROR: Translator can't handle comm type: %d\n", recv_msg.type);
     }
   }
 
@@ -360,22 +350,8 @@ void TranslatorDriver::ProcessOdom(player_position2d_data_t &data)
 // Process ranger data
 void TranslatorDriver::ProcessRanger(player_ranger_data_range_t &data)
 {
-  int index = 0;
-  struct comm_range_pose_data_msg send_msg;
-
   if (ranger_countdown-- < 0) {
-    send_msg.hdr.type = COMM_RANGE_POSE_DATA;
-    send_msg.hdr.byte_count = 19 * sizeof(double);
-
-    for (index = 0; index < 16; index++) {
-      send_msg.ranges[index] = data.ranges[index];
-    }
-
-    for (index = 0; index < 3; index++) {
-      send_msg.pose[index] = pose[index];
-    }
-
-    write(replicas[0].pipefd_into_rep[1], (void*)(&send_msg), sizeof(struct comm_range_pose_data_msg));
+    commSendRanger(replicas[0].fd_into_rep[1], data.ranges, pose);
   } else {
     printf("Skipping this one.\n");
   }

@@ -64,7 +64,7 @@ int parseArgs(int argc, const char **argv) {
   return 0;
 }
 
-// Should probably separate this out correctly
+// TODO: Should probably separate this out correctly
 // Basically the init function
 int initReplica() {
   int scheduler;
@@ -83,39 +83,22 @@ int initReplica() {
 }
 
 void enterLoop() {
-  timestamp_t last; //DELME
-  timestamp_t current;
-  void * update_id;
-  int index;
-
-  double ranger_ranges[365]; // 365 comes from somewhere in Player as the max.
-  double pos[3];
-  double goal[3];
-
   int read_ret;
-  struct comm_header hdr;
-  struct comm_range_pose_data_msg recv_msg; // largest message
-  struct comm_mov_cmd_msg send_msg;
+  struct comm_message recv_msg;
  
   while(1) {
     // Blocking, but that's okay with me
-    read_ret = read(read_in_fd, &recv_msg, sizeof(struct comm_range_pose_data_msg));
+    read_ret = read(read_in_fd, &recv_msg, sizeof(struct comm_message));
     if (read_ret > 0) {
-      switch (recv_msg.hdr.type) {
+      switch (recv_msg.type) {
       case COMM_RANGE_POSE_DATA:
-	send_msg.hdr.type = COMM_MOV_CMD;
-	send_msg.hdr.byte_count = 2 * sizeof(double);
-	send_msg.vel_cmd[0] = 0.1;
-	send_msg.vel_cmd[1] = 0.0;
-
-	write(write_out_fd, &send_msg, sizeof(struct comm_range_pose_data_msg));
+	commSendMoveCommand(write_out_fd, 0.1, 0.0);
 	break;
       case COMM_WAY_RES:
-
 	break;
       default:
 	// TODO: Fail? or drop data?
-	printf("ERROR: art_pot_p can't handle comm type: %d\n", hdr.type);
+	printf("ERROR: art_pot_p can't handle comm type: %d\n", recv_msg.type);
       }
     } else if (read_ret == -1) {
       perror("Blocking, eh?");

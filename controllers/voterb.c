@@ -101,16 +101,16 @@ void restartReplica() {
       
       // clean up old data about dearly departed
       // TODO: migrate to replicas.cpp in a sane fashion
-      close(repGroup.replicas[index].pipefd_into_rep[0]);
-      close(repGroup.replicas[index].pipefd_into_rep[1]);
-      close(repGroup.replicas[index].pipefd_outof_rep[0]);
-      close(repGroup.replicas[index].pipefd_outof_rep[1]);
+      close(repGroup.replicas[index].fd_into_rep[0]);
+      close(repGroup.replicas[index].fd_into_rep[1]);
+      close(repGroup.replicas[index].fd_outof_rep[0]);
+      close(repGroup.replicas[index].fd_outof_rep[1]);
       
-      if (pipe(repGroup.replicas[index].pipefd_into_rep) == -1) {
+      if (pipe(repGroup.replicas[index].fd_into_rep) == -1) {
 	perror("replicas pipe error!");
       }
       
-      if (pipe(repGroup.replicas[index].pipefd_outof_rep) == -1) {
+      if (pipe(repGroup.replicas[index].fd_outof_rep) == -1) {
 	perror("replicas pipe error!");
       }
 
@@ -119,7 +119,7 @@ void restartReplica() {
       repGroup.replicas[index].status = RUNNING;
       
       // send new pipe through fd server (should have a request)
-      acceptSendFDS(&sd, &(repGroup.replicas[index].pid), repGroup.replicas[index].pipefd_into_rep[0], repGroup.replicas[index].pipefd_outof_rep[1]);
+      acceptSendFDS(&sd, &(repGroup.replicas[index].pid), repGroup.replicas[index].fd_into_rep[0], repGroup.replicas[index].fd_outof_rep[1]);
     }
   }
 }
@@ -135,7 +135,7 @@ int forkReplicas(struct replica_group* rg) {
     // TODO: Handle possible errors
 
     // send fds
-    acceptSendFDS(&sd, &new_pid, rg->replicas[index].pipefd_into_rep[0], rg->replicas[index].pipefd_outof_rep[1]);
+    acceptSendFDS(&sd, &new_pid, rg->replicas[index].fd_into_rep[0], rg->replicas[index].fd_outof_rep[1]);
     assert(new_pid == rg->replicas[index].pid);
   }
 
@@ -204,14 +204,7 @@ int initVoterB() {
 }
 
 void requestWaypoints() {
-  struct comm_way_req_msg send_msg;
-  int retval;
-
-  send_msg.hdr.type = COMM_WAY_REQ;
-  send_msg.hdr.byte_count = 0;
-
-  retval = write(write_out_fd, &send_msg, sizeof(struct comm_way_req_msg));
-  assert(retval == sizeof(struct comm_way_req_msg));
+  commSendWaypointRequest(write_out_fd);
 }
 
 int parseArgs(int argc, const char **argv) {
@@ -249,14 +242,9 @@ int main(int argc, const char **argv) {
 }
 
 void doOneUpdate() {
-  timestamp_t current;
   int index = 0;
-  int restart_id = -1;
-
   int retval = 0;
-
-  struct comm_range_pose_data_msg recv_msg;
-  double cmd_vel[2];
+  struct comm_message recv_msg;
 
   struct timeval select_timeout;
   fd_set select_set;
@@ -275,7 +263,7 @@ void doOneUpdate() {
     max_fd = timeout_fd[0];
   }
   for (index = 0; index < REP_COUNT; index++) {
-    rep_pipe_r = replicas[index].pipefd_outof_rep[0];
+    rep_pipe_r = replicas[index].fd_outof_rep[0];
     if (rep_pipe_r > max_fd) {
       max_fd = rep_pipe_r;
     }
@@ -299,29 +287,21 @@ void doOneUpdate() {
     
     // Check for data from the benchmarker
     if (FD_ISSET(read_in_fd, &select_set)) {
-      retval = read(read_in_fd, &recv_msg, sizeof(struct comm_range_pose_data_msg));;
+      retval = read(read_in_fd, &recv_msg, sizeof(struct comm_message));;
       if (retval > 0) {
-	switch (recv_msg.hdr.type) {
+	switch (recv_msg.type) {
 	case COMM_RANGE_POSE_DATA:
 	  // send to reps!
-	  range_count = 16;
-	  for (index = 0; index < range_count; index++) {
-	    ranger_ranges[index] = recv_msg.ranges[index];
-	  }
-	  for (index = 0; index < 3; index++) {
-	    pos[index] =  recv_msg.pose[index];
-	  }
+	  commCopyRanger(&recv_msg, ranger_ranges, pos);
 	  processRanger();      
 	  break;
 	case COMM_WAY_RES:
 	  // New waypoints from benchmarker!
-	  for (index = 0; index < 3; index++) {
-	    next_goal[index] = ((struct comm_way_res_msg*) (&recv_msg))->point[index];
-	  }
+	  commCopyWaypoints(&recv_msg, next_goal);
 	  processCommand();
 	  break;
 	default:
-	  printf("ERROR: VoterB can't handle comm type: %d\n", recv_msg.hdr.type);
+	  printf("ERROR: VoterB can't handle comm type: %d\n", recv_msg.type);
 	}
       }
     }
@@ -329,22 +309,20 @@ void doOneUpdate() {
     // Check all replicas for data
     for (index = 0; index < REP_COUNT; index++) {
       // clear comm_header for next message
-      recv_msg.hdr.type = -1;
+      recv_msg.type = -1;
       
-      if (FD_ISSET(replicas[index].pipefd_outof_rep[0], &select_set)) {
-	retval = read(replicas[index].pipefd_outof_rep[0], &recv_msg, sizeof(struct comm_range_pose_data_msg));
+      if (FD_ISSET(replicas[index].fd_outof_rep[0], &select_set)) {
+	retval = read(replicas[index].fd_outof_rep[0], &recv_msg, sizeof(struct comm_message));
 	if (retval > 0) {
-	  switch (recv_msg.hdr.type) {
+	  switch (recv_msg.type) {
 	  case COMM_WAY_REQ:
 	    sendWaypoints(index);
 	    break;
 	  case COMM_MOV_CMD:
-	    cmd_vel[0] = ((struct comm_mov_cmd_msg*) (&recv_msg))->vel_cmd[0];
-	    cmd_vel[1] = ((struct comm_mov_cmd_msg*) (&recv_msg))->vel_cmd[1];
-	    processVelCmdFromRep(cmd_vel[0], cmd_vel[1], index);
+	    processVelCmdFromRep(recv_msg.data.m_cmd.vel_cmd[0], recv_msg.data.m_cmd.vel_cmd[1], index);
 	    break;
 	  default:
-	    printf("ERROR: VoterB can't handle comm type: %d\n", recv_msg.hdr.type);
+	    printf("ERROR: VoterB can't handle comm type: %d\n", recv_msg.type);
 	  }
 	}
       }
@@ -356,19 +334,6 @@ void doOneUpdate() {
 // Process ranger data
 void processRanger() {
   int index = 0;
-  int retval;
-  struct comm_range_pose_data_msg send_msg;
-
-  send_msg.hdr.type = COMM_RANGE_POSE_DATA;
-  send_msg.hdr.byte_count = 19 * sizeof(double);
-
-  for (index = 0; index < range_count; index++) {
-    send_msg.ranges[index] = ranger_ranges[index];
-  }
-
-  for (index = 0; index < 3; index++) {
-    send_msg.pose[index] = pos[index];
-  }
 
   vote_stat = VOTING;
 
@@ -383,9 +348,7 @@ void processRanger() {
   }
 
   for (index = 0; index < REP_COUNT; index++) {
-    // Write range data
-    retval = write(replicas[index].pipefd_into_rep[1], (void*)(&send_msg), sizeof(struct comm_range_pose_data_msg));
-    assert(retval == sizeof(struct comm_range_pose_data_msg));
+    commSendRanger(replicas[index].fd_into_rep[1], ranger_ranges, pos);
   }
 }
 
@@ -405,31 +368,19 @@ void resetVotingState() {
 ////////////////////////////////////////////////////////////////////////////////
 // handle the request for inputs
 // This is the primary input to the replicas, so make sure it is duplicated
-void sendWaypoints(int replica_num) {
+void sendWaypoints(int rep_num) {
   int index = 0;
-  int retval;
   bool all_sent = true;
-  struct comm_header hdr;
-  struct comm_way_res_msg message;
-  
   // For now only one waypoint at a time (it's Art Pot, so fine.)
  
   // if replica already has latest... errors
-  if (sent[replica_num] == true) {
+  if (sent[rep_num] == true) {
     puts("SEND WAYPOINT ERROR: requester already has latest points.");
     return;
   } else { // send and mark sent
-    sent[replica_num] = true;
+    sent[rep_num] = true;
 
-    hdr.type = COMM_WAY_RES;
-    hdr.byte_count = 3 * sizeof(double);
-    message.hdr = hdr;
-    message.point[INDEX_X] = curr_goal[INDEX_X];
-    message.point[INDEX_Y] = curr_goal[INDEX_Y];
-    message.point[INDEX_A] = curr_goal[INDEX_A];
-
-    retval = write(replicas[replica_num].pipefd_into_rep[1], (void*)(&message), sizeof(struct comm_way_res_msg));
-    assert(retval == sizeof(struct comm_way_res_msg));
+    commSendWaypoints(replicas[rep_num].fd_into_rep[1], curr_goal[INDEX_X], curr_goal[INDEX_Y], curr_goal[INDEX_A]);
   }
 }
 
@@ -487,18 +438,7 @@ void processVelCmdFromRep(double cmd_vel_x, double cmd_vel_a, int replica_num) {
 ////////////////////////////////////////////////////////////////////////////////
 // Send commands to underlying position device
 void putCommand(double cmd_speed, double cmd_turnrate) {
-  int retval;
-  struct comm_header hdr;
-  struct comm_mov_cmd_msg message;
-
-  hdr.type = COMM_MOV_CMD;
-  hdr.byte_count = 2 * sizeof(double);
-  message.hdr = hdr;
-  message.vel_cmd[0] = cmd_speed;
-  message.vel_cmd[1] = cmd_turnrate;
-
-  retval = write(write_out_fd, (void*)&message, sizeof(struct comm_mov_cmd_msg));
-  assert(retval == sizeof(struct comm_mov_cmd_msg));
+  commSendMoveCommand(write_out_fd, cmd_speed, cmd_turnrate);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
