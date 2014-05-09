@@ -254,7 +254,6 @@ void TranslatorDriver::DoOneUpdate() {
       this->SendWaypoints();
       break;
     case COMM_MOV_CMD:
-      // This read is non-blocking... whole message should be written at once to prevent interleaving
       this->PutCommand(recv_msg.data.m_cmd.vel_cmd[0], recv_msg.data.m_cmd.vel_cmd[1]);
       break;
     default:

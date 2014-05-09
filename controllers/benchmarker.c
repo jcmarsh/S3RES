@@ -18,10 +18,6 @@
 
 #define REP_COUNT 1
 
-#define TARGET_ROW 17
-#define TARGET_COL 3
-
-
 // Replica related data
 struct replica_group repGroup;
 struct replica replicas[REP_COUNT];
@@ -33,8 +29,6 @@ int read_in_fd; // These are to your parent (Translator)
 int write_out_fd;
 
 timestamp_t last;
-long timer_interrupts;
-char i_buffer[256];
 
 struct comm_message range_pose_data_msg;
 struct comm_message way_req_msg;
@@ -67,8 +61,8 @@ int initBenchMarker() {
 
   initReplicas(&repGroup, replicas, REP_COUNT);
   //forkSingleReplica(&repGroup, 0, "Empty");
-  //forkSingleReplica(&repGroup, 0, "ArtPot");
-  forkSingleReplica(&repGroup, 0, "VoterB");
+  forkSingleReplica(&repGroup, 0, "ArtPot");
+  //  forkSingleReplica(&repGroup, 0, "VoterB");
 
   return 0;
 }
@@ -119,21 +113,11 @@ void doOneUpdate() {
   if (retval > 0) {
     switch (recv_msg.type) {
     case COMM_RANGE_POSE_DATA:
-      for (index = 0; index < 16; index++) {
-	range_pose_data_msg.data.rp_data.ranges[index] = recv_msg.data.rp_data.ranges[index];
-      }
-      for (index = 0; index < 3; index++) {
-	range_pose_data_msg.data.rp_data.pose[index] = recv_msg.data.rp_data.pose[index];
-      }
-      //	  puts("Bench: Range / Pose Data");
+      commCopyRanger(&recv_msg, range_pose_data_msg.data.rp_data.ranges, range_pose_data_msg.data.rp_data.pose);
       processRanger();      
       break;
     case COMM_WAY_RES:
-      // TODO: Figure this out
-      puts("DANGER WILL ROBINSON!");
-      for (index = 0; index < 3; index++) {
-	way_res_msg.data.w_res.point[index] = recv_msg.data.w_res.point[index];
-      }
+      commCopyWaypoints(&recv_msg, way_res_msg.data.w_res.point);
       sendWaypoints();
       break;
     default:
@@ -148,13 +132,11 @@ void doOneUpdate() {
   if (retval > 0) {
     switch (recv_msg.type) {
     case COMM_WAY_REQ:
-      puts("THIS IS NOT ACCEPTABLE");
       requestWaypoints();
       break;
     case COMM_MOV_CMD:
       mov_cmd_msg.data.m_cmd.vel_cmd[0] = recv_msg.data.m_cmd.vel_cmd[0];
       mov_cmd_msg.data.m_cmd.vel_cmd[1] = recv_msg.data.m_cmd.vel_cmd[1];
-      //	  puts("\tBench: Command Recv.");
       processCommand();
       break;
     default:
