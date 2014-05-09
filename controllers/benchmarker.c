@@ -34,7 +34,6 @@ int write_out_fd;
 
 timestamp_t last;
 long timer_interrupts;
-FILE* proc_interrupts;
 char i_buffer[256];
 
 struct comm_message range_pose_data_msg;
@@ -51,42 +50,6 @@ void processOdom();
 void processRanger();
 void requestWaypoints();
 void processCommand();
-long parseInterrupts();
-
-int initParser() {
-  proc_interrupts = fopen("/proc/interrupts", "r");
-}
-
-long parseInterrupts() {
-  int cpus_check[] = {2, 3};
-  int inte_check[] = {14,15,17,19,20,21,25};
-  int iindex = 0;
-  const char token[2] = " ";
-  int row_num = 0;
-  int col_num = 0;
-  char *cell_value;
-  long total = 0;
-
-  rewind(proc_interrupts);
-
-  while(fgets(i_buffer, 256, proc_interrupts) > 0) {
-    if (row_num == inte_check[iindex] and row_num < 25) {
-      cell_value = strtok(i_buffer, token);
-      while (cell_value != NULL) {
-	cell_value = strtok(NULL, token);
-	if (col_num == cpus_check[0] || col_num == cpus_check[1]) {
-	  total += atol(cell_value);
-	}
-	col_num++;
-      }
-      col_num = 0;
-      iindex++;
-    }
-    row_num++;
-  }
-  return total;
-}
-
 
 int initBenchMarker() {
   int scheduler;
@@ -97,17 +60,15 @@ int initBenchMarker() {
   scheduler = sched_getscheduler(0);
   printf("BenchMarker Scheduler: %d\n", scheduler);
 
-  initParser();
-
   way_req_msg.type = COMM_WAY_REQ;
   way_res_msg.type = COMM_WAY_RES;
   mov_cmd_msg.type = COMM_MOV_CMD;
   range_pose_data_msg.type = COMM_RANGE_POSE_DATA;  
 
   initReplicas(&repGroup, replicas, REP_COUNT);
-  forkSingleReplica(&repGroup, 0, "Empty");
+  //forkSingleReplica(&repGroup, 0, "Empty");
   //forkSingleReplica(&repGroup, 0, "ArtPot");
-  //forkSingleReplica(&repGroup, 0, "VoterB");
+  forkSingleReplica(&repGroup, 0, "VoterB");
 
   return 0;
 }
@@ -217,7 +178,6 @@ void processRanger() {
 
 #ifdef _STATS_BENCH_ROUND_TRIP_
   last = generate_timestamp();
-  timer_interrupts = parseInterrupts();
 #endif // _STATS_BENCH_ROUND_TRIP_
 
   write(replicas[0].fd_into_rep[1], &range_pose_data_msg, sizeof(struct comm_message));
@@ -235,12 +195,10 @@ void processCommand() {
   timestamp_t current;
   long new_interrupts;
 
-  new_interrupts = parseInterrupts();
   current = generate_timestamp();
   // check against previous interrupt count
 
-  //  printf("%ld\t%lld\n", 42, current - last);
-  printf("%ld\t%lld\n", new_interrupts - timer_interrupts, current - last);
+  printf("%lld\n", current - last);
 #endif
 
   // data was set by read

@@ -168,11 +168,11 @@ int TranslatorDriver::MainSetup()
   // Should just be one "replica": The program running (VoterB or a controller)
   initReplicas(&repGroup, replicas, REP_COUNT);
   // TODO: Will need to set this parameter correctly
-  //  forkSingleReplica(&repGroup, 0, "BenchMarker"); // TODO uncomment
+  forkSingleReplica(&repGroup, 0, "BenchMarker");
 
   // Need this pipe not to block so that player and the outside world play nice
-  //  flags = fcntl(replicas[index].fd_outof_rep[0], F_GETFL, 0);
-  //  fcntl(replicas[index].fd_outof_rep[0], F_SETFL, flags | O_NONBLOCK);
+  flags = fcntl(replicas[index].fd_outof_rep[0], F_GETFL, 0);
+  fcntl(replicas[index].fd_outof_rep[0], F_SETFL, flags | O_NONBLOCK);
 
   puts("Translator driver ready");
 
@@ -251,11 +251,11 @@ void TranslatorDriver::DoOneUpdate() {
   if (retval > 0) {
     switch(recv_msg.type) {
     case COMM_WAY_REQ:
-      //      this->SendWaypoints(); uncomment
+      this->SendWaypoints();
       break;
     case COMM_MOV_CMD:
       // This read is non-blocking... whole message should be written at once to prevent interleaving
-      //	this->PutCommand(recv_msg.data.m_cmd.vel_cmd[0], recv_msg.data.m_cmd.vel_cmd[1]);
+      this->PutCommand(recv_msg.data.m_cmd.vel_cmd[0], recv_msg.data.m_cmd.vel_cmd[1]);
       break;
     default:
       printf("ERROR: Translator can't handle comm type: %d\n", recv_msg.type);
