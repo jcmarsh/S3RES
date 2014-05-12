@@ -66,6 +66,7 @@ int forkSingleReplica(struct replica_group* rg, int num, char* prog_name) {
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
       // art_pot expects something like: ./art_pot read_fd write_fd
+      // ugly, but must be done so that the benchmarker doesn't need to run an fd server for the baseline
       sprintf(read_in, "%02d", rg->replicas[num].fd_into_rep[0]);
       rep_argv[1] = read_in;
       sprintf(write_out, "%02d", rg->replicas[num].fd_outof_rep[1]);

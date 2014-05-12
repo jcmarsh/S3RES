@@ -1,14 +1,12 @@
 #include "../include/taslimited.h"
 
 // From Gabe's cos_loader.c
-void call_getrlimit(int id, char *name) {
+void call_getrlimit(int id) {
   struct rlimit rl;
 
   if (getrlimit(id, &rl)) {
     perror("getrlimit: ");
   }
-    //  printf("rlimit for %s is %d:%d (inf %d)\n", 
-    //  	 name, (int)rl.rlim_cur, (int)rl.rlim_max, (int)RLIM_INFINITY);
 }
 
 // From Gabe's cos_loader.c
@@ -30,9 +28,8 @@ int InitTAS(cpu_id_t cpu, cpu_speed_t *cpu_speed, int prio_offset) {
   pid = getpid();
 
   // R-Limit
-  //call_getrlimit(RLIMIT_RTPRIO, "RTPRIO");
   call_setrlimit(RLIMIT_RTPRIO, RLIM_INFINITY, RLIM_INFINITY);
-  call_getrlimit(RLIMIT_RTPRIO, "RTPRIO");
+  call_getrlimit(RLIMIT_RTPRIO);
 
   // Bind
   if( cpu_c::bind(pid, cpu) != cpu_c::ERROR_NONE ) {
