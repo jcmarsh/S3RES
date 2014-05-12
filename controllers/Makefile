@@ -1,6 +1,6 @@
 RESEARCH=/home/jcmarsh/research
-SRC=../src/cpu.cpp ../src/time.cpp ../src/scheduler.cpp ../src/force.cpp ../src/taslimited.cpp ../src/commtypes.cpp 
-LIB=-lrt
+SRC=../src/commtypes.cpp
+LIB=-lrt -lTASLimited
 FLAGS=-O3
 
 all: regular
