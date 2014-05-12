@@ -33,7 +33,7 @@ double goal[3];
 
 // Position
 double pos[3];
-int ranger_count;
+int ranger_count = 16;
 double ranges[16]; // 16 is the size in commtypes.h
 
 int read_in_fd;

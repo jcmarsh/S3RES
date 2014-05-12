@@ -62,7 +62,7 @@ int initBenchMarker() {
   initReplicas(&repGroup, replicas, REP_COUNT);
   //forkSingleReplica(&repGroup, 0, "Empty");
   forkSingleReplica(&repGroup, 0, "ArtPot");
-  //  forkSingleReplica(&repGroup, 0, "VoterB");
+  //forkSingleReplica(&repGroup, 0, "VoterB");
 
   return 0;
 }
@@ -184,6 +184,5 @@ void processCommand() {
 #endif
 
   // data was set by read
-
   write(write_out_fd, &mov_cmd_msg, sizeof(struct comm_message));
 }

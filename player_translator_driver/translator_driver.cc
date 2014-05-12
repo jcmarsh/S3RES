@@ -212,7 +212,6 @@ int TranslatorDriver::ProcessMessage(QueuePointer & resp_queue,
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
 				  PLAYER_RANGER_DATA_RANGE, this->ranger_addr)) {
     // Ranger scan update; update scan data
-
     ProcessRanger(*reinterpret_cast<player_ranger_data_range_t *> (data));
     return 0;
   } else if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_DATA,
@@ -246,6 +245,10 @@ void TranslatorDriver::DoOneUpdate() {
   int retval;
   struct comm_message recv_msg;
 
+  if (!this->InQueue->Empty()) {
+    this->ProcessMessages();
+  }
+
   // This read is non-blocking
   retval = read(replicas[0].fd_outof_rep[0], &recv_msg, sizeof(struct comm_message));
   if (retval > 0) {
@@ -260,12 +263,6 @@ void TranslatorDriver::DoOneUpdate() {
       printf("ERROR: Translator can't handle comm type: %d\n", recv_msg.type);
     }
   }
-
-  if (this->InQueue->Empty()) {
-    return;
-  }
-
-  this->ProcessMessages();
 }
 
 

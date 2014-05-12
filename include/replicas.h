@@ -27,7 +27,6 @@ struct replica {
   int fd_outof_rep[2];
   // Possibly put a pointer to entry function
   replica_status status;
-  //  unsigned long last_result; // TODO: Usefull comment.
 };  
 
 struct replica_group {
