@@ -49,7 +49,7 @@ int initBenchMarker() {
   int scheduler;
   int p_offset = 0;
 
-  InitTAS(3, &cpu_speed, 0);
+  InitTAS(DEFAULT_CPU, &cpu_speed, 0);
 
   scheduler = sched_getscheduler(0);
   printf("BenchMarker Scheduler: %d\n", scheduler);
@@ -60,8 +60,8 @@ int initBenchMarker() {
   range_pose_data_msg.type = COMM_RANGE_POSE_DATA;  
 
   initReplicas(&repGroup, replicas, REP_COUNT);
-  //forkSingleReplica(&repGroup, 0, "Empty");
-  forkSingleReplica(&repGroup, 0, "ArtPot");
+  forkSingleReplica(&repGroup, 0, "Empty");
+  //forkSingleReplica(&repGroup, 0, "ArtPot");
   //forkSingleReplica(&repGroup, 0, "VoterB");
 
   return 0;

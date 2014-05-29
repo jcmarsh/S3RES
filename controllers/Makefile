@@ -6,10 +6,10 @@ FLAGS=-O3
 all: regular
 
 regular:
-	g++ -o ArtPot art_pot_p.c $(SRC) ../src/fd_client.cpp $(LIB)
-	g++ -o Empty empty.c $(SRC) ../src/fd_client.cpp $(LIB) 
-	g++ -o VoterB voterb.c $(SRC) ../src/replicas.cpp ../src/fd_server.cpp $(LIB)
-	g++ -o BenchMarker benchmarker.c $(SRC) ../src/replicas.cpp $(LIB)
+	g++ $(FLAGS) -o ArtPot art_pot_p.c $(SRC) ../src/fd_client.cpp $(LIB)
+	g++ $(FLAGS) -o Empty empty.c $(SRC) ../src/fd_client.cpp $(LIB) 
+	g++ $(FLAGS) -o VoterB voterb.c $(SRC) ../src/replicas.cpp ../src/fd_server.cpp $(LIB)
+	g++ $(FLAGS) -o BenchMarker benchmarker.c $(SRC) ../src/replicas.cpp $(LIB)
 
 copy: regular
 	cp ArtPot ../../stage/experiments/

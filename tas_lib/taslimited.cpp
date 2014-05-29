@@ -33,7 +33,7 @@ int InitTAS(cpu_id_t cpu, cpu_speed_t *cpu_speed, int prio_offset) {
 
   // Bind
   if( cpu_c::bind(pid, cpu) != cpu_c::ERROR_NONE ) {
-    printf("(voter_b_driver) InitTAS() failed calling cpu_c::_bind(pid,DEFAULT_CPU).\n");
+    printf("InitTAS() failed calling cpu_c::_bind(pid, cpu), with pid %d, cpu %d\n", pid, cpu);
   }
 
   // Set Realtime Scheduling
