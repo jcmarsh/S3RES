@@ -1,5 +1,5 @@
 /*
- * Artificial Potential controller stand alone.
+ * An empty controller for debugging
  * This variation uses file descriptors for I/O (for now just ranger and command out).
  *
  * James Marshall
@@ -98,7 +98,7 @@ void enterLoop() {
 	break;
       default:
 	// TODO: Fail? or drop data?
-	printf("ERROR: art_pot_p can't handle comm type: %d\n", recv_msg.type);
+	printf("ERROR: empty can't handle comm type: %d\n", recv_msg.type);
       }
     } else if (read_ret == -1) {
       perror("Blocking, eh?");
