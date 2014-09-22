@@ -66,6 +66,10 @@ int handleProcess(struct replica_group *rg, pid_t pid, int status, int insert_er
       printf("Unhandled signal: %d\n", signal);
       break;
     }
+
+    // Not sure about this. 
+    // Do not suppress signal, pass on.
+    ptrace(PTRACE_CONT, pid, 0, signal);
   }
   // TODO: return? something special if error inserted? Error?
   return error_inserted;

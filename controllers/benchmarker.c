@@ -60,9 +60,9 @@ int initBenchMarker() {
   range_pose_data_msg.type = COMM_RANGE_POSE_DATA;  
 
   initReplicas(&repGroup, replicas, REP_COUNT);
-  forkSingleReplica(&repGroup, 0, "Empty");
+  //forkSingleReplica(&repGroup, 0, "Empty");
   //forkSingleReplica(&repGroup, 0, "ArtPot");
-  //forkSingleReplica(&repGroup, 0, "VoterB");
+  forkSingleReplica(&repGroup, 0, "VoterB");
 
   return 0;
 }
