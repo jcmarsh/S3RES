@@ -231,7 +231,16 @@ int TranslatorDriver::ProcessMessage(QueuePointer & resp_queue,
 }
 
 void TranslatorDriver::SendWaypoints() {
-  commSendWaypoints(replicas[0].fd_into_rep[1], curr_goal[INDEX_X], curr_goal[INDEX_Y], curr_goal[INDEX_A]);
+  // Generates a CRC for the message
+  struct comm_message send_msg;
+
+  send_msg.type = COMM_WAY_RES;
+  send_msg.data.w_res.point[INDEX_X] = curr_goal[INDEX_X];
+  send_msg.data.w_res.point[INDEX_Y] = curr_goal[INDEX_Y];
+  send_msg.data.w_res.point[INDEX_A] = curr_goal[INDEX_A];
+  generateCRC(&send_msg, &(send_msg.crc));
+
+  write(replicas[0].fd_into_rep[1], &send_msg, sizeof(struct comm_message));
 }
 
 void TranslatorDriver::Main() {
@@ -250,7 +259,12 @@ void TranslatorDriver::DoOneUpdate() {
   }
 
   // This read is non-blocking
+  unsigned short int checkCRC;
   retval = read(replicas[0].fd_outof_rep[0], &recv_msg, sizeof(struct comm_message));
+  generateCRC(&recv_msg, &checkCRC);
+  if (checkCRC != recv_msg.crc) {
+    printf("ERROR: CRCs do not match!");
+  }
   if (retval > 0) {
     switch(recv_msg.type) {
     case COMM_WAY_REQ:
@@ -347,7 +361,19 @@ void TranslatorDriver::ProcessOdom(player_position2d_data_t &data)
 void TranslatorDriver::ProcessRanger(player_ranger_data_range_t &data)
 {
   if (ranger_countdown-- < 0) {
-    commSendRanger(replicas[0].fd_into_rep[1], data.ranges, pose);
+    int index = 0;
+    struct comm_message send_msg;
+ 
+    send_msg.type = COMM_RANGE_POSE_DATA;
+    for (index = 0; index < 16; index++) {
+      send_msg.data.rp_data.ranges[index] = data.ranges[index];
+    }
+    for (index = 0; index < 3; index++) {
+      send_msg.data.rp_data.pose[index] = pose[index];
+    }
+    generateCRC(&send_msg, &(send_msg.crc));
+
+    write(replicas[0].fd_into_rep[1], &send_msg, sizeof(struct comm_message));
   } else {
     printf("Skipping this one.\n");
   }

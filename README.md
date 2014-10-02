@@ -13,12 +13,12 @@ This is likely a temporary repo (thus the terrible name). Meant to simulate Sing
   * `voterb.c` - Manages three controllers (such as `art_pot_p.c`), restarting them if problems are detected.
 * `./examples/` - Not sure. Need to investigate / clean up if this is no longer used.
 * `./include/` -
-* `./lib/` -
+* `./lib/` - PINT should be library. But it isn't yet.
 * `./player_tanslator_driver/` - Interacts with Player / Stage as a plugin driver, and a controller (such as `benchmarker.c`).
   * `baseline.cfg` - Configuration file for Player.
   * `CMakeLists.txt` - Follows the Player plugin build system.
   * `translator_driver.cc` - The code.
-* `./src/` - Source code for the PINT library.
+* `./src/` - Source code for PINT, for now included in the controller compilation. Should be a library.
 * `./tas_lib/` - From Taylor's work, a reduced and old version of TCS.
 * `./tracee_progs/` - Not sure, seems related to the examples directory.
 

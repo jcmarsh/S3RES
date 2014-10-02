@@ -45,6 +45,7 @@ struct comm_message {
     struct comm_mov_cmd m_cmd;
     struct comm_range_pose_data rp_data;
   } data;
+  unsigned short int crc; // Only used between "external" bits. For example, comm with the platform
 };
 
 int commSendWaypoints(int send_fd, double way_x, double way_y, double way_a);
@@ -56,5 +57,7 @@ int commSendMoveCommand(int send_fd, double vel_0, double vel_1);
 
 int commSendRanger(int send_fd, double * ranger_data, double * pose_data);
 void commCopyRanger(struct comm_message * recv_msg, double * range_data, double * pose_data);
+
+void generateCRC(struct comm_message *msg, unsigned short int *crc);
 
 #endif // _COMM_TYPES_H_

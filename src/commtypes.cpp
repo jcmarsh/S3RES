@@ -1,5 +1,21 @@
 #include "../include/commtypes.h"
 
+#define POLY 0x1021 // CRC-16-CCITT normal
+void generateCRC(struct comm_message *msg, unsigned short int *crc) {
+  int index, jndex;
+  
+  char *buffer = (char *) msg;
+  int length = sizeof(msg);
+  
+  for (index = 0; index < length; index++) {
+    char current_char = buffer[index];
+      for (jndex = 0; jndex < 8; jndex++) {
+        *crc = (*crc >> 1) ^ (((current_char ^ *crc) & 0x01) ? POLY : 0);
+        current_char >>= 1;
+    }
+  }
+}
+
 int commSendWaypoints(int send_fd, double way_x, double way_y, double way_a) {
   struct comm_message msg;
 
@@ -49,7 +65,7 @@ int commSendRanger(int send_fd, double * ranger_data, double * pose_data) {
     msg.data.rp_data.pose[index] = pose_data[index];
   }
 
-  write(send_fd, &msg, sizeof(struct comm_message));
+  return write(send_fd, &msg, sizeof(struct comm_message));
 }
 
 void commCopyRanger(struct comm_message * recv_msg, double * range_data, double * pose_data) {
@@ -63,5 +79,3 @@ void commCopyRanger(struct comm_message * recv_msg, double * range_data, double 
   }
   return;
 }
-
-  
