@@ -10,6 +10,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <stdio.h>
 
 #include "../include/taslimited.h"
 #include "../include/statstime.h"
@@ -42,7 +43,6 @@ void doOneUpdate();
 void sendWaypoints();
 void processOdom();
 void processRanger();
-void requestWaypoints();
 void processCommand();
 
 int initBenchMarker() {
@@ -59,11 +59,43 @@ int initBenchMarker() {
   mov_cmd_msg.type = COMM_MOV_CMD;
   range_pose_data_msg.type = COMM_RANGE_POSE_DATA;  
 
+  // Should only be a single replica
   initReplicas(&repGroup, replicas, REP_COUNT);
-  //forkSingleReplica(&repGroup, 0, "Empty");
-  //forkSingleReplica(&repGroup, 0, "ArtPot");
-  forkSingleReplica(&repGroup, 0, "VoterB");
+  
+  // Seems like a shit way to do this.
+  // Read the name of the test program from a file
+  char *line;
+  ssize_t ret;
+  size_t length;
+  FILE *fptr;
+  printf("What the bloody hell is going on here?\n");
+  if ((fptr=fopen("controller_name.txt","r"))==NULL) {
+    puts("No file controller_name.txt found, running default controller.");
+    //forkSingleReplica(&repGroup, 0, "Empty");
+    forkSingleReplica(&repGroup, 0, "ArtPot");
+    //forkSingleReplica(&repGroup, 0, "VoterB");  
+  } else {
+    printf("Why am I so tired?\n");
+    ret = getline(&line, &length, fptr);
+    printf("And why is none of this working? ret: %d\n", ret);
 
+    if (ret <= 0) {
+      puts("File read failed");
+      return ret;
+    }
+
+    if (line[ret - 1] == '\n') {
+      line[ret - 1] = NULL;
+    }
+
+    printf("Forking: %s\n", line);
+
+    forkSingleReplica(&repGroup, 0, line);
+  
+    free(line);
+    fclose(fptr);
+  }
+  
   return 0;
 }
 
@@ -87,6 +119,7 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
+  printf("Bench: About to init bench\n");
   if (initBenchMarker() < 0) {
     puts("ERROR: failure in setup function.");
     return -1;
@@ -113,11 +146,11 @@ void doOneUpdate() {
   if (retval > 0) {
     switch (recv_msg.type) {
     case COMM_RANGE_POSE_DATA:
-      commCopyRanger(&recv_msg, range_pose_data_msg.data.rp_data.ranges, range_pose_data_msg.data.rp_data.pose);
+      memcpy(&range_pose_data_msg, &recv_msg, sizeof(struct comm_message));
       processRanger();      
       break;
     case COMM_WAY_RES:
-      commCopyWaypoints(&recv_msg, way_res_msg.data.w_res.point);
+      memcpy(&way_res_msg, &recv_msg, sizeof(struct comm_message));
       sendWaypoints();
       break;
     default:
@@ -132,7 +165,9 @@ void doOneUpdate() {
   if (retval > 0) {
     switch (recv_msg.type) {
     case COMM_WAY_REQ:
-      requestWaypoints();
+      // To translator
+      memcpy(&way_req_msg, &recv_msg, sizeof(struct comm_message));
+      write(write_out_fd, &way_req_msg, sizeof(struct comm_message));
       break;
     case COMM_MOV_CMD:
       mov_cmd_msg.data.m_cmd.vel_cmd[0] = recv_msg.data.m_cmd.vel_cmd[0];
@@ -163,11 +198,6 @@ void processRanger() {
 #endif // _STATS_BENCH_ROUND_TRIP_
 
   write(replicas[0].fd_into_rep[1], &range_pose_data_msg, sizeof(struct comm_message));
-}
-
-// To translator
-void requestWaypoints() {
-  write(write_out_fd, &way_req_msg, sizeof(struct comm_message));
 }
 
 ////////////////////////////////////////////////////////////////////////////////

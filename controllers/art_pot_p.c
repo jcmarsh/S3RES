@@ -182,21 +182,21 @@ void enterLoop() {
     if (read_ret > 0) {
       switch (recv_msg.type) {
       case COMM_RANGE_POSE_DATA:
-	commCopyRanger(&recv_msg, ranges, pos);
-	// Calculates and sends the new command
-	command();
-	break;
+        commCopyRanger(&recv_msg, ranges, pos);
+        // Calculates and sends the new command
+        command();
+        break;
       case COMM_WAY_RES:
-	commCopyWaypoints(&recv_msg, goal);
-	break;
+        commCopyWaypoints(&recv_msg, goal);
+        break;
       default:
-	// TODO: Fail? or drop data?
-	printf("ERROR: art_pot_p can't handle comm type: %d\n", recv_msg.type);
+        // TODO: Fail? or drop data?
+        printf("ERROR: art_pot_p can't handle comm type: %d\n", recv_msg.type);
       }
     } else if (read_ret == -1) {
       perror("Blocking, eh?");
     } else {
-      puts("ArtPot read_ret == 0?");
+      perror("ArtPot read_ret == 0?");
     }
   }
 }

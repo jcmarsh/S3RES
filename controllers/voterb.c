@@ -203,7 +203,11 @@ int initVoterB() {
 }
 
 void requestWaypoints() {
-  commSendWaypointRequest(write_out_fd);
+  struct comm_message msg;
+
+  msg.type = COMM_WAY_REQ;
+
+  write(write_out_fd, &msg, sizeof(struct comm_message));
 }
 
 int parseArgs(int argc, const char **argv) {
@@ -244,9 +248,6 @@ void doOneUpdate() {
   int index = 0;
   int retval = 0;
   struct comm_message recv_msg;
-  // Need duplicate 
-  struct comm_message recv_msg0;
-  struct comm_message recv_msg1;
 
   struct timeval select_timeout;
   fd_set select_set;
@@ -289,27 +290,21 @@ void doOneUpdate() {
     
     // Check for data from the benchmarker
     if (FD_ISSET(read_in_fd, &select_set)) {
-      retval = read(read_in_fd, &recv_msg0, sizeof(struct comm_message));
-      //memcpy(msg1, msg0, sizeof(struct comm_message));
-      // Check crc here
-      // Need to check the crc, and then "replicate" (but not really, one rep needs to get a different one to prevent SDCs)
-      // But how do I tell the difference between that type of error and a rep failure?
-      // Send all, then check that they matched? 
-      // Will come back to this
+      retval = read(read_in_fd, &recv_msg, sizeof(struct comm_message));
       if (retval > 0) {
-        switch (recv_msg0.type) {
+        switch (recv_msg.type) {
         case COMM_RANGE_POSE_DATA:
           // send to reps!
-          commCopyRanger(&recv_msg0, ranger_ranges, pos);
+          commCopyRanger(&recv_msg, ranger_ranges, pos);
           processRanger();
           break;
         case COMM_WAY_RES:
           // New waypoints from benchmarker!
-          commCopyWaypoints(&recv_msg0, next_goal);
+          commCopyWaypoints(&recv_msg, next_goal);
           processCommand();
           break;
         default:
-          printf("ERROR: VoterB can't handle comm type: %d\n", recv_msg0.type);
+          printf("ERROR: VoterB can't handle comm type: %d\n", recv_msg.type);
         }
       }
     }
@@ -432,24 +427,13 @@ void processVelCmdFromRep(double cmd_vel_x, double cmd_vel_a, int replica_num) {
   }
 
   if (all_reporting && all_agree) {
-    // Create two messages to prevent SDCs
-    // Only one message is sent, but with the other's crc
-    struct comm_message msg0;
-    struct comm_message msg1;
+    struct comm_message msg;
 
-    msg0.type = COMM_MOV_CMD;
-    msg0.data.m_cmd.vel_cmd[0] = cmds[0][0];
-    msg0.data.m_cmd.vel_cmd[1] = cmds[0][1];
+    msg.type = COMM_MOV_CMD;
+    msg.data.m_cmd.vel_cmd[0] = cmds[1][0];
+    msg.data.m_cmd.vel_cmd[1] = cmds[1][1];
 
-    msg1.type = COMM_MOV_CMD;
-    msg1.data.m_cmd.vel_cmd[0] = cmds[1][0];
-    msg1.data.m_cmd.vel_cmd[1] = cmds[1][1];
-
-    memcpy(msg0.data.m_cmd.padding, msg1.data.m_cmd.padding, sizeof(double) * 17); // ensure padding is the same
-
-    generateCRC(&msg1, &(msg0.crc));
-
-    write(write_out_fd, &msg0, sizeof(struct comm_message));
+    write(write_out_fd, &msg, sizeof(struct comm_message));
     resetVotingState();
   } else if (all_reporting) {
     // Should put the correct command
