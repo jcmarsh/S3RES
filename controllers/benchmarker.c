@@ -68,12 +68,16 @@ int initBenchMarker() {
   ssize_t ret;
   size_t length;
   FILE *fptr;
-  printf("What the bloody hell is going on here?\n");
+
+  forkSingleReplica(&repGroup, 0, "pb");
+  
+/*
   if ((fptr=fopen("controller_name.txt","r"))==NULL) {
     puts("No file controller_name.txt found, running default controller.");
     //forkSingleReplica(&repGroup, 0, "Empty");
     forkSingleReplica(&repGroup, 0, "ArtPot");
-    //forkSingleReplica(&repGroup, 0, "VoterB");  
+    //forkSingleReplica(&repGroup, 0, "VoterB");
+    //forkSingleReplica(&repGroup, 0, "VoterC");
   } else {
     printf("Why am I so tired?\n");
     ret = getline(&line, &length, fptr);
@@ -95,7 +99,8 @@ int initBenchMarker() {
     free(line);
     fclose(fptr);
   }
-  
+  */
+
   return 0;
 }
 
