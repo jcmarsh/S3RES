@@ -38,8 +38,8 @@ int forkSingleReplicaNoFD(struct replica_group* rg, int num, char* prog_name) {
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
       if (-1 == execv(prog_name, rep_argv)) {
-	perror("EXEC ERROR!");
-	return -1;
+        perror("EXEC ERROR!");
+        return -1;
       }
     } else { // Parent Process
       rg->replicas[num].pid = currentPID;
@@ -74,8 +74,8 @@ int forkSingleReplica(struct replica_group* rg, int num, char* prog_name) {
       close(rg->replicas[num].fd_into_rep[1]); // close write end of into_rep pipe in child
 
       if (-1 == execv(prog_name, rep_argv)) {
-	perror("EXEC ERROR!");
-	return -1;
+        perror("EXEC ERROR!");
+        return -1;
       }
     } else { // Parent Process
       close(rg->replicas[num].fd_into_rep[0]); // close read end of into_rep pipe in parent

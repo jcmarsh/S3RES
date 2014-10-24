@@ -2,9 +2,11 @@
 
 %{
 #include <stdio.h>
+#include "plumbing.h"
 
 extern FILE *yyin;
 
+struct nodelist all_nodes;
 %}
 
 %token BENCH
@@ -21,9 +23,17 @@ line:
 ;
 
 relationship:
-  BENCH BI comp { printf("The benches: Bench launches %s\n", $3); }
-| comp BI comp { printf("bi between %s and %s\n", $1, $3); }
-| comp SINGLE comp { printf("single between %s and %s\n", $1, $3); }
+  BENCH BI comp { printf("The benches: Bench launches %s\n", $3);
+                  add_node(&all_nodes, $3); }
+| comp BI comp { printf("bi between %s and %s\n", $1, $3);
+                 add_node(&all_nodes, $1);
+                 add_node(&all_nodes, $3);
+                 link_node(&all_nodes, $1, $3);
+                 link_node(&all_nodes, $3, $1); }
+| comp SINGLE comp { printf("single between %s and %s\n", $1, $3);
+                 add_node(&all_nodes, $1);
+                 add_node(&all_nodes, $3);
+                 link_node(&all_nodes, $1, $3); }
 ;
 
 invocation:
@@ -36,6 +46,7 @@ comp:
 
 %%
 int main(int argc, char **argv) {
+
   if (argc > 1) {
     if (!(yyin = fopen(argv[1], "r"))) {
       perror(argv[1]);
@@ -44,6 +55,9 @@ int main(int argc, char **argv) {
   }
 
   yyparse();
+
+  printf("Did it work?\n");
+  print_nodes(&all_nodes);
 
   return 0;
 }

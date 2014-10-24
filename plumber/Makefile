@@ -1,7 +1,7 @@
 pb: pb.l pb.y
 	bison -d pb.y
 	flex pb.l
-	cc -o plumber pb.tab.c lex.yy.c -lfl
+	cc -g -o plumber plumbing.c pb.tab.c lex.yy.c -lfl
 
 clean:
 	rm -rf plumber
