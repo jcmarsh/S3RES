@@ -62,3 +62,32 @@ void print_nodes(struct nodelist * nodes)
 		print_nodes(nodes->next);
 	}
 }
+
+// TODO: compare to "forkSingleReplica" in replicas.cpp
+int launch_node(struct node * launchee) {
+	pid_t currentPID = 0;
+	char write_out[3]; // TODO: Handle multiple write out fds
+	char read_in[3];
+	// TODO: handle args
+	char *rep_argv[] = {launchee->name, read_in, write_out, NULL};
+
+	currentPID = fork();
+
+	if (currentPID >= 0) { // Successful fork
+		if (currentPID == 0) { // Child process
+			sprintf(read_in, "%02d", launchee->in_fd);
+			rep_argv[1] = read_in;
+			sprintf(write_out, "%02d", launchee->out_fd);
+			rep_argv[2] = write_out;
+			if (-1 == execv(rep_argv[0], rep_argv)) {
+				perror("EXEC ERROR!");
+				return -1;
+			}
+		} else { // Parent Process
+			
+		}
+	} else {
+		printf("Fork error!\n");
+		return -1;
+	}
+}

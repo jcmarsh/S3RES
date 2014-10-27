@@ -61,46 +61,8 @@ int initBenchMarker() {
 
   // Should only be a single replica
   initReplicas(&repGroup, replicas, REP_COUNT);
+  forkSingleReplica(&repGroup, 0, "plumber");
   
-  // Seems like a shit way to do this.
-  // Read the name of the test program from a file
-  char *line;
-  ssize_t ret;
-  size_t length;
-  FILE *fptr;
-
-  forkSingleReplica(&repGroup, 0, "pb");
-  
-/*
-  if ((fptr=fopen("controller_name.txt","r"))==NULL) {
-    puts("No file controller_name.txt found, running default controller.");
-    //forkSingleReplica(&repGroup, 0, "Empty");
-    forkSingleReplica(&repGroup, 0, "ArtPot");
-    //forkSingleReplica(&repGroup, 0, "VoterB");
-    //forkSingleReplica(&repGroup, 0, "VoterC");
-  } else {
-    printf("Why am I so tired?\n");
-    ret = getline(&line, &length, fptr);
-    printf("And why is none of this working? ret: %d\n", ret);
-
-    if (ret <= 0) {
-      puts("File read failed");
-      return ret;
-    }
-
-    if (line[ret - 1] == '\n') {
-      line[ret - 1] = NULL;
-    }
-
-    printf("Forking: %s\n", line);
-
-    forkSingleReplica(&repGroup, 0, line);
-  
-    free(line);
-    fclose(fptr);
-  }
-  */
-
   return 0;
 }
 
