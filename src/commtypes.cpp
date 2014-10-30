@@ -1,7 +1,11 @@
 #include "../include/commtypes.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 int commSendWaypoints(int send_fd, double way_x, double way_y, double way_a) {
   struct comm_message msg;
+  memset(&msg, 0, sizeof(struct comm_message));
 
   msg.type = COMM_WAY_RES;
   msg.data.w_res.point[INDEX_X] = way_x;
@@ -21,6 +25,7 @@ void commCopyWaypoints(struct comm_message * recv_msg, double * waypoints) {
 
 int commSendWaypointRequest(int send_fd) {
   struct comm_message send_msg;
+  memset(&send_msg, 0, sizeof(struct comm_message));
   
   send_msg.type = COMM_WAY_REQ;
 
@@ -30,6 +35,7 @@ int commSendWaypointRequest(int send_fd) {
 
 int commSendMoveCommand(int send_fd, double vel_0, double vel_1) {
   struct comm_message msg;
+  memset(&msg, 0, sizeof(struct comm_message));
 
   msg.type = COMM_MOV_CMD;
   msg.data.m_cmd.vel_cmd[0] = vel_0;
@@ -41,6 +47,7 @@ int commSendMoveCommand(int send_fd, double vel_0, double vel_1) {
 int commSendRanger(int send_fd, double * ranger_data, double * pose_data) {
   int index = 0;
   struct comm_message msg;
+  memset(&msg, 0, sizeof(struct comm_message));
  
   msg.type = COMM_RANGE_POSE_DATA;
   for (index = 0; index < 16; index++) {

@@ -29,7 +29,7 @@
 
 // Controller state
 bool active_goal;
-double goal[3];
+double goal[] = {7.0, 7.0, 0.0};
 
 // Position
 double pos[3];
@@ -187,6 +187,7 @@ void enterLoop() {
         command();
         break;
       case COMM_WAY_RES:
+        printf("Should likely never happen now.\n");
         commCopyWaypoints(&recv_msg, goal);
         break;
       default:
@@ -212,7 +213,7 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
-  requestWaypoints();
+  // requestWaypoints();
 
   enterLoop();
 

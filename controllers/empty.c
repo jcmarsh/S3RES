@@ -92,13 +92,13 @@ void enterLoop() {
     if (read_ret > 0) {
       switch (recv_msg.type) {
       case COMM_RANGE_POSE_DATA:
-	commSendMoveCommand(write_out_fd, 0.1, 0.0);
-	break;
+        commSendMoveCommand(write_out_fd, 0.1, 0.0);
+        break;
       case COMM_WAY_RES:
-	break;
+        break;
       default:
-	// TODO: Fail? or drop data?
-	printf("ERROR: empty can't handle comm type: %d\n", recv_msg.type);
+        // TODO: Fail? or drop data?
+        printf("ERROR: empty can't handle comm type: %d\n", recv_msg.type);
       }
     } else if (read_ret == -1) {
       perror("Blocking, eh?");

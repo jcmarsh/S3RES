@@ -351,7 +351,7 @@ void processFromRep(struct comm_message * msg, int replica_num) {
   } else {
     // record vote
     reporting[replica_num] = true;
-    memcpy(&rep_outputs[replica_num], msg, sizeof(comm_message));
+    memcpy(&rep_outputs[replica_num], msg, sizeof(struct comm_message));
   }
  
   for (index = 0; index < REP_COUNT - 1; index++) {
@@ -359,7 +359,7 @@ void processFromRep(struct comm_message * msg, int replica_num) {
     all_reporting = all_reporting && reporting[index];
 
     // Check that all agree
-    if (memcmp(&rep_outputs[index], &rep_outputs[index+1], sizeof(comm_message)) == 0) {
+    if (memcmp(&rep_outputs[index], &rep_outputs[index+1], sizeof(struct comm_message)) == 0) {
       // all_agree stays true
     } else {
       all_agree = false;
@@ -368,6 +368,7 @@ void processFromRep(struct comm_message * msg, int replica_num) {
   all_reporting = all_reporting && reporting[REP_COUNT - 1];
 
   if (all_reporting && all_agree) {
+    // Voting was successful
     write(write_out_fd, &rep_outputs[0], sizeof(struct comm_message));
     resetVotingState();
   } else if (all_reporting) {
@@ -376,5 +377,8 @@ void processFromRep(struct comm_message * msg, int replica_num) {
     // reset voting state.
 
     // For now the timer will go off and trigger a recovery.
+  } else {
+    // Awaiting at least one more replica
   }
+
 }
