@@ -1,5 +1,5 @@
 /*
- * James Marshall
+ * James Marshall 
  */
 
 #include <string.h>
@@ -8,25 +8,41 @@
 
 #include "plumbing.h"
 
-struct node* add_node(struct nodelist * nodes, char* Name) {
+// True if succeeds, false otherwise.
+bool add_node(struct nodelist* nodes, char* Name, char* Value) {
 	// if current is null, add new node
 	if (nodes->current == NULL) {
+		printf("Adding node %s - %s\n", Name, Value);
 		struct node *new_node = malloc(sizeof(struct node));
 		new_node->name = malloc(strlen(Name));
+		new_node->value = malloc(strlen(Value));
 		new_node->links = malloc(sizeof(struct nodelist));
 		strcpy(new_node->name, Name);
+		strcpy(new_node->value, Value);
 		nodes->current = new_node;
 		nodes->next = malloc(sizeof(struct nodelist));
-		return nodes->current;
+		return true;
 	} else if (strcmp(Name, nodes->current->name) == 0) {
 		// Node already exists, bail
-		return nodes->current;
+		printf("PLUMBING ERROR: Re-defining component: %s\n", Name);
+		return false;
 	} else {
-		return add_node(nodes->next, Name);
+		return add_node(nodes->next, Name, Value);
 	}
 }
 
-void add_link(struct nodelist * froms_nodes, struct node * toNode) {
+struct node* get_node(struct nodelist* nodes, char* Name) {
+	if (nodes->current == NULL) {
+		printf("PLUMBING ERROR: get_node, request nodes doesn't exist: %s\n", Name);
+		return NULL;
+	} else if (strcmp(Name, nodes->current->name) == 0) {
+		return nodes->current;
+	} else {
+		return get_node(nodes->next, Name);
+	}
+}
+
+void add_link(struct nodelist* froms_nodes, struct node* toNode) {
 	if (froms_nodes->current == NULL) {
 		froms_nodes->current = toNode;
 		froms_nodes->next = malloc(sizeof(struct nodelist));
@@ -35,14 +51,11 @@ void add_link(struct nodelist * froms_nodes, struct node * toNode) {
 	}
 }
 
-void link_node(struct nodelist * nodes, char* fromName, char* toName) {
-	struct node * fromNode = add_node(nodes, fromName);
-	struct node * toNode = add_node(nodes, toName);
-
+void link_node(struct nodelist* nodes, struct node* fromNode, struct node* toNode) {
 	add_link(fromNode->links, toNode);
 }
 
-void print_links(struct nodelist * nodes) {
+void print_links(struct nodelist* nodes) {
 	if (nodes->current == NULL) {
 		printf("XXX\n");
 	} else {
@@ -51,7 +64,7 @@ void print_links(struct nodelist * nodes) {
 	}
 }
 
-void print_nodes(struct nodelist * nodes)
+void print_nodes(struct nodelist* nodes)
 {
 	if (nodes->current == NULL) {
 		printf("XXX\n");
@@ -64,7 +77,7 @@ void print_nodes(struct nodelist * nodes)
 }
 
 // TODO: compare to "forkSingleReplica" in replicas.cpp
-int launch_node(struct node * launchee) {
+int launch_node(struct node* launchee) {
 	pid_t currentPID = 0;
 	char write_out[3]; // TODO: Handle multiple write out fds
 	char read_in[3];

@@ -13,43 +13,56 @@ int entry_to_bench_fd;
 
 %}
 
-%token BENCH
+%union {
+  char* str;
+}
+
+%token <str> BENCH
+%token COMP
+%token <str> COMP_NAME
+%token <str> COMP_VALUE
+%token ASSIGN
 %token BI
 %token SINGLE
-%token COMPONENT
-%token ARGS
 %token EOL
 
 %%
 line:
 | line relationship EOL { }
-| line invocation EOL { }
+| line declaration EOL { }
+| line EOL { }
+;
+
+declaration:
+  COMP COMP_NAME ASSIGN COMP_VALUE { printf("Adding component %s - %s\n", $2, $4);
+                                     add_node(&all_nodes, $2, $4);
+                                    }
 ;
 
 relationship:
-  BENCH BI comp { printf("The benches: Bench launches %s\n", $3);
-                  struct node * new_node = add_node(&all_nodes, $3);
-                  new_node->in_fd = bench_to_entry_fd;
-                  new_node->out_fd = entry_to_bench_fd; }
+  BENCH BI COMP_NAME { printf("The benches: Bench launches %s - %s\n", $1, $3);
+                       struct node * node_a = get_node(&all_nodes, $3);
+                       node_a->in_fd = bench_to_entry_fd;
+                       node_a->out_fd = entry_to_bench_fd; }
 
-| comp BI comp { printf("bi between %s and %s\n", $1, $3);
-                 add_node(&all_nodes, $1);
-                 add_node(&all_nodes, $3);
-                 link_node(&all_nodes, $1, $3);
-                 link_node(&all_nodes, $3, $1); }
-| comp SINGLE comp { printf("single between %s and %s\n", $1, $3);
-                 add_node(&all_nodes, $1);
-                 add_node(&all_nodes, $3);
-                 link_node(&all_nodes, $1, $3); }
-;
+| BENCH SINGLE COMP_NAME { printf("The benches: Bench launches (single) %s - %s\n", $1, $3);
+                           struct node * node_a = get_node(&all_nodes, $3);
+                           node_a->in_fd = bench_to_entry_fd; }
 
-invocation:
-  // TODO: add args for each node
-  comp ARGS { printf("Set args for: %s with args %s\n", $1, $2); }
-;
+| COMP_NAME SINGLE BENCH { printf("The benches: Bench recieves from %s\n", $1);
+                           struct node * node_a = get_node(&all_nodes, $1);
+                           node_a->out_fd = entry_to_bench_fd; }
 
-comp:
-  COMPONENT { $$ = $1; }
+| COMP_NAME BI COMP_NAME { printf("bi between %s and %s\n", $1, $3);
+                           struct node * node_a = get_node(&all_nodes, $1);
+                           struct node * node_b = get_node(&all_nodes, $3);
+                           link_node(&all_nodes, node_a, node_b);
+                           link_node(&all_nodes, node_a, node_b); }
+
+| COMP_NAME SINGLE COMP_NAME { printf("single from %s to %s\n", $1, $3);
+                               struct node * node_a = get_node(&all_nodes, $1);
+                               struct node * node_b = get_node(&all_nodes, $3);
+                               link_node(&all_nodes, node_a, node_b); }
 ;
 
 %%
@@ -62,6 +75,7 @@ int main(int argc, char **argv) {
   }
 
   // fds are passed in as arguments
+  /*
   if (argc >= 3) {
     bench_to_entry_fd = atoi(argv[1]);
     entry_to_bench_fd = atoi(argv[2]);    
@@ -70,6 +84,7 @@ int main(int argc, char **argv) {
     printf("\tConfiguration file is: config_plumber.cfg\n");
     return(1);
   }
+  */
 
   yyparse();
 
@@ -80,7 +95,7 @@ int main(int argc, char **argv) {
 
   // Start executing each component
   // TODO: Launch more than one
-  launch_node(all_nodes.current);
+  //launch_node(all_nodes.current);
 
   return 0;
 }

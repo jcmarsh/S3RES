@@ -2,31 +2,34 @@
  * Useful structs and what not for the plumber program.
  *
  * James Marshall
-  */
+ */
+
+#include <stdbool.h>
 
 struct node {
  	// Name...
- 	char *name;
+ 	char* name;
+ 	char* value;
  	
+ 	// comm will need to be changed to multiple named pipes
  	int in_fd;
- 	// list of out fds? For now just one
  	int out_fd;
 
- 	// Needs args
-
  	// list of nodes it talks to
- 	struct nodelist * links;
+ 	struct nodelist* links;
 };
 
 struct nodelist {
-	struct node *current;
-	struct nodelist *next;
+	struct node* current;
+	struct nodelist* next;
 };
 
-struct node* add_node(struct nodelist * nodes, char* Name);
+bool add_node(struct nodelist* nodes, char* Name, char* Value);
 
-void link_node(struct nodelist * nodes, char* fromName, char* toName);
+struct node* get_node(struct nodelist* nodes, char* Name);
 
-void print_nodes(struct nodelist * nodes);
+void link_node(struct nodelist* nodes, struct node* fromName, struct node* toName);
 
-int launch_node(struct node * launchee);
+void print_nodes(struct nodelist* nodes);
+
+int launch_node(struct node* launchee);
