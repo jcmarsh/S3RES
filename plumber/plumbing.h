@@ -6,11 +6,16 @@
 
 #include <stdbool.h>
 
+typedef enum {NONE, DMR, TMR} replication_t;
+
 struct node {
  	// Name...
  	char* name;
  	char* value;
  	
+ 	replication_t rep_strat;
+ 	char* voter_name;
+
  	// comm will need to be changed to multiple named pipes
  	int in_fd;
  	int out_fd;
@@ -24,7 +29,7 @@ struct nodelist {
 	struct nodelist* next;
 };
 
-bool add_node(struct nodelist* nodes, char* Name, char* Value);
+bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep_type, char* voter_name);
 
 struct node* get_node(struct nodelist* nodes, char* Name);
 

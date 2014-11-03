@@ -9,7 +9,7 @@
 #include "plumbing.h"
 
 // True if succeeds, false otherwise.
-bool add_node(struct nodelist* nodes, char* Name, char* Value) {
+bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep_type, char* voter_name) {
 	// if current is null, add new node
 	if (nodes->current == NULL) {
 		printf("Adding node %s - %s\n", Name, Value);
@@ -19,15 +19,29 @@ bool add_node(struct nodelist* nodes, char* Name, char* Value) {
 		new_node->links = malloc(sizeof(struct nodelist));
 		strcpy(new_node->name, Name);
 		strcpy(new_node->value, Value);
+
+		// Zero fds
+		new_node->in_fd = 0;
+		new_node->out_fd = 0;
+
+		// Set replication strategy and voter name (if one)
+		new_node->rep_strat = rep_type;
+		if (rep_type != NONE) {
+			new_node->voter_name = malloc(strlen(voter_name));
+			strcpy(new_node->voter_name, voter_name);
+		} else {
+			new_node->voter_name = NULL;
+		}
+
 		nodes->current = new_node;
-		nodes->next = malloc(sizeof(struct nodelist));
+		nodes->next = malloc(sizeof(struct nodelist));		
 		return true;
 	} else if (strcmp(Name, nodes->current->name) == 0) {
 		// Node already exists, bail
 		printf("PLUMBING ERROR: Re-defining component: %s\n", Name);
 		return false;
 	} else {
-		return add_node(nodes->next, Name, Value);
+		return add_node(nodes->next, Name, Value, rep_type, voter_name);
 	}
 }
 
@@ -42,6 +56,8 @@ struct node* get_node(struct nodelist* nodes, char* Name) {
 	}
 }
 
+// TODO: These links don't really make sense yet...
+// Links are going to have to be replaced with pipes of some sort...
 void add_link(struct nodelist* froms_nodes, struct node* toNode) {
 	if (froms_nodes->current == NULL) {
 		froms_nodes->current = toNode;
