@@ -1,6 +1,6 @@
 /*
- * An empty controller for debugging
- * This variation uses file descriptors for I/O (for now just ranger and command out).
+ * Simple filter that averages the three values previous values for
+ * Ranger readings.
  *
  * James Marshall
  */
@@ -17,6 +17,15 @@
 #include "../include/statstime.h"
 #include "../include/fd_client.h"
 
+// Configuration parameters
+#define WINDOW_SIZE 3
+#define RANGER_COUNT 16  // 16 is the size in commtypes.h
+
+int window_index = 0;
+double ranges[WINDOW_SIZE][RANGER_COUNT] = {0};
+// range and pose data is sent together...
+double pose[3];
+
 int read_in_fd;
 int write_out_fd;
 
@@ -24,6 +33,7 @@ int write_out_fd;
 cpu_speed_t cpu_speed;
 
 void enterLoop();
+void command();
 int initReplica();
 
 void restartHandler(int signo) {
@@ -38,6 +48,7 @@ void restartHandler(int signo) {
       // Get own pid, send to voter
       currentPID = getpid();
       connectRecvFDS(currentPID, &read_in_fd, &write_out_fd);
+      command(); // recalculate missed command TODO DON"T NEED
       enterLoop(); // return to normal
     } else {   // Parent just returns
       return;
@@ -64,7 +75,7 @@ int parseArgs(int argc, const char **argv) {
   return 0;
 }
 
-// TODO: Should probably separate this out correctly
+// Should probably separate this out correctly
 // Basically the init function
 int initReplica() {
   int scheduler;
@@ -73,7 +84,7 @@ int initReplica() {
   InitTAS(DEFAULT_CPU, &cpu_speed, 5);
 
   scheduler = sched_getscheduler(0);
-  printf("Empty Scheduler: %d\n", scheduler);
+  printf("Filter Scheduler: %d\n", scheduler);
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     puts("Failed to register the restart handler");
@@ -82,28 +93,50 @@ int initReplica() {
   return 0;
 }
 
+void command() {
+  double range_average[RANGER_COUNT] = {0};
+
+  for (int j = 0; j < RANGER_COUNT; j++) {
+    for (int i = 0; i < WINDOW_SIZE; i++) {
+      range_average[j] += ranges[i][j];
+    }
+    range_average[j] = range_average[j] / WINDOW_SIZE;
+  }
+
+  // Write out averaged range data (with pose)
+  commSendRanger(write_out_fd, range_average, pose);
+}
+
+void requestWaypoints() {
+  commSendWaypointRequest(write_out_fd);
+}
+
 void enterLoop() {
+  void * update_id;
+  int index;
+
   int read_ret;
   struct comm_message recv_msg;
- 
+
   while(1) {
     // Blocking, but that's okay with me
     read_ret = read(read_in_fd, &recv_msg, sizeof(struct comm_message));
     if (read_ret > 0) {
       switch (recv_msg.type) {
       case COMM_RANGE_POSE_DATA:
-        commSendMoveCommand(write_out_fd, 0.1, 0.0);
-        break;
-      case COMM_WAY_RES:
+        commCopyRanger(&recv_msg, ranges[window_index], pose);
+        window_index = (window_index + 1) % WINDOW_SIZE;
+        // Calculates and sends the new command
+        command();
         break;
       default:
         // TODO: Fail? or drop data?
-        printf("ERROR: empty can't handle comm type: %d\n", recv_msg.type);
+        printf("ERROR: filter can't handle comm type: %d\n", recv_msg.type);
       }
     } else if (read_ret == -1) {
-      perror("Empty - read blocking");
+      perror("Filter - read blocking");
     } else {
-      puts("Empty read_ret == 0?");
+      perror("Filter read_ret == 0?");
     }
   }
 }

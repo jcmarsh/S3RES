@@ -37,4 +37,4 @@ void link_node(struct nodelist* nodes, struct node* fromName, struct node* toNam
 
 void print_nodes(struct nodelist* nodes);
 
-int launch_node(struct node* launchee);
+int launch_node(struct nodelist* nodes);

@@ -86,7 +86,6 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
-  printf("Bench: About to init bench\n");
   if (initBenchMarker() < 0) {
     puts("ERROR: failure in setup function.");
     return -1;

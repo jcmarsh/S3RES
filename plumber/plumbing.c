@@ -12,7 +12,6 @@
 bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep_type, char* voter_name) {
 	// if current is null, add new node
 	if (nodes->current == NULL) {
-		printf("Adding node %s - %s\n", Name, Value);
 		struct node *new_node = malloc(sizeof(struct node));
 		new_node->name = malloc(strlen(Name));
 		new_node->value = malloc(strlen(Value));
@@ -93,30 +92,53 @@ void print_nodes(struct nodelist* nodes)
 }
 
 // TODO: compare to "forkSingleReplica" in replicas.cpp
-int launch_node(struct node* launchee) {
+int launch_node(struct nodelist* nodes) {
 	pid_t currentPID = 0;
 	char write_out[3]; // TODO: Handle multiple write out fds
 	char read_in[3];
+	char* rep_argv[4];
 	// TODO: handle args
-	char *rep_argv[] = {launchee->name, read_in, write_out, NULL};
 
-	currentPID = fork();
+	struct node* curr = nodes->current;
 
-	if (currentPID >= 0) { // Successful fork
-		if (currentPID == 0) { // Child process
-			sprintf(read_in, "%02d", launchee->in_fd);
+	if (curr != NULL) {
+		if (curr->rep_strat == NONE) {
+			// launch with no replication
+			// printf("Launching with no rep: %d -> %s -> %d\n", curr->in_fd, curr->name, curr->out_fd);
+			rep_argv[0] = curr->value;
 			rep_argv[1] = read_in;
-			sprintf(write_out, "%02d", launchee->out_fd);
 			rep_argv[2] = write_out;
-			if (-1 == execv(rep_argv[0], rep_argv)) {
-				perror("EXEC ERROR!");
-				return -1;
-			}
-		} else { // Parent Process
-			
+			rep_argv[3] = NULL;
+		} else if (curr->rep_strat == DMR) {
+			printf("pb.y: No support for DMR\n");
+		} else if (curr->rep_strat == TMR) {
+			// launch with voter
+			// printf("Launching with a voter: %d -> (%s)%s -> %d\n", curr->in_fd, curr->name, curr->voter_name, curr->out_fd);
+			rep_argv[0] = curr->voter_name;
+			rep_argv[1] = read_in;
+			rep_argv[2] = write_out;
+			rep_argv[3] = NULL;
 		}
-	} else {
-		printf("Fork error!\n");
-		return -1;
-	}
+
+		currentPID = fork();
+
+		if (currentPID >= 0) { // Successful fork
+			if (currentPID == 0) { // Child process
+				sprintf(read_in, "%02d", curr->in_fd);
+				rep_argv[1] = read_in;
+				sprintf(write_out, "%02d", curr->out_fd);
+				rep_argv[2] = write_out;
+				if (-1 == execv(rep_argv[0], rep_argv)) {
+					printf("File: %s\n", rep_argv[0]);
+					perror("EXEC ERROR!");
+					return -1;
+				}
+			} else { // Parent Process
+				launch_node(nodes->next);
+			}
+		} else {
+			printf("Fork error!\n");
+			return -1;
+		}
+	} // curr == NULL, okay.
 }

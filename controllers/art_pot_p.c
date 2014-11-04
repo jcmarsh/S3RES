@@ -143,9 +143,9 @@ void command() {
       theta = atan2(obs_y, obs_x);
     
       if (dist <= OBST_EXTENT + OBST_RADIUS) {
-	delta_x += -OBST_SCALE * (OBST_EXTENT + OBST_RADIUS - dist) * cos(theta);
-	delta_y += -OBST_SCALE * (OBST_EXTENT + OBST_RADIUS - dist) * sin(theta);
-	total_factors += 1;
+        delta_x += -OBST_SCALE * (OBST_EXTENT + OBST_RADIUS - dist) * cos(theta);
+        delta_y += -OBST_SCALE * (OBST_EXTENT + OBST_RADIUS - dist) * sin(theta);
+        total_factors += 1;
       }
     }
 
@@ -195,7 +195,7 @@ void enterLoop() {
         printf("ERROR: art_pot_p can't handle comm type: %d\n", recv_msg.type);
       }
     } else if (read_ret == -1) {
-      perror("Blocking, eh?");
+      perror("ArtPot - read blocking");
     } else {
       perror("ArtPot read_ret == 0?");
     }
