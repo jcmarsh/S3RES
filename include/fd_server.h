@@ -20,6 +20,6 @@ struct server_data{
   int sock_fd;
 };
 
-int createFDS(struct server_data * sd);
+int createFDS(struct server_data * sd, const char* name);
 
 int acceptSendFDS(struct server_data * sd, pid_t *pid, int read_in, int write_out);

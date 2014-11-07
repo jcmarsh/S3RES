@@ -42,23 +42,31 @@ int sendFDS(int connection_fd, int read_in, int write_out) { // fd names from cl
   return n;
 }
 
-// Name is always ./fd_server
-int createFDS(struct server_data * sd) {
+// Name is ./<name>_fd_server
+int createFDS(struct server_data * sd, const char* name) {
   // create domain socked
+  const char* pre_name = "./";
+  const char* post_name = "_fd_server";
+  char* actual_name;
+  
+  asprintf(&actual_name, "%s%s%s", pre_name, name, post_name);
+
   sd->sock_fd = socket(PF_UNIX, SOCK_STREAM, 0);
   if (sd->sock_fd < 0) {
     perror("Socket creation failed.");
     return 1;
   }
 
+  printf("Making fd_server: %s\n", actual_name);
+
   // should delete previous remnants
-  unlink("./fd_server");
+  unlink(actual_name);
 
   /* start with a clean address structure */
   memset(&(sd->address), 0, sizeof(struct sockaddr_un));
 
   sd->address.sun_family = AF_UNIX;
-  snprintf(sd->address.sun_path, UNIX_PATH_MAX, "./fd_server");
+  snprintf(sd->address.sun_path, UNIX_PATH_MAX, actual_name);
 
   if(bind(sd->sock_fd, (struct sockaddr *) &(sd->address), sizeof(struct sockaddr_un)) != 0) {
     printf("bind() failed\n");

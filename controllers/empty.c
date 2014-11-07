@@ -37,7 +37,7 @@ void restartHandler(int signo) {
       initReplica();
       // Get own pid, send to voter
       currentPID = getpid();
-      connectRecvFDS(currentPID, &read_in_fd, &write_out_fd);
+      connectRecvFDS(currentPID, &read_in_fd, &write_out_fd, "Empty");
       enterLoop(); // return to normal
     } else {   // Parent just returns
       return;
@@ -55,7 +55,7 @@ int parseArgs(int argc, const char **argv) {
   // TODO: error checking
   if (argc < 3) { // Must request fds
     pid = getpid();
-    connectRecvFDS(pid, &read_in_fd, &write_out_fd);
+    connectRecvFDS(pid, &read_in_fd, &write_out_fd, "Empty");
   } else {
     read_in_fd = atoi(argv[1]);
     write_out_fd = atoi(argv[2]);

@@ -51,6 +51,7 @@ cpu_speed_t cpu_speed;
 // FD server
 struct server_data sd;
 
+char* controller_name;
 // FDs to the benchmarker
 int read_in_fd;
 int write_out_fd;
@@ -130,7 +131,7 @@ int forkReplicas(struct replica_group* rg) {
 
   // Fork children
   for (index = 0; index < rg->num; index++) {
-    forkSingleReplicaNoFD(rg, index, "ArtPot");
+    forkSingleReplicaNoFD(rg, index, controller_name);
     // TODO: Handle possible errors
 
     // send fds
@@ -193,7 +194,7 @@ int initVoterB() {
   resetVotingState();
 
   // Setup fd server
-  createFDS(&sd);
+  createFDS(&sd, controller_name);
 
   // Let's try to launch the replicas
   initReplicas(&repGroup, replicas, REP_COUNT);
@@ -214,12 +215,13 @@ int parseArgs(int argc, const char **argv) {
   int i;
 
   if (argc < 3) {
-    puts("Usage: VoterB <read_in_fd> <write_out_fd>");
+    puts("Usage: VoterB <controller_name> <read_in_fd> <write_out_fd>");
     return -1;
   }
 
-  read_in_fd = atoi(argv[1]);
-  write_out_fd = atoi(argv[2]);
+  controller_name = const_cast<char*>(argv[1]);
+  read_in_fd = atoi(argv[2]);
+  write_out_fd = atoi(argv[3]);
 
   return 0;
 }

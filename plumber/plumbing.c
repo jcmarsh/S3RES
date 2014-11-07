@@ -96,7 +96,7 @@ int launch_node(struct nodelist* nodes) {
 	pid_t currentPID = 0;
 	char write_out[3]; // TODO: Handle multiple write out fds
 	char read_in[3];
-	char* rep_argv[4];
+	char** rep_argv;
 	// TODO: handle args
 
 	struct node* curr = nodes->current;
@@ -105,6 +105,7 @@ int launch_node(struct nodelist* nodes) {
 		if (curr->rep_strat == NONE) {
 			// launch with no replication
 			// printf("Launching with no rep: %d -> %s -> %d\n", curr->in_fd, curr->name, curr->out_fd);
+			rep_argv = malloc(sizeof(char *) * 4);
 			rep_argv[0] = curr->value;
 			rep_argv[1] = read_in;
 			rep_argv[2] = write_out;
@@ -114,10 +115,12 @@ int launch_node(struct nodelist* nodes) {
 		} else if (curr->rep_strat == TMR) {
 			// launch with voter
 			// printf("Launching with a voter: %d -> (%s)%s -> %d\n", curr->in_fd, curr->name, curr->voter_name, curr->out_fd);
+			rep_argv = malloc(sizeof(char *) * 5);
 			rep_argv[0] = curr->voter_name;
-			rep_argv[1] = read_in;
-			rep_argv[2] = write_out;
-			rep_argv[3] = NULL;
+			rep_argv[1] = curr->value;
+			rep_argv[2] = read_in;
+			rep_argv[3] = write_out;
+			rep_argv[4] = NULL;
 		}
 
 		currentPID = fork();
@@ -125,12 +128,11 @@ int launch_node(struct nodelist* nodes) {
 		if (currentPID >= 0) { // Successful fork
 			if (currentPID == 0) { // Child process
 				sprintf(read_in, "%02d", curr->in_fd);
-				rep_argv[1] = read_in;
 				sprintf(write_out, "%02d", curr->out_fd);
-				rep_argv[2] = write_out;
 				if (-1 == execv(rep_argv[0], rep_argv)) {
 					printf("File: %s\n", rep_argv[0]);
 					perror("EXEC ERROR!");
+					free(rep_argv);
 					return -1;
 				}
 			} else { // Parent Process
@@ -138,7 +140,9 @@ int launch_node(struct nodelist* nodes) {
 			}
 		} else {
 			printf("Fork error!\n");
+			free(rep_argv);
 			return -1;
 		}
+		free(rep_argv);
 	} // curr == NULL, okay.
 }
