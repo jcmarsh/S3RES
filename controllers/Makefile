@@ -1,5 +1,5 @@
 RESEARCH=/home/jcmarsh/research
-SRC=../src/commtypes.cpp
+SRC=../src/commtypes.c
 LIB=-lrt -lTASLimited
 FLAGS=-O3
 

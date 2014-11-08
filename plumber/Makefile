@@ -1,7 +1,7 @@
 default: pb.l pb.y
 	bison -d pb.y
 	flex pb.l
-	cc -g -o plumber plumbing.c pb.tab.c lex.yy.c -lfl
+	cc -g -o plumber ../src/commtypes.c plumbing.c pb.tab.c lex.yy.c -lfl
 
 copy: default
 	cp plumber ../../stage/experiments/

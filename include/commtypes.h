@@ -11,7 +11,8 @@ typedef enum {
   WAY_REQ,
   WAY_RES,
   MOV_CMD,
-  RANGE_POSE_DATA
+  RANGE_POSE_DATA,
+  COMM_ERROR
 } comm_message_t;
 
 #define INDEX_X 0
@@ -34,6 +35,9 @@ struct comm_range_pose_data {
   double ranges[16];
   double pose[3];
 };
+
+// Hack to check when parsing
+comm_message_t commToEnum(char* name);
 
 int commSendWaypoints(int send_fd, double way_x, double way_y, double way_a);
 void commCopyWaypoints(struct comm_way_res * recv_msg, double * waypoints);

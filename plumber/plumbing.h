@@ -5,6 +5,7 @@
  */
 
 #include <stdbool.h>
+#include "../include/commtypes.h"
 
 typedef enum {NONE, DMR, TMR} replication_t;
 
@@ -33,7 +34,7 @@ bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep
 
 struct node* get_node(struct nodelist* nodes, char* Name);
 
-void link_node(struct nodelist* nodes, struct node* fromName, struct node* toName);
+void link_node(struct nodelist* nodes, comm_message_t type, struct node* fromName, struct node* toName);
 
 void print_nodes(struct nodelist* nodes);
 

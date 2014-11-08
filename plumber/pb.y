@@ -65,7 +65,11 @@ relationship
   | VAR_NAME arrow VAR_NAME {
       struct node * node_a = get_node(&all_nodes, $1);
       struct node * node_b = get_node(&all_nodes, $3);
-      link_node(&all_nodes, node_a, node_b); }
+      if (commToEnum($2) == COMM_ERROR) {
+        printf("Comm type doesn't exist! %s\n", $2);
+        return -1;
+      }
+      link_node(&all_nodes, commToEnum($2), node_a, node_b); }
   ;
 
 arrow

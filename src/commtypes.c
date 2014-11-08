@@ -3,6 +3,20 @@
 #include <stdlib.h>
 #include <string.h>
 
+comm_message_t commToEnum(char* name) {
+  if (strcmp(name, "WAY_RES") == 0) {
+    return WAY_RES;
+  } else if (strcmp(name, "WAY_REQ") == 0) {
+    return WAY_REQ;
+  } else if (strcmp(name, "MOV_CMD") == 0) {
+    return MOV_CMD;
+  } else if (strcmp(name, "RANGE_POSE_DATA") == 0) {
+    return RANGE_POSE_DATA;
+  } else {
+    return COMM_ERROR;
+  }
+}
+
 int commSendWaypoints(int send_fd, double way_x, double way_y, double way_a) {
   struct comm_way_res msg;
   memset(&msg, 0, sizeof(struct comm_way_res));

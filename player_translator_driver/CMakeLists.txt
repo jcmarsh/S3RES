@@ -5,7 +5,7 @@ PROJECT (translator_driver)
 SET (CMAKE_MODULE_PATH "/usr/local/share/cmake/Modules")
 INCLUDE (UsePlayerPlugin)
 
-PLAYER_ADD_PLUGIN_DRIVER (translator_driver SOURCES translator_driver.cc ../src/replicas.cpp ../src/commtypes.cpp)
+PLAYER_ADD_PLUGIN_DRIVER (translator_driver SOURCES translator_driver.cc ../src/replicas.cpp ../src/commtypes.c)
 
 target_link_libraries(translator_driver TASLimited)
 

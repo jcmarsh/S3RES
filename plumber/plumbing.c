@@ -66,7 +66,7 @@ void add_link(struct nodelist* froms_nodes, struct node* toNode) {
 	}
 }
 
-void link_node(struct nodelist* nodes, struct node* fromNode, struct node* toNode) {
+void link_node(struct nodelist* nodes, comm_message_t type, struct node* fromNode, struct node* toNode) {
 	add_link(fromNode->links, toNode);
 }
 
