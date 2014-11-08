@@ -18,48 +18,59 @@ int entry_to_bench_fd;
 }
 
 %token <str> BENCH
-%token COMP
-%token <str> COMP_N
-%token <str> COMP_V_N
-%token <str> COMP_V_VOTER
+%token START_PIPE
+%token END_PIPE
+%token START_VOTE
+%token END_VOTE
 %token ASSIGN
-%token BI
-%token SINGLE
+%token <str> VAR_NAME
+%token <str> NAMED_OB
 %token EOL
+%type <str> arrow
+%type <str> rep_comp
 
 %%
-line:
-| line relationship EOL { }
-| line declaration EOL { }
-| line EOL { }
-;
+line
+  :
+  | line relationship EOL { }
+  | line declaration EOL { }
+  | line EOL { }
+  ;
 
-declaration:
-  COMP COMP_N ASSIGN COMP_V_N { add_node(&all_nodes, $2, $4, NONE, NULL); }
+declaration
+  : VAR_NAME ASSIGN NAMED_OB { 
+      printf("Adding: %s - %s\n", $1, $3);
+      printf("TODO: Need to do checking on %s\n", $3);
+      add_node(&all_nodes, $1, $3, NONE, NULL); }
 
-| COMP COMP_N ASSIGN COMP_V_N COMP_V_VOTER { add_node(&all_nodes, $2, $4, TMR, $5); }
-;
+  | VAR_NAME ASSIGN rep_comp NAMED_OB { 
+      printf("Adding TMR: %s %s %s\n", $1, $3, $4);
+      printf("TODO: Checking on: %s and %s\n", $3, $4);
+      add_node(&all_nodes, $1, $3, TMR, $4); }
+  ;
 
-relationship:
-  BENCH BI COMP_N { struct node * node_a = get_node(&all_nodes, $3);
-                    node_a->in_fd = bench_to_entry_fd;
-                    node_a->out_fd = entry_to_bench_fd; }
+rep_comp
+  : START_VOTE NAMED_OB END_VOTE { $$ = $2; }
+  ;
 
-| BENCH SINGLE COMP_N { struct node * node_a = get_node(&all_nodes, $3);
-                        node_a->in_fd = bench_to_entry_fd; }
+relationship
+  : BENCH arrow VAR_NAME {
+      struct node * node_a = get_node(&all_nodes, $3);
+      node_a->in_fd = bench_to_entry_fd; }
 
-| COMP_N SINGLE BENCH { struct node * node_a = get_node(&all_nodes, $1);
-                        node_a->out_fd = entry_to_bench_fd; }
+  | VAR_NAME arrow BENCH {
+      struct node * node_a = get_node(&all_nodes, $1);
+      node_a->out_fd = entry_to_bench_fd; }
 
-| COMP_N BI COMP_N { struct node * node_a = get_node(&all_nodes, $1);
-                     struct node * node_b = get_node(&all_nodes, $3);
-                     link_node(&all_nodes, node_a, node_b);
-                     link_node(&all_nodes, node_b, node_a); }
+  | VAR_NAME arrow VAR_NAME {
+      struct node * node_a = get_node(&all_nodes, $1);
+      struct node * node_b = get_node(&all_nodes, $3);
+      link_node(&all_nodes, node_a, node_b); }
+  ;
 
-| COMP_N SINGLE COMP_N { struct node * node_a = get_node(&all_nodes, $1);
-                         struct node * node_b = get_node(&all_nodes, $3);
-                         link_node(&all_nodes, node_a, node_b); }
-;
+arrow
+  : START_PIPE NAMED_OB END_PIPE { $$ = $2; }
+  ;
 
 %%
 int main(int argc, char **argv) {
@@ -82,7 +93,8 @@ int main(int argc, char **argv) {
 
   yyparse();
 
-  // print_nodes(&all_nodes);
+  print_nodes(&all_nodes);
+
 
   struct nodelist* next = &all_nodes;
   while(next->current != NULL) {
@@ -106,7 +118,7 @@ int main(int argc, char **argv) {
       }
     }
   }
-  
+
   // Start executing each component
   launch_node(&all_nodes);
 

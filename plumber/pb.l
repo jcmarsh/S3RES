@@ -6,23 +6,13 @@
 %%
 [ \t\r]
 "Bench"			{ yylval.str = "Bench"; return BENCH; }
-"comp"			{ return COMP; }
-"<->"			{ return BI; }
-"-->"			{ return SINGLE; }
+"--"			{ return START_PIPE; }
+"->"			{ return END_PIPE; }
+"("				{ return START_VOTE; }
+")"				{ return END_VOTE; }
 ":="			{ return ASSIGN; }
-[a-zA-Z_]+		{ yylval.str = strdup(yytext); return COMP_N; }
-\"[\(a-zA-Z_]+	{ int len = strlen(yytext) - 2;
-				  yylval.str = malloc(len + 1);
-				  memcpy(yylval.str, &(yytext[2]), len);
-				  yylval.str[len] = NULL; return COMP_V_N; }
-\)[a-zA-Z_]+\"	{ int len = strlen(yytext) - 2;
-				  yylval.str = malloc(len + 1);
-				  memcpy(yylval.str, &(yytext[1]), len);
-				  yylval.str[len] = NULL; return COMP_V_VOTER; }
-\"[a-zA-Z_]+\"	{ int len = strlen(yytext) - 2;
-				  yylval.str = malloc(len + 1);
-				  memcpy(yylval.str, &(yytext[1]), len);
-				  yylval.str[len] = NULL; return COMP_V_N; }
+[a-z][a-zA-Z_]+	{ yylval.str = strdup(yytext); return VAR_NAME; }
+[A-Z][a-zA-Z_]+ { yylval.str = strdup(yytext); return NAMED_OB; }
 \n				{ return EOL; }
 .				{ printf("Mystery character %c, %s\n", *yytext, yytext); }
 %%
