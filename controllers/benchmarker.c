@@ -23,6 +23,9 @@
 struct replica_group repGroup;
 struct replica replicas[REP_COUNT];
 
+struct comm_range_pose_data range_pose_data_msg;
+struct comm_mov_cmd mov_cmd_msg;
+
 // TAS Stuff
 cpu_speed_t cpu_speed;
 
@@ -30,11 +33,6 @@ int read_in_fd; // These are to your parent (Translator)
 int write_out_fd;
 
 timestamp_t last;
-
-struct comm_message range_pose_data_msg;
-struct comm_message way_req_msg;
-struct comm_message way_res_msg;
-struct comm_message mov_cmd_msg;
 
 // FUNCTIONS!
 int initBenchMarker();
@@ -53,11 +51,6 @@ int initBenchMarker() {
 
   scheduler = sched_getscheduler(0);
   printf("BenchMarker Scheduler: %d\n", scheduler);
-
-  way_req_msg.type = COMM_WAY_REQ;
-  way_res_msg.type = COMM_WAY_RES;
-  mov_cmd_msg.type = COMM_MOV_CMD;
-  range_pose_data_msg.type = COMM_RANGE_POSE_DATA;  
 
   // Should only be a single replica
   initReplicas(&repGroup, replicas, REP_COUNT);
@@ -101,58 +94,37 @@ int main(int argc, const char **argv) {
 void doOneUpdate() {
   int retval = 0;
   int index;
-  struct comm_message recv_msg;
+  struct comm_range_pose_data recv_msg_tran;
+  struct comm_mov_cmd recv_msg_rep;
 
   // Message comes in from translator
   // Message goes out from replica
   // That is it. Except for those waypoint request / responses
 
   // Translator driven, check first. This call blocks.
-  retval = read(read_in_fd, &recv_msg, sizeof(struct comm_message));
+
+  // TODO: handle waypoint responses
+  retval = read(read_in_fd, &recv_msg_tran, sizeof(struct comm_range_pose_data));
   if (retval > 0) {
-    switch (recv_msg.type) {
-    case COMM_RANGE_POSE_DATA:
-      memcpy(&range_pose_data_msg, &recv_msg, sizeof(struct comm_message));
-      processRanger();      
-      break;
-    case COMM_WAY_RES:
-      memcpy(&way_res_msg, &recv_msg, sizeof(struct comm_message));
-      sendWaypoints();
-      break;
-    default:
-      printf("ERROR: BenchMarker can't handle comm type: %d\n", recv_msg.type);
-    }
+    // TODO: Check for erros
+    memcpy(&range_pose_data_msg, &recv_msg_tran, sizeof(struct comm_range_pose_data));
+    processRanger();      
   } else {
     perror("Bench: read should have worked, failed."); // EINTR?
   }
 
   // Second part of the cycle: response from replica
-  retval = read(replicas[0].fd_outof_rep[0], &recv_msg, sizeof(struct comm_message));
+  // TODO: Handle waypoint requests
+  retval = read(replicas[0].fd_outof_rep[0], &recv_msg_rep, sizeof(struct comm_mov_cmd));
   if (retval > 0) {
-    switch (recv_msg.type) {
-    case COMM_WAY_REQ:
-      // To translator
-      memcpy(&way_req_msg, &recv_msg, sizeof(struct comm_message));
-      write(write_out_fd, &way_req_msg, sizeof(struct comm_message));
-      break;
-    case COMM_MOV_CMD:
-      mov_cmd_msg.data.m_cmd.vel_cmd[0] = recv_msg.data.m_cmd.vel_cmd[0];
-      mov_cmd_msg.data.m_cmd.vel_cmd[1] = recv_msg.data.m_cmd.vel_cmd[1];
-      processCommand();
-      break;
-    default:
-      printf("ERROR: BenchMarker can't handle comm type: %d\n", recv_msg.type);
-    }
+    mov_cmd_msg.vel_cmd[0] = recv_msg_rep.vel_cmd[0];
+    mov_cmd_msg.vel_cmd[1] = recv_msg_rep.vel_cmd[1];
+    processCommand();
   } else {
     perror("Bench: read should have worked, failed."); // EINTR?
   }
 }
 
-void sendWaypoints() {
-  // data set by read
-
-  write(replicas[0].fd_into_rep[1], &way_res_msg, sizeof(struct comm_message));
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process ranger data
@@ -163,7 +135,7 @@ void processRanger() {
   last = generate_timestamp();
 #endif // _STATS_BENCH_ROUND_TRIP_
 
-  write(replicas[0].fd_into_rep[1], &range_pose_data_msg, sizeof(struct comm_message));
+  write(replicas[0].fd_into_rep[1], &range_pose_data_msg, sizeof(struct comm_range_pose_data));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -180,5 +152,5 @@ void processCommand() {
 #endif
 
   // data was set by read
-  write(write_out_fd, &mov_cmd_msg, sizeof(struct comm_message));
+  write(write_out_fd, &mov_cmd_msg, sizeof(struct comm_mov_cmd));
 }

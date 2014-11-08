@@ -174,26 +174,17 @@ void enterLoop() {
   int index;
 
   int read_ret;
-  struct comm_message recv_msg;
+  // TODO: Right now can only handle range data incoming
+  struct comm_range_pose_data recv_msg;
 
   while(1) {
     // Blocking, but that's okay with me
-    read_ret = read(read_in_fd, &recv_msg, sizeof(struct comm_message));
+    read_ret = read(read_in_fd, &recv_msg, sizeof(struct comm_range_pose_data));
     if (read_ret > 0) {
-      switch (recv_msg.type) {
-      case COMM_RANGE_POSE_DATA:
-        commCopyRanger(&recv_msg, ranges, pos);
-        // Calculates and sends the new command
-        command();
-        break;
-      case COMM_WAY_RES:
-        printf("Should likely never happen now.\n");
-        commCopyWaypoints(&recv_msg, goal);
-        break;
-      default:
-        // TODO: Fail? or drop data?
-        printf("ERROR: art_pot_p can't handle comm type: %d\n", recv_msg.type);
-      }
+      // TODO check for erros
+      commCopyRanger(&recv_msg, ranges, pos);
+      // Calculates and sends the new command
+      command();
     } else if (read_ret == -1) {
       perror("ArtPot - read blocking");
     } else {

@@ -4,70 +4,65 @@
 #include <string.h>
 
 int commSendWaypoints(int send_fd, double way_x, double way_y, double way_a) {
-  struct comm_message msg;
-  memset(&msg, 0, sizeof(struct comm_message));
+  struct comm_way_res msg;
+  memset(&msg, 0, sizeof(struct comm_way_res));
 
-  msg.type = COMM_WAY_RES;
-  msg.data.w_res.point[INDEX_X] = way_x;
-  msg.data.w_res.point[INDEX_Y] = way_y;
-  msg.data.w_res.point[INDEX_A] = way_a;
+  msg.point[INDEX_X] = way_x;
+  msg.point[INDEX_Y] = way_y;
+  msg.point[INDEX_A] = way_a;
 
-  return write(send_fd, &msg, sizeof(struct comm_message));
+  return write(send_fd, &msg, sizeof(struct comm_way_res));
 }
 
-void commCopyWaypoints(struct comm_message * recv_msg, double * waypoints) {
+void commCopyWaypoints(struct comm_way_res * recv_msg, double * waypoints) {
   int index = 0;
   for (index = 0; index < 3; index++) {
-    waypoints[index] = recv_msg->data.w_res.point[index];
+    waypoints[index] = recv_msg->point[index];
   }
   return;
 }
 
 int commSendWaypointRequest(int send_fd) {
-  struct comm_message send_msg;
-  memset(&send_msg, 0, sizeof(struct comm_message));
-  
-  send_msg.type = COMM_WAY_REQ;
+  struct comm_way_req send_msg;
+  memset(&send_msg, 0, sizeof(struct comm_way_req));
 
-  return write(send_fd, &send_msg, sizeof(struct comm_message));
+  return write(send_fd, &send_msg, sizeof(struct comm_way_req));
 }
 
 
 int commSendMoveCommand(int send_fd, double vel_0, double vel_1) {
-  struct comm_message msg;
-  memset(&msg, 0, sizeof(struct comm_message));
+  struct comm_mov_cmd msg;
+  memset(&msg, 0, sizeof(struct comm_mov_cmd));
 
-  msg.type = COMM_MOV_CMD;
-  msg.data.m_cmd.vel_cmd[0] = vel_0;
-  msg.data.m_cmd.vel_cmd[1] = vel_1;
+  msg.vel_cmd[0] = vel_0;
+  msg.vel_cmd[1] = vel_1;
 
-  return write(send_fd, &msg, sizeof(struct comm_message));
+  return write(send_fd, &msg, sizeof(struct comm_mov_cmd));
 } 
 
 int commSendRanger(int send_fd, double * ranger_data, double * pose_data) {
   int index = 0;
-  struct comm_message msg;
-  memset(&msg, 0, sizeof(struct comm_message));
- 
-  msg.type = COMM_RANGE_POSE_DATA;
+  struct comm_range_pose_data msg;
+  memset(&msg, 0, sizeof(struct comm_range_pose_data));
+
   for (index = 0; index < 16; index++) {
-    msg.data.rp_data.ranges[index] = ranger_data[index];
+    msg.ranges[index] = ranger_data[index];
   }
   for (index = 0; index < 3; index++) {
-    msg.data.rp_data.pose[index] = pose_data[index];
+    msg.pose[index] = pose_data[index];
   }
 
-  return write(send_fd, &msg, sizeof(struct comm_message));
+  return write(send_fd, &msg, sizeof(struct comm_range_pose_data));
 }
 
-void commCopyRanger(struct comm_message * recv_msg, double * range_data, double * pose_data) {
+void commCopyRanger(struct comm_range_pose_data * recv_msg, double * range_data, double * pose_data) {
   int index = 0;
 
   for (index = 0; index < 16; index++) {
-    range_data[index] = recv_msg->data.rp_data.ranges[index];
+    range_data[index] = recv_msg->ranges[index];
   }
   for (index = 0; index < 3; index++) {
-    pose_data[index] = recv_msg->data.rp_data.pose[index];
+    pose_data[index] = recv_msg->pose[index];
   }
   return;
 }

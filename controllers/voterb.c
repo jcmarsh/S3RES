@@ -70,7 +70,6 @@ double ranger_ranges[365]; // 365 is the max from a Player Ranger
 // Functions!
 int forkReplicas(struct replica_group* rg);
 int initVoterB();
-void requestWaypoints();
 int parseArgs(int argc, const char **argv);
 int main(int argc, const char **argv);
 void doOneUpdate();
@@ -203,14 +202,6 @@ int initVoterB() {
   return 0;
 }
 
-void requestWaypoints() {
-  struct comm_message msg;
-
-  msg.type = COMM_WAY_REQ;
-
-  write(write_out_fd, &msg, sizeof(struct comm_message));
-}
-
 int parseArgs(int argc, const char **argv) {
   int i;
 
@@ -237,8 +228,6 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
-  requestWaypoints();
-
   while(1) {
     doOneUpdate();
   }
@@ -249,7 +238,8 @@ int main(int argc, const char **argv) {
 void doOneUpdate() {
   int index = 0;
   int retval = 0;
-  struct comm_message recv_msg;
+  struct comm_range_pose_data recv_r_p_msg;
+  struct comm_mov_cmd recv_m_msg;
 
   struct timeval select_timeout;
   fd_set select_set;
@@ -292,43 +282,22 @@ void doOneUpdate() {
     
     // Check for data from the benchmarker
     if (FD_ISSET(read_in_fd, &select_set)) {
-      retval = read(read_in_fd, &recv_msg, sizeof(struct comm_message));
+      retval = read(read_in_fd, &recv_r_p_msg, sizeof(struct comm_range_pose_data));
       if (retval > 0) {
-        switch (recv_msg.type) {
-        case COMM_RANGE_POSE_DATA:
-          // send to reps!
-          commCopyRanger(&recv_msg, ranger_ranges, pos);
-          processRanger();
-          break;
-        case COMM_WAY_RES:
-          // New waypoints from benchmarker!
-          commCopyWaypoints(&recv_msg, next_goal);
-          processCommand();
-          break;
-        default:
-          printf("ERROR: VoterB can't handle comm type: %d\n", recv_msg.type);
-        }
+        // TODO: check for errors
+        // Range data recieved, send to reps!
+        commCopyRanger(&recv_r_p_msg, ranger_ranges, pos);
+        processRanger();
       }
     }
     
     // Check all replicas for data
     for (index = 0; index < REP_COUNT; index++) {
-      // clear comm_header for next message
-      recv_msg.type = -1;
-      
       if (FD_ISSET(replicas[index].fd_outof_rep[0], &select_set)) {
-        retval = read(replicas[index].fd_outof_rep[0], &recv_msg, sizeof(struct comm_message));
+        retval = read(replicas[index].fd_outof_rep[0], &recv_m_msg, sizeof(struct comm_mov_cmd));
         if (retval > 0) {
-          switch (recv_msg.type) {
-          case COMM_WAY_REQ:
-            sendWaypoints(index);
-            break;
-          case COMM_MOV_CMD:
-            processVelCmdFromRep(recv_msg.data.m_cmd.vel_cmd[0], recv_msg.data.m_cmd.vel_cmd[1], index);
-            break;
-          default:
-            printf("ERROR: VoterB can't handle comm type: %d\n", recv_msg.type);
-          }
+          //TODO: Error checking
+          processVelCmdFromRep(recv_m_msg.vel_cmd[0], recv_m_msg.vel_cmd[1], index);
         }
       }
     }
@@ -429,13 +398,12 @@ void processVelCmdFromRep(double cmd_vel_x, double cmd_vel_a, int replica_num) {
   }
 
   if (all_reporting && all_agree) {
-    struct comm_message msg;
+    struct comm_mov_cmd msg;
 
-    msg.type = COMM_MOV_CMD;
-    msg.data.m_cmd.vel_cmd[0] = cmds[1][0];
-    msg.data.m_cmd.vel_cmd[1] = cmds[1][1];
+    msg.vel_cmd[0] = cmds[1][0];
+    msg.vel_cmd[1] = cmds[1][1];
 
-    write(write_out_fd, &msg, sizeof(struct comm_message));
+    write(write_out_fd, &msg, sizeof(struct comm_mov_cmd));
     resetVotingState();
   } else if (all_reporting) {
     // Should put the correct command

@@ -231,14 +231,13 @@ int TranslatorDriver::ProcessMessage(QueuePointer & resp_queue,
 }
 
 void TranslatorDriver::SendWaypoints() {
-  struct comm_message send_msg;
+  struct comm_way_res send_msg;
 
-  send_msg.type = COMM_WAY_RES;
-  send_msg.data.w_res.point[INDEX_X] = curr_goal[INDEX_X];
-  send_msg.data.w_res.point[INDEX_Y] = curr_goal[INDEX_Y];
-  send_msg.data.w_res.point[INDEX_A] = curr_goal[INDEX_A];
+  send_msg.point[INDEX_X] = curr_goal[INDEX_X];
+  send_msg.point[INDEX_Y] = curr_goal[INDEX_Y];
+  send_msg.point[INDEX_A] = curr_goal[INDEX_A];
 
-  write(replicas[0].fd_into_rep[1], &send_msg, sizeof(struct comm_message));
+  write(replicas[0].fd_into_rep[1], &send_msg, sizeof(struct comm_way_res));
 }
 
 void TranslatorDriver::Main() {
@@ -250,25 +249,18 @@ void TranslatorDriver::Main() {
 // Called by player for each non-threaded driver.
 void TranslatorDriver::DoOneUpdate() {
   int retval;
-  struct comm_message recv_msg;
+  struct comm_mov_cmd recv_msg;
 
   if (!this->InQueue->Empty()) {
     this->ProcessMessages();
   }
 
+  // TODO: Translator should only ever have one rep
   // This read is non-blocking
-  retval = read(replicas[0].fd_outof_rep[0], &recv_msg, sizeof(struct comm_message));
+  retval = read(replicas[0].fd_outof_rep[0], &recv_msg, sizeof(struct comm_mov_cmd));
   if (retval > 0) {
-    switch(recv_msg.type) {
-    case COMM_WAY_REQ:
-      this->SendWaypoints();
-      break;
-    case COMM_MOV_CMD:
-      this->PutCommand(recv_msg.data.m_cmd.vel_cmd[0], recv_msg.data.m_cmd.vel_cmd[1]);
-      break;
-    default:
-      printf("ERROR: Translator can't handle comm type: %d\n", recv_msg.type);
-    }
+    // TODO: check for errors
+    this->PutCommand(recv_msg.vel_cmd[0], recv_msg.vel_cmd[1]);
   }
 }
 
@@ -355,17 +347,16 @@ void TranslatorDriver::ProcessRanger(player_ranger_data_range_t &data)
 {
   if (ranger_countdown-- < 0) {
     int index = 0;
-    struct comm_message send_msg;
+    struct comm_range_pose_data send_msg;
  
-    send_msg.type = COMM_RANGE_POSE_DATA;
     for (index = 0; index < 16; index++) {
-      send_msg.data.rp_data.ranges[index] = data.ranges[index];
+      send_msg.ranges[index] = data.ranges[index];
     }
     for (index = 0; index < 3; index++) {
-      send_msg.data.rp_data.pose[index] = pose[index];
+      send_msg.pose[index] = pose[index];
     }
 
-    write(replicas[0].fd_into_rep[1], &send_msg, sizeof(struct comm_message));
+    write(replicas[0].fd_into_rep[1], &send_msg, sizeof(struct comm_range_pose_data));
   } else {
     printf("Skipping this one.\n");
   }

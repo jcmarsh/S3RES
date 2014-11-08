@@ -133,9 +133,9 @@ bool addObstacle(struct point_i obs) {
 void updateMap(struct comm_range_pose_data * data) {
   double x_pose, y_pose, theta_pose;
   // Read pose
-  x_pose = data->pose[0];
-  y_pose = data->pose[1];
-  theta_pose = data->pose[2];
+  x_pose = data->pose[INDEX_X];
+  y_pose = data->pose[INDEX_Y];
+  theta_pose = data->pose[INDEX_A];
 
   bool changed = false;
 
@@ -175,7 +175,7 @@ void updateMap(struct comm_range_pose_data * data) {
 
 void enterLoop() {
   int read_ret;
-  struct comm_message recv_msg;
+  struct comm_range_pose_data recv_msg;
 
   // For now I'm goint to write out everything to a file
   out_file = fopen("map_output.txt", "w");
@@ -193,16 +193,10 @@ void enterLoop() {
  
   while(1) {
     // Blocking, but that's okay with me
-    read_ret = read(read_in_fd, &recv_msg, sizeof(struct comm_message));
+    read_ret = read(read_in_fd, &recv_msg, sizeof(struct comm_range_pose_data));
     if (read_ret > 0) {
-      switch (recv_msg.type) {
-      case COMM_RANGE_POSE_DATA:
-        updateMap((comm_range_pose_data *) &(recv_msg.data.rp_data));
-        break;
-      default:
-        // TODO: Fail? or drop data?
-        printf("ERROR: mapper can't handle comm type: %d\n", recv_msg.type);
-      }
+      // TODO: Error checking
+      updateMap(&recv_msg);
     } else if (read_ret == -1) {
       perror("Blocking, eh?");
     } else {

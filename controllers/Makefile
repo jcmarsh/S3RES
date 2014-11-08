@@ -13,7 +13,7 @@ regular:
 	g++ $(FLAGS) -o Filter filter.c $(SRC) ../src/fd_client.cpp $(LIB) 
 	g++ $(FLAGS) -o Mapper mapper.c $(SRC) ../src/fd_client.cpp $(LIB) 
 	g++ $(FLAGS) -o VoterB voterb.c $(SRC) ../src/replicas.cpp ../src/fd_server.cpp $(LIB)
-	g++ $(FLAGS) -o VoterC voterc.c $(SRC) ../src/replicas.cpp ../src/fd_server.cpp $(LIB)
+#	g++ $(FLAGS) -o VoterC voterc.c $(SRC) ../src/replicas.cpp ../src/fd_server.cpp $(LIB)
 
 copy: regular
 	cp ArtPot ../../stage/experiments/
@@ -23,8 +23,7 @@ copy: regular
 	cp Filter ../../stage/experiments/
 	cp Mapper ../../stage/experiments/
 	cp VoterB ../../stage/experiments/
-	cp VoterC ../../stage/experiments/
-	cp BenchMarker ../../stage/experiments/
+#	cp VoterC ../../stage/experiments/
 
 clean:
 	rm -f ArtPot
@@ -34,5 +33,5 @@ clean:
 	rm -f Filter
 	rm -f Mapper
 	rm -f VoterB
-	rm -f VoterC
+#	rm -f VoterC
 

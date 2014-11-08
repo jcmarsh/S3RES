@@ -84,22 +84,13 @@ int initReplica() {
 
 void enterLoop() {
   int read_ret;
-  struct comm_message recv_msg;
+  struct comm_range_pose_data recv_msg;
  
   while(1) {
     // Blocking, but that's okay with me
-    read_ret = read(read_in_fd, &recv_msg, sizeof(struct comm_message));
+    read_ret = read(read_in_fd, &recv_msg, sizeof(struct comm_range_pose_data));
     if (read_ret > 0) {
-      switch (recv_msg.type) {
-      case COMM_RANGE_POSE_DATA:
-        commSendMoveCommand(write_out_fd, 0.1, 0.0);
-        break;
-      case COMM_WAY_RES:
-        break;
-      default:
-        // TODO: Fail? or drop data?
-        printf("ERROR: empty can't handle comm type: %d\n", recv_msg.type);
-      }
+      commSendMoveCommand(write_out_fd, 0.1, 0.0);
     } else if (read_ret == -1) {
       perror("Empty - read blocking");
     } else {
@@ -123,4 +114,3 @@ int main(int argc, const char **argv) {
 
   return 0;
 }
-
