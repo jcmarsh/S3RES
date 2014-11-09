@@ -17,8 +17,8 @@
 #include "../include/statstime.h"
 #include "../include/fd_client.h"
 
-int read_in_fd;
-int write_out_fd;
+struct typed_pipe data_in;
+struct typed_pipe cmd_out;
 
 // TAS related
 cpu_speed_t cpu_speed;
@@ -37,7 +37,7 @@ void restartHandler(int signo) {
       initReplica();
       // Get own pid, send to voter
       currentPID = getpid();
-      connectRecvFDS(currentPID, &read_in_fd, &write_out_fd, "Empty");
+      //connectRecvFDS(currentPID, &read_in_fd, &write_out_fd, "Empty");
       enterLoop(); // return to normal
     } else {   // Parent just returns
       return;
@@ -55,10 +55,10 @@ int parseArgs(int argc, const char **argv) {
   // TODO: error checking
   if (argc < 3) { // Must request fds
     pid = getpid();
-    connectRecvFDS(pid, &read_in_fd, &write_out_fd, "Empty");
+    //connectRecvFDS(pid, &read_in_fd, &write_out_fd, "Empty");
   } else {
-    read_in_fd = atoi(argv[1]);
-    write_out_fd = atoi(argv[2]);
+    deserializePipe(argv[1], &data_in);
+    deserializePipe(argv[2], &cmd_out);
   }
 
   return 0;
@@ -88,9 +88,9 @@ void enterLoop() {
  
   while(1) {
     // Blocking, but that's okay with me
-    read_ret = read(read_in_fd, &recv_msg, sizeof(struct comm_range_pose_data));
+    read_ret = read(data_in.fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
     if (read_ret > 0) {
-      commSendMoveCommand(write_out_fd, 0.1, 0.0);
+      commSendMoveCommand(cmd_out.fd_out, 0.1, 0.0);
     } else if (read_ret == -1) {
       perror("Empty - read blocking");
     } else {

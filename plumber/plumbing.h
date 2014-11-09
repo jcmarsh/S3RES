@@ -9,20 +9,20 @@
 
 typedef enum {NONE, DMR, TMR} replication_t;
 
+// Why 10? No reason.
+#define PIPE_LIMIT 10
+
 struct node {
- 	// Name...
- 	char* name;
- 	char* value;
+	// Name...
+	char* name;
+	char* value;
  	
- 	replication_t rep_strat;
- 	char* voter_name;
+	replication_t rep_strat;
+	char* voter_name;
 
- 	// comm will need to be changed to multiple named pipes
- 	int in_fd;
- 	int out_fd;
-
- 	// list of nodes it talks to
- 	struct nodelist* links;
+	// comm will need to be changed to multiple named pipes
+	int pipe_count;
+	struct typed_pipe pipes[PIPE_LIMIT];
 };
 
 struct nodelist {
@@ -34,7 +34,8 @@ bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep
 
 struct node* get_node(struct nodelist* nodes, char* Name);
 
-void link_node(struct nodelist* nodes, comm_message_t type, struct node* fromName, struct node* toName);
+void link_bench(struct node* n, comm_message_t type, int fd_in, int fd_out);
+void link_node(comm_message_t type, struct node* fromName, struct node* toName);
 
 void print_nodes(struct nodelist* nodes);
 

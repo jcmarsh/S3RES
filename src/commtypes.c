@@ -17,6 +17,29 @@ comm_message_t commToEnum(char* name) {
   }
 }
 
+char* serializePipe(struct typed_pipe pipe) {
+  char* serial;
+  if (pipe.fd_in == 0) {
+    asprintf(&serial, "%s:%d:%d", MESSAGE_T[pipe.type], 0, pipe.fd_out);
+  } else {
+    asprintf(&serial, "%s:%d:%d", MESSAGE_T[pipe.type], pipe.fd_in, 0);
+  }
+  return serial;  
+}
+
+void deserializePipe(const char* serial, struct typed_pipe *pipe) {
+  char* type = (char*)malloc(sizeof(char) * 100);
+  int in = 0;
+  int out = 0;
+
+  sscanf(serial, "%[^:]:%d:%d", type, &in, &out);
+  pipe->fd_in = in;
+  pipe->fd_out = out;
+
+  pipe->type = commToEnum(type);
+  free(type);
+}
+
 int commSendWaypoints(int send_fd, double way_x, double way_y, double way_a) {
   struct comm_way_res msg;
   memset(&msg, 0, sizeof(struct comm_way_res));

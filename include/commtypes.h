@@ -15,9 +15,20 @@ typedef enum {
   COMM_ERROR
 } comm_message_t;
 
+// TODO: consider generating with macros: http://stackoverflow.com/questions/9907160/how-to-convert-enum-names-to-string-in-c
+static const char* MESSAGE_T[] = {"WAY_REQ", "WAY_RES", "MOV_CMD", "RANGE_POSE_DATA"};
+
 #define INDEX_X 0
 #define INDEX_Y 1
 #define INDEX_A 2
+
+// Not sure... each component will only have half of this pipe.
+struct typed_pipe {
+  comm_message_t type;
+  // Only one of these will be set at a time
+  int fd_in;
+  int fd_out;
+};
 
 struct comm_way_req {
   double padding;
@@ -37,7 +48,12 @@ struct comm_range_pose_data {
 };
 
 // Hack to check when parsing
+// Also need for deserialization
 comm_message_t commToEnum(char* name);
+
+// Typed pipes
+char* serializePipe(struct typed_pipe pipe);
+void deserializePipe(const char* serial, struct typed_pipe* pipe);
 
 int commSendWaypoints(int send_fd, double way_x, double way_y, double way_a);
 void commCopyWaypoints(struct comm_way_res * recv_msg, double * waypoints);

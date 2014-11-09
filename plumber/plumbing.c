@@ -15,13 +15,11 @@ bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep
 		struct node *new_node = malloc(sizeof(struct node));
 		new_node->name = malloc(strlen(Name));
 		new_node->value = malloc(strlen(Value));
-		new_node->links = malloc(sizeof(struct nodelist));
 		strcpy(new_node->name, Name);
 		strcpy(new_node->value, Value);
 
-		// Zero fds
-		new_node->in_fd = 0;
-		new_node->out_fd = 0;
+		// Pipes
+		new_node->pipe_count = 0;
 
 		// Set replication strategy and voter name (if one)
 		new_node->rep_strat = rep_type;
@@ -55,27 +53,32 @@ struct node* get_node(struct nodelist* nodes, char* Name) {
 	}
 }
 
-// TODO: These links don't really make sense yet...
-// Links are going to have to be replaced with pipes of some sort...
-void add_link(struct nodelist* froms_nodes, struct node* toNode) {
-	if (froms_nodes->current == NULL) {
-		froms_nodes->current = toNode;
-		froms_nodes->next = malloc(sizeof(struct nodelist));
-	} else {
-		add_link(froms_nodes->next, toNode);
-	}
+// stupid bench making everything a pain
+// Bench already has fds, one passed in should be 0
+void link_bench(struct node* n, comm_message_t type, int fd_in, int fd_out) {
+	n->pipes[n->pipe_count].type = type;
+	n->pipes[n->pipe_count].fd_in = fd_in;
+	n->pipes[n->pipe_count].fd_out = fd_out;
+	n->pipe_count++;
+	// printf("Setting with bench: %s - %d %d\n", n->name, fd_in, fd_out);
 }
 
-void link_node(struct nodelist* nodes, comm_message_t type, struct node* fromNode, struct node* toNode) {
-	add_link(fromNode->links, toNode);
-}
-
-void print_links(struct nodelist* nodes) {
-	if (nodes->current == NULL) {
-		printf("XXX\n");
+void link_node(comm_message_t type, struct node* fromNode, struct node* toNode) {
+	// create pipe
+	int pipe_fds[2];
+	if (pipe(pipe_fds) == -1) {
+		printf("Plumber pipe error\n");
 	} else {
-		printf("%s --> ", nodes->current->name);
-		print_links(nodes->next);
+		// give half to fromNode
+		fromNode->pipes[fromNode->pipe_count].type = type;
+		fromNode->pipes[fromNode->pipe_count].fd_in = 0;
+		fromNode->pipes[fromNode->pipe_count].fd_out = pipe_fds[1];
+		fromNode->pipe_count++;
+		// other half to toNode
+		toNode->pipes[toNode->pipe_count].type = type;
+		toNode->pipes[toNode->pipe_count].fd_in = pipe_fds[0];
+		toNode->pipes[toNode->pipe_count].fd_out = 0;
+		toNode->pipe_count++;
 	}
 }
 
@@ -85,8 +88,7 @@ void print_nodes(struct nodelist* nodes)
 		printf("XXX\n");
 		return;
 	} else {
-		printf("%s\n\t", nodes->current->name);
-		print_links(nodes->current->links);
+		printf("%s\n", nodes->current->name);
 		print_nodes(nodes->next);
 	}
 }
@@ -94,41 +96,43 @@ void print_nodes(struct nodelist* nodes)
 // TODO: compare to "forkSingleReplica" in replicas.cpp
 int launch_node(struct nodelist* nodes) {
 	pid_t currentPID = 0;
-	char write_out[3]; // TODO: Handle multiple write out fds
-	char read_in[3];
 	char** rep_argv;
 	// TODO: handle args
+	int i;
 
 	struct node* curr = nodes->current;
 
 	if (curr != NULL) {
+		int rep_count = 0;
 		if (curr->rep_strat == NONE) {
 			// launch with no replication
-			// printf("Launching with no rep: %d -> %s -> %d\n", curr->in_fd, curr->name, curr->out_fd);
-			rep_argv = malloc(sizeof(char *) * 4);
+			printf("Launching with no rep: %s\n", curr->name);
+			rep_count = 2 + curr->pipe_count;
+			rep_argv = malloc(sizeof(char *) * rep_count);
 			rep_argv[0] = curr->value;
-			rep_argv[1] = read_in;
-			rep_argv[2] = write_out;
-			rep_argv[3] = NULL;
+			// All other args are serialized pipes, set later
+			rep_argv[rep_count - 1] = NULL;
 		} else if (curr->rep_strat == DMR) {
 			printf("pb.y: No support for DMR\n");
 		} else if (curr->rep_strat == TMR) {
 			// launch with voter
-			// printf("Launching with a voter: %d -> (%s)%s -> %d\n", curr->in_fd, curr->name, curr->voter_name, curr->out_fd);
+			printf("Launching with a voter: (%s)%s\n", curr->name, curr->voter_name);
+			int rep_count = 3 + curr->pipe_count;
 			rep_argv = malloc(sizeof(char *) * 5);
 			rep_argv[0] = curr->voter_name;
 			rep_argv[1] = curr->value;
-			rep_argv[2] = read_in;
-			rep_argv[3] = write_out;
-			rep_argv[4] = NULL;
+			rep_argv[rep_count - 1] = NULL;
+		}
+
+		for (i = 1; i <= curr->pipe_count; i++) {
+			rep_argv[i] = serializePipe(curr->pipes[i - 1]);
 		}
 
 		currentPID = fork();
 
 		if (currentPID >= 0) { // Successful fork
 			if (currentPID == 0) { // Child process
-				sprintf(read_in, "%02d", curr->in_fd);
-				sprintf(write_out, "%02d", curr->out_fd);
+				printf("Exec-ing: %s, %s, %s\n", rep_argv[0], rep_argv[1], rep_argv[2]);
 				if (-1 == execv(rep_argv[0], rep_argv)) {
 					printf("File: %s\n", rep_argv[0]);
 					perror("EXEC ERROR!");
@@ -143,6 +147,7 @@ int launch_node(struct nodelist* nodes) {
 			free(rep_argv);
 			return -1;
 		}
+		// TODO: Need to free all pointers inside too, no?
 		free(rep_argv);
 	} // curr == NULL, okay.
 }
