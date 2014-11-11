@@ -37,10 +37,19 @@ void deserializePipe(const char* serial, struct typed_pipe *pipe) {
   pipe->fd_out = out;
 
   pipe->type = commToEnum(type);
+
+  memset(pipe->buffer, 0, 1024);
+  pipe->buff_count = 0;
+
   free(type);
 }
 
-int commSendWaypoints(int send_fd, double way_x, double way_y, double way_a) {
+int commSendWaypoints(struct typed_pipe pipe, double way_x, double way_y, double way_a) {
+  if (pipe.fd_out == 0 || pipe.type != WAY_RES) {
+    printf("Error: pipe does not match type or have a valid fd.");
+    return 0;
+  }
+
   struct comm_way_res msg;
   memset(&msg, 0, sizeof(struct comm_way_res));
 
@@ -48,7 +57,7 @@ int commSendWaypoints(int send_fd, double way_x, double way_y, double way_a) {
   msg.point[INDEX_Y] = way_y;
   msg.point[INDEX_A] = way_a;
 
-  return write(send_fd, &msg, sizeof(struct comm_way_res));
+  return write(pipe.fd_out, &msg, sizeof(struct comm_way_res));
 }
 
 void commCopyWaypoints(struct comm_way_res * recv_msg, double * waypoints) {
@@ -59,25 +68,40 @@ void commCopyWaypoints(struct comm_way_res * recv_msg, double * waypoints) {
   return;
 }
 
-int commSendWaypointRequest(int send_fd) {
+int commSendWaypointRequest(struct typed_pipe pipe) {
+  if (pipe.fd_out == 0 || pipe.type != WAY_REQ) {
+    printf("Error: pipe does not match type or have a valid fd.");
+    return 0;
+  }
+
   struct comm_way_req send_msg;
   memset(&send_msg, 0, sizeof(struct comm_way_req));
 
-  return write(send_fd, &send_msg, sizeof(struct comm_way_req));
+  return write(pipe.fd_out, &send_msg, sizeof(struct comm_way_req));
 }
 
 
-int commSendMoveCommand(int send_fd, double vel_0, double vel_1) {
+int commSendMoveCommand(struct typed_pipe pipe, double vel_0, double vel_1) {
+  if (pipe.fd_out == 0 || pipe.type != MOV_CMD) {
+    printf("Error: pipe does not match type or have a valid fd.");
+    return 0;
+  }
+
   struct comm_mov_cmd msg;
   memset(&msg, 0, sizeof(struct comm_mov_cmd));
 
   msg.vel_cmd[0] = vel_0;
   msg.vel_cmd[1] = vel_1;
 
-  return write(send_fd, &msg, sizeof(struct comm_mov_cmd));
+  return write(pipe.fd_out, &msg, sizeof(struct comm_mov_cmd));
 } 
 
-int commSendRanger(int send_fd, double * ranger_data, double * pose_data) {
+int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_data) {
+  if (pipe.fd_out == 0 || pipe.type != RANGE_POSE_DATA) {
+    printf("Error: pipe does not match type or have a valid fd.");
+    return 0;
+  }
+
   int index = 0;
   struct comm_range_pose_data msg;
   memset(&msg, 0, sizeof(struct comm_range_pose_data));
@@ -89,7 +113,7 @@ int commSendRanger(int send_fd, double * ranger_data, double * pose_data) {
     msg.pose[index] = pose_data[index];
   }
 
-  return write(send_fd, &msg, sizeof(struct comm_range_pose_data));
+  return write(pipe.fd_out, &msg, sizeof(struct comm_range_pose_data));
 }
 
 void commCopyRanger(struct comm_range_pose_data * recv_msg, double * range_data, double * pose_data) {

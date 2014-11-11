@@ -7,6 +7,9 @@
 
 #include <unistd.h>
 
+// Why 10? No reason.
+#define PIPE_LIMIT 10
+
 typedef enum {
   WAY_REQ,
   WAY_RES,
@@ -28,6 +31,9 @@ struct typed_pipe {
   // Only one of these will be set at a time
   int fd_in;
   int fd_out;
+
+  int buff_count;
+  char* buffer[1024];
 };
 
 struct comm_way_req {
@@ -55,14 +61,14 @@ comm_message_t commToEnum(char* name);
 char* serializePipe(struct typed_pipe pipe);
 void deserializePipe(const char* serial, struct typed_pipe* pipe);
 
-int commSendWaypoints(int send_fd, double way_x, double way_y, double way_a);
+int commSendWaypoints(struct typed_pipe pipe, double way_x, double way_y, double way_a);
 void commCopyWaypoints(struct comm_way_res * recv_msg, double * waypoints);
 
-int commSendWaypointRequest(int send_fd);
+int commSendWaypointRequest(struct typed_pipe pipe);
 
-int commSendMoveCommand(int send_fd, double vel_0, double vel_1);
+int commSendMoveCommand(struct typed_pipe pipe, double vel_0, double vel_1);
 
-int commSendRanger(int send_fd, double * ranger_data, double * pose_data);
+int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_data);
 void commCopyRanger(struct comm_range_pose_data * recv_msg, double * range_data, double * pose_data);
 
 #endif // _COMM_TYPES_H_

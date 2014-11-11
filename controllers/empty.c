@@ -90,7 +90,7 @@ void enterLoop() {
     // Blocking, but that's okay with me
     read_ret = read(data_in.fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
     if (read_ret > 0) {
-      commSendMoveCommand(cmd_out.fd_out, 0.1, 0.0);
+      commSendMoveCommand(cmd_out, 0.1, 0.0);
     } else if (read_ret == -1) {
       perror("Empty - read blocking");
     } else {

@@ -9,16 +9,15 @@
 
 typedef enum {NONE, DMR, TMR} replication_t;
 
-// Why 10? No reason.
-#define PIPE_LIMIT 10
-
+// Data structure for components that need to be initialized by the plumber
 struct node {
-	// Name...
+	// Name... name / value pair in the config file
+	// ex. local_nav := ArtPot
 	char* name;
 	char* value;
  	
 	replication_t rep_strat;
-	char* voter_name;
+	char* voter_name; // from config file: local_nav = (ArtPot)VoterB
 
 	// comm will need to be changed to multiple named pipes
 	int pipe_count;

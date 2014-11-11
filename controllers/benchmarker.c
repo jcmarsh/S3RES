@@ -17,11 +17,8 @@
 #include "../include/replicas.h"
 #include "../include/commtypes.h"
 
-#define REP_COUNT 1
-
 // Replica related data
-struct replica_group repGroup;
-struct replica replicas[REP_COUNT];
+struct replica replica;
 
 struct comm_range_pose_data range_pose_data_msg;
 struct comm_mov_cmd mov_cmd_msg;
@@ -29,8 +26,8 @@ struct comm_mov_cmd mov_cmd_msg;
 // TAS Stuff
 cpu_speed_t cpu_speed;
 
-int read_in_fd; // These are to your parent (Translator)
-int write_out_fd;
+ // These are to your parent (Translator)
+struct typed_pipe trans_pipes[2];
 
 timestamp_t last;
 
@@ -53,8 +50,10 @@ int initBenchMarker() {
   printf("BenchMarker Scheduler: %d\n", scheduler);
 
   // Should only be a single replica
-  initReplicas(&repGroup, replicas, REP_COUNT);
-  forkSingleReplica(&repGroup, 0, "plumber");
+  struct replica* r_p = &replica;
+  initReplicas(&r_p, 1, "plumber");
+  createPipes(&r_p, 1, trans_pipes, 2);
+  forkReplicas(&r_p, 1);
   
   return 0;
 }
@@ -67,13 +66,19 @@ int parseArgs(int argc, const char **argv) {
     return -1;
   }
 
-  read_in_fd = atoi(argv[1]);
-  write_out_fd = atoi(argv[2]);
+  // TODO: replace with deserializePipe
+  trans_pipes[0].type = RANGE_POSE_DATA;
+  trans_pipes[0].fd_in = atoi(argv[1]);
+  trans_pipes[0].fd_out = 0;
+  trans_pipes[1].type = MOV_CMD;
+  trans_pipes[1].fd_in = 0;
+  trans_pipes[1].fd_out = atoi(argv[2]);;
 
   return 0;
 }
 
 int main(int argc, const char **argv) {
+  printf("Inside the BENCHMARKER!\n");
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");
     return -1;
@@ -104,7 +109,7 @@ void doOneUpdate() {
   // Translator driven, check first. This call blocks.
 
   // TODO: handle waypoint responses
-  retval = read(read_in_fd, &recv_msg_tran, sizeof(struct comm_range_pose_data));
+  retval = read(trans_pipes[0].fd_in, &recv_msg_tran, sizeof(struct comm_range_pose_data));
   if (retval > 0) {
     // TODO: Check for erros
     memcpy(&range_pose_data_msg, &recv_msg_tran, sizeof(struct comm_range_pose_data));
@@ -115,7 +120,7 @@ void doOneUpdate() {
 
   // Second part of the cycle: response from replica
   // TODO: Handle waypoint requests
-  retval = read(replicas[0].fd_outof_rep[0], &recv_msg_rep, sizeof(struct comm_mov_cmd));
+  retval = read(replica.vot_pipes[1].fd_in, &recv_msg_rep, sizeof(struct comm_mov_cmd));
   if (retval > 0) {
     mov_cmd_msg.vel_cmd[0] = recv_msg_rep.vel_cmd[0];
     mov_cmd_msg.vel_cmd[1] = recv_msg_rep.vel_cmd[1];
@@ -135,7 +140,7 @@ void processRanger() {
   last = generate_timestamp();
 #endif // _STATS_BENCH_ROUND_TRIP_
 
-  write(replicas[0].fd_into_rep[1], &range_pose_data_msg, sizeof(struct comm_range_pose_data));
+  write(replica.vot_pipes[0].fd_out, &range_pose_data_msg, sizeof(struct comm_range_pose_data));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -152,5 +157,5 @@ void processCommand() {
 #endif
 
   // data was set by read
-  write(write_out_fd, &mov_cmd_msg, sizeof(struct comm_mov_cmd));
+  write(trans_pipes[1].fd_out, &mov_cmd_msg, sizeof(struct comm_mov_cmd));
 }

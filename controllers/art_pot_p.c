@@ -36,8 +36,8 @@ double pos[3];
 int ranger_count = 16;
 double ranges[16]; // 16 is the size in commtypes.h
 
-int read_in_fd;
-int write_out_fd;
+struct typed_pipe data_in;
+struct typed_pipe cmd_out;
 
 // TAS related
 cpu_speed_t cpu_speed;
@@ -57,7 +57,7 @@ void restartHandler(int signo) {
       initReplica();
       // Get own pid, send to voter
       currentPID = getpid();
-      connectRecvFDS(currentPID, &read_in_fd, &write_out_fd, "ArtPot");
+      //connectRecvFDS(currentPID, &read_in_fd, &write_out_fd, "ArtPot");
       command(); // recalculate missed command TODO DON"T NEED
       enterLoop(); // return to normal
     } else {   // Parent just returns
@@ -76,10 +76,10 @@ int parseArgs(int argc, const char **argv) {
   // TODO: error checking
   if (argc < 3) { // Must request fds
     pid = getpid();
-    connectRecvFDS(pid, &read_in_fd, &write_out_fd, "ArtPot");
+    //connectRecvFDS(pid, &read_in_fd, &write_out_fd, "ArtPot");
   } else {
-    read_in_fd = atoi(argv[1]);
-    write_out_fd = atoi(argv[2]);
+    deserializePipe(argv[1], &data_in);
+    deserializePipe(argv[2], &cmd_out);
   }
 
   return 0;
@@ -162,11 +162,7 @@ void command() {
   }
 
   // Write move command
-  commSendMoveCommand(write_out_fd, vel_cmd[0], vel_cmd[1]);
-}
-
-void requestWaypoints() {
-  commSendWaypointRequest(write_out_fd);
+  commSendMoveCommand(cmd_out, vel_cmd[0], vel_cmd[1]);
 }
 
 void enterLoop() {
@@ -179,7 +175,7 @@ void enterLoop() {
 
   while(1) {
     // Blocking, but that's okay with me
-    read_ret = read(read_in_fd, &recv_msg, sizeof(struct comm_range_pose_data));
+    read_ret = read(data_in.fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
     if (read_ret > 0) {
       // TODO check for erros
       commCopyRanger(&recv_msg, ranges, pos);
@@ -203,8 +199,6 @@ int main(int argc, const char **argv) {
     puts("ERROR: failure in setup function.");
     return -1;
   }
-
-  // requestWaypoints();
 
   enterLoop();
 

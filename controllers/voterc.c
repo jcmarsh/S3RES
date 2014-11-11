@@ -32,12 +32,9 @@ typedef enum {
 } voting_status;
 
 // Replica related data
-struct replica_group repGroup;
 struct replica replicas[REP_COUNT];
 
 // The voting information and input duplication stuff could be part of the replica struct....
-// Input Duplication stuff
-bool sent[REP_COUNT];
 
 // Voting stuff
 voting_status vote_stat;
@@ -50,9 +47,9 @@ cpu_speed_t cpu_speed;
 struct server_data sd;
 
 char* controller_name;
-// FDs to the benchmarker
-int read_in_fd;
-int write_out_fd;
+// pipes to external components (not replicas)
+int pipe_count = 0;
+struct typed_pipe ext_pipes[PIPE_LIMIT];
 
 // restart timer fd
 char timeout_byte[1] = {'*'};
@@ -61,14 +58,13 @@ timer_t timerid;
 struct itimerspec its;
 
 // Functions!
-int forkReplicas(struct replica_group* rg);
 int initVoterC();
 int parseArgs(int argc, const char **argv);
 int main(int argc, const char **argv);
 void doOneUpdate();
-void processData(struct comm_message * msg);
+void processData(struct typed_pipe pipe);
 void resetVotingState();
-void processFromRep(struct comm_message * msg, int replica_num);
+void processFromRep(struct typed_pipe pipe, int replica_num);
 
 void timeout_sighandler(int signum) {//, siginfo_t *si, void *data) {
   if (vote_stat == VOTING) {
@@ -76,6 +72,7 @@ void timeout_sighandler(int signum) {//, siginfo_t *si, void *data) {
   }
 }
 
+/*
 void restartReplica() {
   int restart_id;
   int index;
@@ -112,24 +109,7 @@ void restartReplica() {
     }
   }
 }
-
-////////////////////////////////////////////////////////////////////////////////
-int forkReplicas(struct replica_group* rg) {
-  int index = 0;
-  pid_t new_pid;
-
-  // Fork children
-  for (index = 0; index < rg->num; index++) {
-    forkSingleReplicaNoFD(rg, index, controller_name);
-    // TODO: Handle possible errors
-
-    // send fds
-    acceptSendFDS(&sd, &new_pid, rg->replicas[index].fd_into_rep[0], rg->replicas[index].fd_outof_rep[1]);
-    assert(new_pid == rg->replicas[index].pid);
-  }
-
-  return 1;
-}
+*/
 
 ////////////////////////////////////////////////////////////////////////////////
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
@@ -174,33 +154,30 @@ int initVoterC() {
     return -1;
   }
 
-  for (index = 0; index < REP_COUNT; index++) {
-    sent[index] = false;
-  }
-
   resetVotingState();
 
   // Setup fd server
   createFDS(&sd, controller_name);
 
   // Let's try to launch the replicas
-  initReplicas(&repGroup, replicas, REP_COUNT);
-  forkReplicas(&repGroup);
+  initReplicas((struct replica **) &replicas, REP_COUNT, controller_name);
+  createPipes((struct replica **) &replicas, REP_COUNT, ext_pipes, pipe_count);
+  forkReplicas((struct replica **) &replicas, REP_COUNT);
 
   return 0;
 }
 
 int parseArgs(int argc, const char **argv) {
-  int i;
-
-  if (argc < 4) {
-    puts("Usage: VoterC <controller_name> <read_in_fd> <write_out_fd>");
+  if (argc < 3) {
+    puts("Usage: VoterC <controller_name> <message_type:fd_in:fd_out> <...>");
     return -1;
   }
 
   controller_name = const_cast<char*>(argv[1]);
-  read_in_fd = atoi(argv[2]);
-  write_out_fd = atoi(argv[3]);
+  for (int i = 0; i < argc - 2; i++) {
+    deserializePipe(argv[i + 2], &ext_pipes[pipe_count]);
+    pipe_count++;
+  }
 
   return 0;
 }
@@ -226,7 +203,6 @@ int main(int argc, const char **argv) {
 void doOneUpdate() {
   int index = 0;
   int retval = 0;
-  struct comm_message recv_msg;
 
   struct timeval select_timeout;
   fd_set select_set;
@@ -238,18 +214,30 @@ void doOneUpdate() {
   select_timeout.tv_usec = 0;
 
   FD_ZERO(&select_set);
-  FD_SET(read_in_fd, &select_set);
-  max_fd = read_in_fd;
+  // Check for timeouts
   FD_SET(timeout_fd[0], &select_set);
-  if (timeout_fd[0] > max_fd) {
-    max_fd = timeout_fd[0];
-  }
-  for (index = 0; index < REP_COUNT; index++) {
-    rep_pipe_r = replicas[index].fd_outof_rep[0];
-    if (rep_pipe_r > max_fd) {
-      max_fd = rep_pipe_r;
+  max_fd = timeout_fd[0];
+  // Check external in pipes
+  for (index = 0; index < pipe_count; index++) {
+    if (ext_pipes[index].fd_in != 0) {
+      int e_pipe_fd = ext_pipes[index].fd_in;
+      FD_SET(e_pipe_fd, &select_set);
+      if (e_pipe_fd > max_fd) {
+        max_fd = e_pipe_fd;
+      }
     }
-    FD_SET(rep_pipe_r, &select_set);
+  }
+  // Check pipes from replicas
+  for (index = 0; index < REP_COUNT; index++) {
+    for (int p_index = 0; p_index < replicas[index].pipe_count; p_index++) {
+      rep_pipe_r = replicas[index].vot_pipes[p_index].fd_in;
+      if (rep_pipe_r != 0) {
+        FD_SET(rep_pipe_r, &select_set);      
+        if (rep_pipe_r > max_fd) {
+          max_fd = rep_pipe_r;
+        }
+      }
+    }
   }
 
   // This will wait at least timeout until return. Returns earlier if something has data.
@@ -260,42 +248,34 @@ void doOneUpdate() {
     if (FD_ISSET(timeout_fd[0], &select_set)) {
       retval = read(timeout_fd[0], timeout_byte, 1);
       if (retval > 0) {
-        printf("VoterC restarting replica\n");
-        restartReplica();
+        printf("VoterC: CAN't CALL restarting replica\n");
+        //restartReplica();
       } else {
         // TODO: Do I care about this?
       }
     }
     
-    // Check for data from the benchmarker
-    if (FD_ISSET(read_in_fd, &select_set)) {
-      retval = read(read_in_fd, &recv_msg, sizeof(struct comm_message));
-      if (retval > 0) {
-        switch (recv_msg.type) {
-        case COMM_WAY_RES: // can't handle yet
-          // New waypoints from benchmarker!
-          printf("ERROR: VoterC can't handle Waypoint responses.\n");
-          break;
-        default:
-          processData(&recv_msg);
+    // Check for data from externel sources
+    for (index = 0; index < pipe_count; index++) {
+      int read_fd = ext_pipes[index].fd_in;
+      if (read_fd != 0) {
+        if (FD_ISSET(read_fd, &select_set)) {
+          ext_pipes[index].buff_count = read(read_fd, ext_pipes[index].buffer, 1024); // TODO remove magic number
+          processData(ext_pipes[index]);
         }
       }
     }
-    
+
     // Check all replicas for data
     for (index = 0; index < REP_COUNT; index++) {
-      // clear comm_header for next message
-      recv_msg.type = -1;
-      
-      if (FD_ISSET(replicas[index].fd_outof_rep[0], &select_set)) {
-        retval = read(replicas[index].fd_outof_rep[0], &recv_msg, sizeof(struct comm_message));
-        if (retval > 0) {
-          switch (recv_msg.type) {
-          case COMM_WAY_REQ:
-            printf("ERROR: VoterC can't handle sending Waypoint requests.\n");
-            break;
-          default:
-            processFromRep(&recv_msg, index);
+      for (int p_index = 0; p_index < replicas[index].pipe_count; p_index++) {
+        struct typed_pipe curr_pipe = replicas[index].vot_pipes[p_index];
+        if (curr_pipe.fd_in !=0) {
+          if (FD_ISSET(curr_pipe.fd_in, &select_set)) {
+            curr_pipe.buff_count = read(curr_pipe.fd_in, curr_pipe.buffer, 1024);
+            if (curr_pipe.buffer > 0) {
+              processFromRep(curr_pipe, index);  
+            }
           }
         }
       }
@@ -305,9 +285,11 @@ void doOneUpdate() {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process data
-void processData(struct comm_message * msg) {
+// TODO: This isn't really meant to handle multiple inputs yet
+void processData(struct typed_pipe pipe) {
   int index = 0;
 
+  // TODO Voting should be per-pipe
   vote_stat = VOTING;
 
   // Arm timer
@@ -320,10 +302,17 @@ void processData(struct comm_message * msg) {
     perror("VoterC timer_settime failed");
   }
 
+  // This has to find the matched pipes. Shitty.
   for (index = 0; index < REP_COUNT; index++) {
-    int written = write(replicas[index].fd_into_rep[1], msg, sizeof(struct comm_message));
-    if (written != sizeof(struct comm_message)) {
-      perror("VoterC failed write to replica\n");
+    // TODO: this just matches direction and type
+    for (int p_index = 0; p_index < replicas[index].pipe_count; p_index++) {
+      if (replicas[index].vot_pipes[p_index].fd_out != 0 &&
+          replicas[index].vot_pipes[p_index].type == pipe.type) {
+        int written = write(replicas[index].vot_pipes[p_index].fd_out, pipe.buffer, pipe.buff_count);
+        if (written != sizeof(pipe.buff_count)) {
+          perror("VoterC failed write to replica\n");
+        }
+      }
     }
   }
 }
@@ -339,10 +328,12 @@ void resetVotingState() {
   }
 }
 
-struct comm_message rep_outputs[3];
+// TODO: Should be per pipe as well
+char rep_outputs[REP_COUNT][1024];
+int rep_output_c[REP_COUNT];
 ////////////////////////////////////////////////////////////////////////////////
 // Process output from replica; vote on it
-void processFromRep(struct comm_message * msg, int replica_num) {
+void processFromRep(struct typed_pipe pipe, int replica_num) {
   int index = 0;
   bool all_reporting = true;
   bool all_agree = true;
@@ -352,7 +343,8 @@ void processFromRep(struct comm_message * msg, int replica_num) {
   } else {
     // record vote
     reporting[replica_num] = true;
-    memcpy(&rep_outputs[replica_num], msg, sizeof(struct comm_message));
+    rep_output_c[replica_num] = pipe.buff_count;
+    memcpy(rep_outputs[replica_num], pipe.buffer, pipe.buff_count);
   }
  
   for (index = 0; index < REP_COUNT - 1; index++) {
@@ -360,7 +352,7 @@ void processFromRep(struct comm_message * msg, int replica_num) {
     all_reporting = all_reporting && reporting[index];
 
     // Check that all agree
-    if (memcmp(&rep_outputs[index], &rep_outputs[index+1], sizeof(struct comm_message)) == 0) {
+    if (memcmp(rep_outputs[index], rep_outputs[index+1], rep_output_c[replica_num]) == 0) {
       // all_agree stays true
     } else {
       all_agree = false;
@@ -370,7 +362,14 @@ void processFromRep(struct comm_message * msg, int replica_num) {
 
   if (all_reporting && all_agree) {
     // Voting was successful
-    write(write_out_fd, &rep_outputs[0], sizeof(struct comm_message));
+    // TODO, this should be matched from ext pipe to int pipes
+    // Right now this just outputs to any matching pipe
+    for (index = 0; index < pipe_count; index++) {
+      if (ext_pipes[index].fd_out != 0 &&
+          ext_pipes[index].type == pipe.type) {
+        write(ext_pipes[index].fd_out, rep_outputs[0], rep_output_c[0]);
+      }
+    }
     resetVotingState();
   } else if (all_reporting) {
     // Should put the correct command
@@ -381,5 +380,4 @@ void processFromRep(struct comm_message * msg, int replica_num) {
   } else {
     // Awaiting at least one more replica
   }
-
 }

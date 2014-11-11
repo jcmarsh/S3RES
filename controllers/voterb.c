@@ -37,8 +37,6 @@ struct replica replicas[REP_COUNT];
 // The voting information and input duplication stuff could be part of the replica struct....
 // Input Duplication stuff
 bool sent[REP_COUNT];
-double curr_goal[3]; // Current goal for planners
-double next_goal[3]; // Next goal for planners
 
 // Voting stuff
 voting_status vote_stat;
@@ -53,8 +51,8 @@ struct server_data sd;
 
 char* controller_name;
 // FDs to the benchmarker
-int read_in_fd;
-int write_out_fd;
+struct typed_pipe data_in;
+struct typed_pipe cmd_out;
 
 // restart timer fd
 char timeout_byte[1] = {'*'};
@@ -78,7 +76,6 @@ void processRanger();
 void resetVotingState();
 void sendWaypoints(int replica_num);
 void processVelCmdFromRep(double cmd_vel_x, double cmd_vel_a, int replica_num);
-void processCommand();
 
 void timeout_sighandler(int signum) {//, siginfo_t *si, void *data) {
   if (vote_stat == VOTING) {
@@ -100,17 +97,18 @@ void restartReplica() {
       
       // clean up old data about dearly departed
       // TODO: migrate to replicas.cpp in a sane fashion
+      // index here is wrong I think
       close(repGroup.replicas[index].fd_into_rep[0]);
       close(repGroup.replicas[index].fd_into_rep[1]);
       close(repGroup.replicas[index].fd_outof_rep[0]);
       close(repGroup.replicas[index].fd_outof_rep[1]);
       
       if (pipe(repGroup.replicas[index].fd_into_rep) == -1) {
-	perror("replicas pipe error!");
+        perror("replicas pipe error!");
       }
       
       if (pipe(repGroup.replicas[index].fd_outof_rep) == -1) {
-	perror("replicas pipe error!");
+        perror("replicas pipe error!");
       }
 
       repGroup.replicas[index].pid = -1;
@@ -130,12 +128,12 @@ int forkReplicas(struct replica_group* rg) {
 
   // Fork children
   for (index = 0; index < rg->num; index++) {
-    forkSingleReplicaNoFD(rg, index, controller_name);
+    forkSingleReplica(rg, index, controller_name);
     // TODO: Handle possible errors
 
     // send fds
-    acceptSendFDS(&sd, &new_pid, rg->replicas[index].fd_into_rep[0], rg->replicas[index].fd_outof_rep[1]);
-    assert(new_pid == rg->replicas[index].pid);
+    //acceptSendFDS(&sd, &new_pid, rg->replicas[index].fd_into_rep[0], rg->replicas[index].fd_outof_rep[1]);
+    //assert(new_pid == rg->replicas[index].pid);
   }
 
   return 1;
@@ -184,8 +182,6 @@ int initVoterB() {
     return -1;
   }
 
-  curr_goal[INDEX_X] = curr_goal[INDEX_Y] = curr_goal[INDEX_A] = 0.0;
-  next_goal[INDEX_X] = next_goal[INDEX_Y] = next_goal[INDEX_A] = 0.0;
   for (index = 0; index < REP_COUNT; index++) {
     sent[index] = false;
   }
@@ -211,8 +207,8 @@ int parseArgs(int argc, const char **argv) {
   }
 
   controller_name = const_cast<char*>(argv[1]);
-  read_in_fd = atoi(argv[2]);
-  write_out_fd = atoi(argv[3]);
+  deserialize(argv[2], data_in);  
+  deserialize(argv[3], cmd_out);
 
   return 0;
 }
@@ -340,25 +336,6 @@ void resetVotingState() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// handle the request for inputs
-// This is the primary input to the replicas, so make sure it is duplicated
-void sendWaypoints(int rep_num) {
-  int index = 0;
-  bool all_sent = true;
-  // For now only one waypoint at a time (it's Art Pot, so fine.)
- 
-  // if replica already has latest... errors
-  if (sent[rep_num] == true) {
-    puts("SEND WAYPOINT ERROR: requester already has latest points.");
-    return;
-  } else { // send and mark sent
-    sent[rep_num] = true;
-
-    commSendWaypoints(replicas[rep_num].fd_into_rep[1], curr_goal[INDEX_X], curr_goal[INDEX_Y], curr_goal[INDEX_A]);
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // Process velocity command from replica
 // This is the output from the replicas, so vote on it.
 void processVelCmdFromRep(double cmd_vel_x, double cmd_vel_a, int replica_num) {
@@ -412,24 +389,4 @@ void processVelCmdFromRep(double cmd_vel_x, double cmd_vel_a, int replica_num) {
 
     // For now the timer will go off and trigger a recovery.
   }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Check for new commands from the server
-void processCommand() {
-  bool all_sent = true;
-  bool non_sent = false;
-  int index = 0;
-
-  // next_goal has been updated by the main read loop
-  // if all three are waiting, move to current
-  for (index = 0; index < REP_COUNT; index++) {
-    all_sent = all_sent && sent[index];
-    non_sent = non_sent || sent[index];
-  }
-  if (all_sent || !non_sent) {
-    curr_goal[INDEX_X] = next_goal[INDEX_X];
-    curr_goal[INDEX_Y] = next_goal[INDEX_Y];
-    curr_goal[INDEX_A] = next_goal[INDEX_A];
-  } 
 }

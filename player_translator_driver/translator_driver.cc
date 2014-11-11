@@ -14,9 +14,6 @@
 
 #include "../include/taslimited.h"
 #include "../include/replicas.h"
-#include "../include/commtypes.h"
-
-#define REP_COUNT 1
 
 ////////////////////////////////////////////////////////////////////////////////
 // The class for the driver
@@ -74,8 +71,7 @@ private:
   cpu_speed_t cpu_speed;
 
   // Replica related data
-  struct replica_group repGroup;
-  struct replica replicas[REP_COUNT];
+  struct replica rep;
 };
 
 // A factory creation function, declared outside of the class so that it
@@ -165,14 +161,25 @@ int TranslatorDriver::MainSetup()
     return -1;
   }
 
-  // Should just be one "replica": The program running (VoterB or a controller)
-  initReplicas(&repGroup, replicas, REP_COUNT);
-  // TODO: Will need to set this parameter correctly
-  forkSingleReplica(&repGroup, 0, "BenchMarker");
+  struct replica* r_p = (struct replica *) &rep;
+  initReplicas(&r_p, 1, "BenchMarker");
+  // create pipes
+  struct typed_pipe pipes[2];
+  int pipe_fd[2];
+  pipe(pipe_fd);
+  pipes[0].type = RANGE_POSE_DATA;
+  pipes[0].fd_in = 0;
+  pipes[0].fd_out = pipe_fd[1];
+  pipes[1].type = MOV_CMD;
+  pipes[1].fd_in = pipe_fd[0];
+  pipes[1].fd_out = 0;
+  createPipes(&r_p, 1, pipes, 2);
+  // fork
+  forkReplicas(&r_p, 1);
 
   // Need this pipe not to block so that player and the outside world play nice
-  flags = fcntl(replicas[index].fd_outof_rep[0], F_GETFL, 0);
-  fcntl(replicas[index].fd_outof_rep[0], F_SETFL, flags | O_NONBLOCK);
+  flags = fcntl(rep.vot_pipes[1].fd_in, F_GETFL, 0);
+  fcntl(rep.vot_pipes[1].fd_in, F_SETFL, flags | O_NONBLOCK);
 
   puts("Translator driver ready");
 
@@ -231,6 +238,8 @@ int TranslatorDriver::ProcessMessage(QueuePointer & resp_queue,
 }
 
 void TranslatorDriver::SendWaypoints() {
+  printf("TRANS: SendWaypoints not implemented.\n");
+  /*
   struct comm_way_res send_msg;
 
   send_msg.point[INDEX_X] = curr_goal[INDEX_X];
@@ -238,6 +247,7 @@ void TranslatorDriver::SendWaypoints() {
   send_msg.point[INDEX_A] = curr_goal[INDEX_A];
 
   write(replicas[0].fd_into_rep[1], &send_msg, sizeof(struct comm_way_res));
+  */
 }
 
 void TranslatorDriver::Main() {
@@ -257,7 +267,7 @@ void TranslatorDriver::DoOneUpdate() {
 
   // TODO: Translator should only ever have one rep
   // This read is non-blocking
-  retval = read(replicas[0].fd_outof_rep[0], &recv_msg, sizeof(struct comm_mov_cmd));
+  retval = read(rep.vot_pipes[1].fd_in, &recv_msg, sizeof(struct comm_mov_cmd));
   if (retval > 0) {
     // TODO: check for errors
     this->PutCommand(recv_msg.vel_cmd[0], recv_msg.vel_cmd[1]);
@@ -356,7 +366,7 @@ void TranslatorDriver::ProcessRanger(player_ranger_data_range_t &data)
       send_msg.pose[index] = pose[index];
     }
 
-    write(replicas[0].fd_into_rep[1], &send_msg, sizeof(struct comm_range_pose_data));
+    write(rep.vot_pipes[0].fd_out, &send_msg, sizeof(struct comm_range_pose_data));
   } else {
     printf("Skipping this one.\n");
   }

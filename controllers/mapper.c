@@ -23,8 +23,7 @@
 
 #define RANGE_COUNT 16
 
-int read_in_fd;
-int write_out_fd;
+struct typed_pipe data_in;
 
 FILE * out_file;
 
@@ -57,7 +56,7 @@ void restartHandler(int signo) {
       initReplica();
       // Get own pid, send to voter
       currentPID = getpid();
-      connectRecvFDS(currentPID, &read_in_fd, &write_out_fd, "Mapper");
+      //connectRecvFDS(currentPID, &read_in_fd, &write_out_fd, "Mapper");
       enterLoop(); // return to normal
     } else {   // Parent just returns
       return;
@@ -75,10 +74,9 @@ int parseArgs(int argc, const char **argv) {
   // TODO: error checking
   if (argc < 3) { // Must request fds
     pid = getpid();
-    connectRecvFDS(pid, &read_in_fd, &write_out_fd, "Mapper");
+    //connectRecvFDS(pid, &read_in_fd, &write_out_fd, "Mapper");
   } else {
-    read_in_fd = atoi(argv[1]);
-    write_out_fd = atoi(argv[2]);
+    deserializePipe(argv[1], &data_in);
   }
 
   return 0;
@@ -193,7 +191,7 @@ void enterLoop() {
  
   while(1) {
     // Blocking, but that's okay with me
-    read_ret = read(read_in_fd, &recv_msg, sizeof(struct comm_range_pose_data));
+    read_ret = read(data_in.fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
     if (read_ret > 0) {
       // TODO: Error checking
       updateMap(&recv_msg);

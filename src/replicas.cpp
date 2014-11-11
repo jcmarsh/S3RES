@@ -1,48 +1,72 @@
 #include "../include/replicas.h"
+#include <string.h>
+#include <stdlib.h>
 
-int initReplicas(struct replica_group* rg, struct replica* reps, int num) {
-  int index = 0;
-
-  rg->replicas = reps;
-  rg->num = num;
-  
+void initReplicas(struct replica** reps,  int rep_num, char* name) {  
   // Init three replicas
-  for (index = 0; index < rg->num; index++) {
-    //    printf("Initing index: %d\n", index);
-    if (pipe(rg->replicas[index].fd_into_rep) == -1) {
-      perror("replicas pipe error!");
-      return 0;
-    }
+  for (int index = 0; index < rep_num; index++) {
+    struct replica new_rep;
 
-    if (pipe(rg->replicas[index].fd_outof_rep) == -1) {
-      printf("replicas pipe error!");
-      return 0;
-    }
+    new_rep.name = name;
+    new_rep.pid = -1;
+    new_rep.priority = -1;
+    new_rep.status = RUNNING;
 
-    rg->replicas[index].pid = -1;
-    rg->replicas[index].priority = -1;
-    rg->replicas[index].status = RUNNING;
+    new_rep.pipe_count = 0;
+
+    reps[index] = &new_rep;
   }
-
-  return 1;
 }
 
-int forkSingleReplicaNoFD(struct replica_group* rg, int num, char* prog_name) {
-  pid_t currentPID = 0;
-  char* rep_argv[] = {prog_name, NULL};
+void createPipes(struct replica** reps, int rep_num, struct typed_pipe ext_pipes[], int pipe_count) {
+  // external pipes are the pipes for the voter (normally the reps pipes)
+  for (int index = 0; index < rep_num; index++) {
+    for (int p_index = 0; p_index < pipe_count; p_index++) {
+      int pipe_fds[2];
+      if (pipe(pipe_fds) == -1) {
+        printf("Replica pipe error\n");
+      } else {
+        struct replica* rep = reps[index];
+        struct typed_pipe ext_pipe = ext_pipes[p_index];
 
-  // TODO: Check if replica_group has been inited.
+        rep->vot_pipes[rep->pipe_count].type = ext_pipe.type;
+        rep->rep_pipes[rep->pipe_count].type = ext_pipe.type;
+
+        if (ext_pipe.fd_in != 0) { // This pipe is incoming
+          rep->vot_pipes[rep->pipe_count].fd_in = 0;
+          rep->vot_pipes[rep->pipe_count].fd_out = pipe_fds[1];
+          rep->rep_pipes[rep->pipe_count].fd_in = pipe_fds[0];
+          rep->rep_pipes[rep->pipe_count].fd_out = 0;
+        } else { // This pipe is outgoing (not friendly)
+          rep->vot_pipes[rep->pipe_count].fd_in = pipe_fds[0];
+          rep->vot_pipes[rep->pipe_count].fd_out = 0;
+          rep->rep_pipes[rep->pipe_count].fd_in = 0;
+          rep->rep_pipes[rep->pipe_count].fd_out = pipe_fds[1];
+        }
+        rep->pipe_count++;
+      }
+    }
+  }
+}
+
+/*
+ * argv - 0th is the program name, the last is NULL
+ * returns the new process' pid
+ */
+int forkSingle(char** argv) {
+  pid_t currentPID = 0;
+
   // Fork child
   currentPID = fork();
 
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
-      if (-1 == execv(prog_name, rep_argv)) {
+      if (-1 == execv(argv[0], argv)) {
         perror("EXEC ERROR!");
         return -1;
       }
     } else { // Parent Process
-      rg->replicas[num].pid = currentPID;
+      return currentPID;
     }
   } else {
     printf("Fork error!\n");
@@ -50,51 +74,23 @@ int forkSingleReplicaNoFD(struct replica_group* rg, int num, char* prog_name) {
   }
 }
 
+void forkReplicas(struct replica** replicas, int rep_num) {
+  for (int index = 0; index < rep_num; index++) {
+    // Each replica needs to build up it's argvs
+    struct replica* curr = replicas[index];
+    int rep_argc = 2 + curr->pipe_count;
+    char** rep_argv = (char**)malloc(sizeof(char *) * rep_argc);
 
-int forkSingleReplica(struct replica_group* rg, int num, char* prog_name) {
-  pid_t currentPID = 0;
-  char write_out[3]; // File descriptor rep will write to. Should survive exec()
-  char read_in[3];
-  char* rep_argv[] = {prog_name, read_in, write_out, NULL};
-
-  // TODO: Check if replica_group has been inited.
-  // Fork child
-  currentPID = fork();
-
-  if (currentPID >= 0) { // Successful fork
-    if (currentPID == 0) { // Child process
-      // art_pot expects something like: ./art_pot read_fd write_fd
-      // ugly, but must be done so that the benchmarker doesn't need to run an fd server for the baseline
-      sprintf(read_in, "%02d", rg->replicas[num].fd_into_rep[0]);
-      rep_argv[1] = read_in;
-      sprintf(write_out, "%02d", rg->replicas[num].fd_outof_rep[1]);
-      rep_argv[2] = write_out;
-
-      close(rg->replicas[num].fd_outof_rep[0]); // close read end of outof_rep pipe in child
-      close(rg->replicas[num].fd_into_rep[1]); // close write end of into_rep pipe in child
-
-      if (-1 == execv(prog_name, rep_argv)) {
-        perror("EXEC ERROR!");
-        return -1;
-      }
-    } else { // Parent Process
-      close(rg->replicas[num].fd_into_rep[0]); // close read end of into_rep pipe in parent
-      close(rg->replicas[num].fd_outof_rep[1]); // close write end of outof_rep pipe in parent
-      rg->replicas[num].pid = currentPID;
+    printf("Forking sim: %s - ", curr->name);
+    rep_argv[0] = curr->name;
+    for (int a_index = 1; a_index <= curr->pipe_count; a_index++) {
+      rep_argv[index] = serializePipe(curr->rep_pipes[a_index - 1]);
+      printf("%s ", rep_argv[index]);
     }
-  } else {
-    printf("Fork error!\n");
-    return -1;
-  }
-}
+    printf("\n");
+    rep_argv[rep_argc - 1] = NULL;
 
-void replicaCrash(struct replica_group* rg, pid_t pid) {
-  int index;
+    //curr->pid = forkSingle(rep_argv);
 
-  kill(pid, SIGKILL);
-  for (index = 0; index < rg->num; index++) {
-    if (rg->replicas[index].pid == pid) {
-      rg->replicas[index].status = CRASHED;
-    }
   }
 }

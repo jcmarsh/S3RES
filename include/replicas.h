@@ -10,8 +10,8 @@
 #include <fcntl.h> // needed to deal with pipes
 #include <sys/user.h> // has pid_t
 #include <signal.h>
-
 #include <stdio.h>
+#include "commtypes.h"
 
 typedef enum {
   RUNNING,
@@ -23,35 +23,31 @@ typedef enum {
 struct replica {
   pid_t pid; // The pid of the thread
   int priority; // Not yet implemented
-  int fd_into_rep[2]; // pipe to communicate with controller
-  int fd_outof_rep[2];
+  char* name;
+
+  // list of connections
+  // Uses the same format as the plumber
+  int pipe_count;
+  struct typed_pipe vot_pipes[PIPE_LIMIT]; // Voter side of pipes
+  struct typed_pipe rep_pipes[PIPE_LIMIT]; // rep side of pipes
+
   // Possibly put a pointer to entry function
   replica_status status;
 };  
 
-struct replica_group {
-  struct replica* replicas;
-  int num;
-}; 
+/*
+ *
+ */
+void initReplicas(struct replica** reps, int num, char* name);
 
 /*
  *
  */
-int initReplicas(struct replica_group* rg, struct replica* reps, int num);
+void createPipes(struct replica** reps, int rep_num, struct typed_pipe ext_pipes[], int pipe_count);
 
 /*
  *
  */
-int forkSingleReplicaNoFD(struct replica_group* rg, int num, char* prog_name);
-
-/*
- *
- */
-int forkSingleReplica(struct replica_group* rg, int num, char* prog_name);
-
-/*
- *
- */
-void replicaCrash(struct replica_group* rg, pid_t pid);
+void forkReplicas(struct replica** replicas, int rep_num);
 
 #endif // __REP_GUARD
