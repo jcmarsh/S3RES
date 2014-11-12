@@ -72,7 +72,6 @@ void timeout_sighandler(int signum) {//, siginfo_t *si, void *data) {
   }
 }
 
-/*
 void restartReplica() {
   int restart_id;
   int index;
@@ -82,34 +81,29 @@ void restartReplica() {
       // This is the failed replica, restart it
       // Send a signal to the rep's friend
       restart_id = (index + (REP_COUNT - 1)) % REP_COUNT; // Plus 2 is minus 1!
-      // printf("Restarting %d, %d now!\n", index, restart_id);
-      kill(repGroup.replicas[restart_id].pid, SIGUSR1);
+      printf("Restarting %d, %d now!\n", index, restart_id);
+      kill(replicas[restart_id].pid, SIGUSR1);
       
       // clean up old data about dearly departed
       // TODO: migrate to replicas.cpp in a sane fashion
-      close(repGroup.replicas[index].fd_into_rep[0]);
-      close(repGroup.replicas[index].fd_into_rep[1]);
-      close(repGroup.replicas[index].fd_outof_rep[0]);
-      close(repGroup.replicas[index].fd_outof_rep[1]);
-      
-      if (pipe(repGroup.replicas[index].fd_into_rep) == -1) {
-        perror("replicas pipe error!");
+      // TODO: Am I closing 0?
+      for (int i = 0; i < replicas[index].pipe_count; i++) {
+        close(replicas[index].vot_pipes[index].fd_in);
+        close(replicas[index].vot_pipes[index].fd_out);
+        close(replicas[index].rep_pipes[index].fd_in);
+        close(replicas[index].rep_pipes[index].fd_out);        
       }
       
-      if (pipe(repGroup.replicas[index].fd_outof_rep) == -1) {
-        perror("replicas pipe error!");
-      }
+      // re-init failed rep, create pipes
+      initReplicas(replicas, 1, controller_name);
+      createPipes(replicas, 1, ext_pipes, pipe_count);
 
-      repGroup.replicas[index].pid = -1;
-      repGroup.replicas[index].priority = -1;
-      repGroup.replicas[index].status = RUNNING;
-      
       // send new pipe through fd server (should have a request)
-      acceptSendFDS(&sd, &(repGroup.replicas[index].pid), repGroup.replicas[index].fd_into_rep[0], repGroup.replicas[index].fd_outof_rep[1]);
+      acceptSendFDS(&sd, &(replicas[index].pid), replicas[index].rep_pipes, replicas[index].pipe_count);
     }
   }
 }
-*/
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
@@ -160,9 +154,10 @@ int initVoterC() {
   createFDS(&sd, controller_name);
 
   // Let's try to launch the replicas
-  initReplicas((struct replica **) &replicas, REP_COUNT, controller_name);
-  createPipes((struct replica **) &replicas, REP_COUNT, ext_pipes, pipe_count);
-  forkReplicas((struct replica **) &replicas, REP_COUNT);
+  initReplicas(replicas, REP_COUNT, controller_name);
+  createPipes(replicas, REP_COUNT, ext_pipes, pipe_count);
+  forkReplicas(replicas, REP_COUNT);
+  printf("VoterC replicas all launched\n");
 
   return 0;
 }
@@ -173,8 +168,10 @@ int parseArgs(int argc, const char **argv) {
     return -1;
   }
 
+  printf("VoterC pipes:\n");
   controller_name = const_cast<char*>(argv[1]);
   for (int i = 0; i < argc - 2; i++) {
+    printf("\t%s\n", argv[i+2]);
     deserializePipe(argv[i + 2], &ext_pipes[pipe_count]);
     pipe_count++;
   }
@@ -183,6 +180,7 @@ int parseArgs(int argc, const char **argv) {
 }
 
 int main(int argc, const char **argv) {
+  printf("Starting VoterC!\n");
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");
     return -1;
@@ -248,8 +246,7 @@ void doOneUpdate() {
     if (FD_ISSET(timeout_fd[0], &select_set)) {
       retval = read(timeout_fd[0], timeout_byte, 1);
       if (retval > 0) {
-        printf("VoterC: CAN't CALL restarting replica\n");
-        //restartReplica();
+        restartReplica();
       } else {
         // TODO: Do I care about this?
       }
@@ -309,7 +306,8 @@ void processData(struct typed_pipe pipe) {
       if (replicas[index].vot_pipes[p_index].fd_out != 0 &&
           replicas[index].vot_pipes[p_index].type == pipe.type) {
         int written = write(replicas[index].vot_pipes[p_index].fd_out, pipe.buffer, pipe.buff_count);
-        if (written != sizeof(pipe.buff_count)) {
+        if (written != pipe.buff_count) {
+          printf("VoterC: bytes written: %d\texpected: %d\n", written, pipe.buff_count);
           perror("VoterC failed write to replica\n");
         }
       }

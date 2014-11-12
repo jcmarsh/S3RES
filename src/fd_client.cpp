@@ -5,27 +5,28 @@
  */
 
 #include "../include/fd_client.h"
+#include "../include/commtypes.h"
 
-int requestFDS(int sock, int * read_in, int * write_out) {
+int requestFDS(int sock, struct typed_pipe* pipes, int pipe_count) {
   struct msghdr hdr;
   struct iovec data;
   struct cmsghdr *cmsg;
   int retval;
   
-  char dummy = '*';
-  data.iov_base = &dummy;
-  data.iov_len = sizeof(dummy);
+  int types_msg[pipe_count * 2];
+  data.iov_base = &types_msg;
+  data.iov_len = sizeof(types_msg);
 
   memset(&hdr, 0, sizeof(hdr));
   hdr.msg_name = NULL;
   hdr.msg_namelen = 0;
   hdr.msg_iov = &data;
-  hdr.msg_iovlen = 1;
+  hdr.msg_iovlen = sizeof(types_msg); // 1;
   hdr.msg_flags = 0;
 
-  cmsg = (cmsghdr*)malloc(CMSG_LEN(sizeof(int) * 2));
+  cmsg = (cmsghdr*)malloc(CMSG_LEN(sizeof(int) * pipe_count));
   hdr.msg_control = cmsg;
-  hdr.msg_controllen = CMSG_LEN(sizeof(int) * 2);
+  hdr.msg_controllen = CMSG_LEN(sizeof(int) * pipe_count);
 
   retval = recvmsg(sock, &hdr, 0);
   if (retval < 0) {
@@ -33,14 +34,32 @@ int requestFDS(int sock, int * read_in, int * write_out) {
     return -1;
   }
 
-  *read_in = ((int *)CMSG_DATA(cmsg))[0];
-  *write_out = ((int *)CMSG_DATA(cmsg))[1];
+  // recover types_msg
+  for (int i = 0; i < pipe_count * 2; i = i + 2) {
+    pipes[i/2].type = (comm_message_t) types_msg[i];
+    if (types_msg[i + 1] == 0) { // the pipe is a read side
+      pipes[i/2].fd_in = 1; // Set to actual fd in a hot minute
+      pipes[i/2].fd_out = 0;
+    } else {
+      pipes[i/2].fd_in = 0;
+      pipes[i/2].fd_out = 1;
+    }
+  }
+
+  // recover pipe fds
+  for (int i = 0; i < pipe_count; i++) {
+    if (pipes[i].fd_in != 0) {
+      pipes[i].fd_in = ((int *)CMSG_DATA(cmsg))[i];
+    } else {
+      pipes[i].fd_out = ((int *)CMSG_DATA(cmsg))[i];
+    }
+  }
 
   free(cmsg);
   return 0;
 }
 
-int connectRecvFDS(pid_t pid, int *read_in, int *write_out, const char* name) {
+int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const char* name) {
   int sock_fd;
   int retval;
   struct sockaddr_un address;
@@ -69,7 +88,7 @@ int connectRecvFDS(pid_t pid, int *read_in, int *write_out, const char* name) {
     return -1;
   }
 
-  retval = requestFDS(sock_fd, read_in, write_out);
+  retval = requestFDS(sock_fd, pipes, pipe_count);
   // TODO: check retval
 
   // Send pid

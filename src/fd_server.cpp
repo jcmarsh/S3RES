@@ -5,33 +5,50 @@
  */
 
 #include "../include/fd_server.h"
+#include "../include/commtypes.h"
 
-int sendFDS(int connection_fd, int read_in, int write_out) { // fd names from client perspective
+
+int sendFDS(int connection_fd, struct typed_pipe* pipes, int pipe_count) { // pipes are the rep side
   struct msghdr hdr;
   struct iovec data;
-  char cmsgbuf[CMSG_SPACE(sizeof(int) * 2)];
+  // cmsg is the out-of-band data (fds)
+  char cmsgbuf[CMSG_SPACE(sizeof(int) * pipe_count)];
 
-  char dummy = '*';
-  data.iov_base = &dummy;
-  data.iov_len = sizeof(dummy);
+  int types_msg[pipe_count * 2];
+  // Need to specify whether each pipe is meant to be an fd_in or fd_out
+  for (int i = 0; i < pipe_count * 2; i = i + 2) {
+    types_msg[i] = (int) pipes[i/2].type;
+    if (pipes[i/2].fd_in != 0) {
+      types_msg[i + 1] = 0; // 0 is the read side
+    } else {
+      types_msg[i + 1] = 1;
+    }
+  }
+  data.iov_base = &types_msg;
+  data.iov_len = sizeof(types_msg);
 
   memset(&hdr, 0, sizeof(hdr));
   hdr.msg_name = NULL;
   hdr.msg_namelen = 0;
   hdr.msg_iov = &data;
-  hdr.msg_iovlen = 1;
+  hdr.msg_iovlen = sizeof(types_msg); // 1;
   hdr.msg_flags = 0;
 
   hdr.msg_control = cmsgbuf;
-  hdr.msg_controllen = CMSG_LEN(sizeof(int) * 2);
+  hdr.msg_controllen = CMSG_LEN(sizeof(int) * pipe_count);
 
   struct cmsghdr* cmsg = CMSG_FIRSTHDR(&hdr);
-  cmsg->cmsg_len   = CMSG_LEN(sizeof(int) * 2);
+  cmsg->cmsg_len   = CMSG_LEN(sizeof(int) * pipe_count);
   cmsg->cmsg_level = SOL_SOCKET;
   cmsg->cmsg_type  = SCM_RIGHTS;
 
-  ((int*)CMSG_DATA(cmsg))[0] = read_in;
-  ((int*)CMSG_DATA(cmsg))[1] = write_out;
+  for (int i = 0; i < pipe_count; i++) {
+    if (pipes[i].fd_in != 0) {
+      ((int*)CMSG_DATA(cmsg))[i] = pipes[i].fd_in;
+    } else {
+      ((int*)CMSG_DATA(cmsg))[i] = pipes[i].fd_out;
+    }
+  }
 
   int n = sendmsg(connection_fd, &hdr, 0);
 
@@ -82,12 +99,12 @@ int createFDS(struct server_data * sd, const char* name) {
 }
 
 // Blocks on accept: You better know a client is about to connect!
-int acceptSendFDS(struct server_data * sd, pid_t *pid, int read_in, int write_out) {
+int acceptSendFDS(struct server_data * sd, pid_t *pid, struct typed_pipe* pipes, int pipe_count) {
   int connection_fd;
   int retval;
 
   if ((connection_fd = accept(sd->sock_fd, (struct sockaddr *) &(sd->address), &(sd->address_length))) > -1) {
-    sendFDS(connection_fd, read_in, write_out); // send read end to client
+    sendFDS(connection_fd, pipes, pipe_count); // send read end to client
   } else {
     perror("FD_Server failed to accept");
     return -1;

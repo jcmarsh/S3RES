@@ -22,4 +22,4 @@ struct server_data{
 
 int createFDS(struct server_data * sd, const char* name);
 
-int acceptSendFDS(struct server_data * sd, pid_t *pid, int read_in, int write_out);
+int acceptSendFDS(struct server_data * sd, pid_t *pid, struct typed_pipe* pipes, int pipe_count);

@@ -50,9 +50,9 @@ int initBenchMarker() {
 
   // Should only be a single replica
   struct replica* r_p = (struct replica *) &replica;
-  initReplicas(&r_p, 1, "plumber");
-  createPipes(&r_p, 1, trans_pipes, 2);
-  forkReplicas(&r_p, 1);
+  initReplicas(r_p, 1, "plumber");
+  createPipes(r_p, 1, trans_pipes, 2);
+  forkReplicas(r_p, 1);
   
   return 0;
 }

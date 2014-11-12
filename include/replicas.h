@@ -38,16 +38,16 @@ struct replica {
 /*
  *
  */
-void initReplicas(struct replica** reps, int num, char* name);
+void initReplicas(struct replica reps[], int num, char* name);
 
 /*
  *
  */
-void createPipes(struct replica** reps, int rep_num, struct typed_pipe ext_pipes[], int pipe_count);
+void createPipes(struct replica reps[], int rep_num, struct typed_pipe ext_pipes[], int pipe_count);
 
 /*
  *
  */
-void forkReplicas(struct replica** replicas, int rep_num);
+void forkReplicas(struct replica replicas[], int rep_num);
 
 #endif // __REP_GUARD

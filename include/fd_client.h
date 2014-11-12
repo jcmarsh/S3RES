@@ -14,4 +14,4 @@
 #include <string.h>
 #include <unistd.h>
 
-int connectRecvFDS(pid_t pid, int *read_in, int *write_out, const char* name);
+int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const char* name);

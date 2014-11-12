@@ -2,21 +2,20 @@
 #include <string.h>
 #include <stdlib.h>
 
-void initReplicas(struct replica** reps,  int rep_num, char* name) {  
+void initReplicas(struct replica reps[], int rep_num, char* name) {  
   // Init three replicas
+  printf("Reps, initing %d, named %s\n", rep_num, name);
   for (int index = 0; index < rep_num; index++) {
-    struct replica* new_rep = reps[index];
-
+    struct replica* new_rep = &reps[index];
     new_rep->name = name;
     new_rep->pid = -1;
     new_rep->priority = -1;
     new_rep->status = RUNNING;
-
     new_rep->pipe_count = 0;
   }
 }
 
-void createPipes(struct replica** reps, int rep_num, struct typed_pipe ext_pipes[], int pipe_count) {
+void createPipes(struct replica reps[], int rep_num, struct typed_pipe ext_pipes[], int pipe_count) {
   // external pipes are the pipes for the voter (normally the reps pipes)
   for (int index = 0; index < rep_num; index++) {
     for (int p_index = 0; p_index < pipe_count; p_index++) {
@@ -24,7 +23,7 @@ void createPipes(struct replica** reps, int rep_num, struct typed_pipe ext_pipes
       if (pipe(pipe_fds) == -1) {
         printf("Replica pipe error\n");
       } else {
-        struct replica* rep = reps[index];
+        struct replica* rep = &reps[index];
         struct typed_pipe ext_pipe = ext_pipes[p_index];
 
         rep->vot_pipes[rep->pipe_count].type = ext_pipe.type;
@@ -41,6 +40,7 @@ void createPipes(struct replica** reps, int rep_num, struct typed_pipe ext_pipes
           rep->rep_pipes[rep->pipe_count].fd_in = 0;
           rep->rep_pipes[rep->pipe_count].fd_out = pipe_fds[1];
         }
+        printf("Replica new pipe vot: %s\trep: %s\n", serializePipe(rep->vot_pipes[rep->pipe_count]), serializePipe(rep->rep_pipes[rep->pipe_count]));
         rep->pipe_count++;
       }
     }
@@ -73,10 +73,10 @@ int forkSingle(char** argv) {
   }
 }
 
-void forkReplicas(struct replica** replicas, int rep_num) {
+void forkReplicas(struct replica replicas[], int rep_num) {
   for (int index = 0; index < rep_num; index++) {
     // Each replica needs to build up it's argvs
-    struct replica* curr = replicas[index];
+    struct replica* curr = &replicas[index];
     int rep_argc = 2 + curr->pipe_count;
     char** rep_argv = (char**)malloc(sizeof(char *) * rep_argc);
 
