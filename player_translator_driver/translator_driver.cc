@@ -78,9 +78,7 @@ private:
 // can be invoked without any object context (alternatively, you can
 // declare it static in the class).  In this function, we create and return
 // (as a generic Driver*) a pointer to a new instance of this driver.
-Driver* 
-TranslatorDriver_Init(ConfigFile* cf, int section)
-{
+Driver* TranslatorDriver_Init(ConfigFile* cf, int section) {
   // Create and return a new instance of this driver
   return((Driver*)(new TranslatorDriver(cf, section)));
 }
@@ -89,8 +87,7 @@ TranslatorDriver_Init(ConfigFile* cf, int section)
 // that it can be invoked without object context.  In this function, we add
 // the driver into the given driver table, indicating which interface the
 // driver can support and how to create a driver instance.
-void TranslatorDriver_Register(DriverTable* table)
-{
+void TranslatorDriver_Register(DriverTable* table) {
   table->AddDriver("translatordriver", TranslatorDriver_Init);
 }
 
@@ -98,8 +95,7 @@ void TranslatorDriver_Register(DriverTable* table)
 // Constructor.  Retrieve options from the configuration file and do any
 // pre-Setup() setup.
 TranslatorDriver::TranslatorDriver(ConfigFile* cf, int section)
-  : ThreadedDriver(cf, section)
-{
+  : ThreadedDriver(cf, section) {
   // Check for position2d for commands
   memset(&(this->cmd_out_odom), 0, sizeof(player_devaddr_t));
   if (cf->ReadDeviceAddr(&(this->cmd_out_odom), section, "provides",
@@ -136,8 +132,7 @@ TranslatorDriver::TranslatorDriver(ConfigFile* cf, int section)
 
 ////////////////////////////////////////////////////////////////////////////////
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
-int TranslatorDriver::MainSetup()
-{   
+int TranslatorDriver::MainSetup() {   
   int index = 0;
   int flags = 0;
 
@@ -163,16 +158,14 @@ int TranslatorDriver::MainSetup()
 
   struct replica* r_p = (struct replica *) &rep;
   initReplicas(&r_p, 1, "BenchMarker");
-  // create pipes
+  // create fake pipes to trick createPipes into create the correct connections
   struct typed_pipe pipes[2];
-  int pipe_fd[2];
-  pipe(pipe_fd);
   pipes[0].type = RANGE_POSE_DATA;
-  pipes[0].fd_in = 0;
-  pipes[0].fd_out = pipe_fd[1];
+  pipes[0].fd_in = 1; // Not used, but indicates that RANGE_POSE_DATA goes to the benchmarker
+  pipes[0].fd_out = 0;
   pipes[1].type = MOV_CMD;
-  pipes[1].fd_in = pipe_fd[0];
-  pipes[1].fd_out = 0;
+  pipes[1].fd_in = 0; 
+  pipes[1].fd_out = 1; // Not used, but indicates that MOV_CMD comes from the benchmarker
   createPipes(&r_p, 1, pipes, 2);
   // fork
   forkReplicas(&r_p, 1);
@@ -188,8 +181,7 @@ int TranslatorDriver::MainSetup()
 
 ////////////////////////////////////////////////////////////////////////////////
 // Shutdown the device
-int TranslatorDriver::MainShutdown()
-{
+int TranslatorDriver::MainShutdown() {
   puts("Shutting Translator driver down");
 
   if(this->ranger) {
@@ -265,7 +257,6 @@ void TranslatorDriver::DoOneUpdate() {
     this->ProcessMessages();
   }
 
-  // TODO: Translator should only ever have one rep
   // This read is non-blocking
   retval = read(rep.vot_pipes[1].fd_in, &recv_msg, sizeof(struct comm_mov_cmd));
   if (retval > 0) {

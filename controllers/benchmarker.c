@@ -47,10 +47,9 @@ int initBenchMarker() {
   InitTAS(DEFAULT_CPU, &cpu_speed, 0);
 
   scheduler = sched_getscheduler(0);
-  printf("BenchMarker Scheduler: %d\n", scheduler);
 
   // Should only be a single replica
-  struct replica* r_p = &replica;
+  struct replica* r_p = (struct replica *) &replica;
   initReplicas(&r_p, 1, "plumber");
   createPipes(&r_p, 1, trans_pipes, 2);
   forkReplicas(&r_p, 1);
@@ -66,13 +65,8 @@ int parseArgs(int argc, const char **argv) {
     return -1;
   }
 
-  // TODO: replace with deserializePipe
-  trans_pipes[0].type = RANGE_POSE_DATA;
-  trans_pipes[0].fd_in = atoi(argv[1]);
-  trans_pipes[0].fd_out = 0;
-  trans_pipes[1].type = MOV_CMD;
-  trans_pipes[1].fd_in = 0;
-  trans_pipes[1].fd_out = atoi(argv[2]);;
+  deserializePipe(argv[1], &trans_pipes[0]);
+  deserializePipe(argv[2], &trans_pipes[1]);
 
   return 0;
 }

@@ -60,7 +60,6 @@ void link_bench(struct node* n, comm_message_t type, int fd_in, int fd_out) {
 	n->pipes[n->pipe_count].fd_in = fd_in;
 	n->pipes[n->pipe_count].fd_out = fd_out;
 	n->pipe_count++;
-	// printf("Setting with bench: %s - %d %d\n", n->name, fd_in, fd_out);
 }
 
 void link_node(comm_message_t type, struct node* fromNode, struct node* toNode) {
@@ -104,38 +103,38 @@ int launch_node(struct nodelist* nodes) {
 
 	if (curr != NULL) {
 		int rep_count = 0;
+		int other_arg = 0;
 		if (curr->rep_strat == NONE) {
 			// launch with no replication
-			printf("Launching with no rep: %s\n", curr->name);
 			rep_count = 2 + curr->pipe_count;
 			rep_argv = malloc(sizeof(char *) * rep_count);
 			rep_argv[0] = curr->value;
-			// All other args are serialized pipes, set later
+			other_arg = 1;
 			rep_argv[rep_count - 1] = NULL;
 		} else if (curr->rep_strat == DMR) {
 			printf("pb.y: No support for DMR\n");
 		} else if (curr->rep_strat == TMR) {
 			// launch with voter
-			printf("Launching with a voter: (%s)%s\n", curr->name, curr->voter_name);
 			int rep_count = 3 + curr->pipe_count;
-			rep_argv = malloc(sizeof(char *) * 5);
+			rep_argv = malloc(sizeof(char *) * rep_count);
 			rep_argv[0] = curr->voter_name;
 			rep_argv[1] = curr->value;
+			other_arg = 2;
 			rep_argv[rep_count - 1] = NULL;
 		}
 
-		for (i = 1; i <= curr->pipe_count; i++) {
-			rep_argv[i] = serializePipe(curr->pipes[i - 1]);
+
+		for (i = other_arg; i < curr->pipe_count + other_arg; i++) {
+			rep_argv[i] = serializePipe(curr->pipes[i - other_arg]);
 		}
 
 		currentPID = fork();
 
 		if (currentPID >= 0) { // Successful fork
 			if (currentPID == 0) { // Child process
-				printf("Exec-ing: %s, %s, %s\n", rep_argv[0], rep_argv[1], rep_argv[2]);
 				if (-1 == execv(rep_argv[0], rep_argv)) {
 					printf("File: %s\n", rep_argv[0]);
-					perror("EXEC ERROR!");
+					perror("Plumber: EXEC ERROR!");
 					free(rep_argv);
 					return -1;
 				}

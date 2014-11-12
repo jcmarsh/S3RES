@@ -8,8 +8,8 @@ extern FILE *yyin;
 
 struct nodelist all_nodes;
 
-int bench_to_entry_fd;
-int entry_to_bench_fd;
+struct typed_pipe data_in;
+struct typed_pipe cmd_out;
 
 %}
 
@@ -39,11 +39,9 @@ line
 
 declaration
   : VAR_NAME ASSIGN NAMED_OB { 
-      // printf("Adding: %s - %s\n", $1, $3);
       add_node(&all_nodes, $1, $3, NONE, NULL); }
 
   | VAR_NAME ASSIGN rep_comp NAMED_OB { 
-      // printf("Adding TMR: %s %s %s\n", $1, $3, $4);
       add_node(&all_nodes, $1, $3, TMR, $4); }
   ;
 
@@ -54,11 +52,11 @@ rep_comp
 relationship
   : BENCH arrow VAR_NAME {
       struct node * node_a = get_node(&all_nodes, $3);
-      link_bench(node_a, commToEnum($2), bench_to_entry_fd, 0); }
+      link_bench(node_a, commToEnum($2), data_in.fd_in, 0); }
 
   | VAR_NAME arrow BENCH {
       struct node * node_a = get_node(&all_nodes, $1);
-      link_bench(node_a, commToEnum($2), 0, entry_to_bench_fd); }
+      link_bench(node_a, commToEnum($2), 0, cmd_out.fd_out); }
 
   | VAR_NAME arrow VAR_NAME {
       struct node * node_a = get_node(&all_nodes, $1);
@@ -85,10 +83,10 @@ int main(int argc, char **argv) {
 
   // fds are passed in as arguments
   if (argc >= 3) {
-    bench_to_entry_fd = atoi(argv[1]);
-    entry_to_bench_fd = atoi(argv[2]);    
+    deserializePipe(argv[1], &data_in);
+    deserializePipe(argv[2], &cmd_out);   
   } else {
-    printf("Usage: plumber <in_fd> <out_fd>\n");
+    printf("Usage: plumber <RANGE_POSE_DATA:fd_in:0> <MSG_CMD:0:fd_out>\n");
     printf("\tConfiguration file is: config_plumber.cfg\n");
     return(1);
   }

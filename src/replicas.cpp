@@ -5,16 +5,14 @@
 void initReplicas(struct replica** reps,  int rep_num, char* name) {  
   // Init three replicas
   for (int index = 0; index < rep_num; index++) {
-    struct replica new_rep;
+    struct replica* new_rep = reps[index];
 
-    new_rep.name = name;
-    new_rep.pid = -1;
-    new_rep.priority = -1;
-    new_rep.status = RUNNING;
+    new_rep->name = name;
+    new_rep->pid = -1;
+    new_rep->priority = -1;
+    new_rep->status = RUNNING;
 
-    new_rep.pipe_count = 0;
-
-    reps[index] = &new_rep;
+    new_rep->pipe_count = 0;
   }
 }
 
@@ -62,7 +60,8 @@ int forkSingle(char** argv) {
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
       if (-1 == execv(argv[0], argv)) {
-        perror("EXEC ERROR!");
+        printf("argv[0]: %s\n", argv[0]);
+        perror("Replica: EXEC ERROR!");
         return -1;
       }
     } else { // Parent Process
@@ -81,16 +80,11 @@ void forkReplicas(struct replica** replicas, int rep_num) {
     int rep_argc = 2 + curr->pipe_count;
     char** rep_argv = (char**)malloc(sizeof(char *) * rep_argc);
 
-    printf("Forking sim: %s - ", curr->name);
     rep_argv[0] = curr->name;
     for (int a_index = 1; a_index <= curr->pipe_count; a_index++) {
-      rep_argv[index] = serializePipe(curr->rep_pipes[a_index - 1]);
-      printf("%s ", rep_argv[index]);
+      rep_argv[a_index] = serializePipe(curr->rep_pipes[a_index - 1]);
     }
-    printf("\n");
     rep_argv[rep_argc - 1] = NULL;
-
-    //curr->pid = forkSingle(rep_argv);
-
+    curr->pid = forkSingle(rep_argv);
   }
 }

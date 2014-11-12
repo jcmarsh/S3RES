@@ -73,7 +73,6 @@ int initReplica() {
   InitTAS(DEFAULT_CPU, &cpu_speed, 5);
 
   scheduler = sched_getscheduler(0);
-  printf("Empty Scheduler: %d\n", scheduler);
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     puts("Failed to register the restart handler");
