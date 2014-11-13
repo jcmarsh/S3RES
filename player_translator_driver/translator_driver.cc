@@ -157,7 +157,7 @@ int TranslatorDriver::MainSetup() {
   }
 
   struct replica* r_p = (struct replica *) &rep;
-  initReplicas(&r_p, 1, "BenchMarker");
+  initReplicas(r_p, 1, "BenchMarker");
   // create fake pipes to trick createPipes into create the correct connections
   struct typed_pipe pipes[2];
   pipes[0].type = RANGE_POSE_DATA;
@@ -166,9 +166,9 @@ int TranslatorDriver::MainSetup() {
   pipes[1].type = MOV_CMD;
   pipes[1].fd_in = 0; 
   pipes[1].fd_out = 1; // Not used, but indicates that MOV_CMD comes from the benchmarker
-  createPipes(&r_p, 1, pipes, 2);
+  createPipes(r_p, 1, pipes, 2);
   // fork
-  forkReplicas(&r_p, 1);
+  forkReplicas(r_p, 1);
 
   // Need this pipe not to block so that player and the outside world play nice
   flags = fcntl(rep.vot_pipes[1].fd_in, F_GETFL, 0);

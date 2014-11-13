@@ -7,30 +7,30 @@
 #include "../include/fd_client.h"
 #include "../include/commtypes.h"
 
-int requestFDS(int sock, struct typed_pipe* pipes, int pipe_count) {
+int requestFDS(int sock_fd, struct typed_pipe* pipes, int pipe_count) {
   struct msghdr hdr;
   struct iovec data;
   struct cmsghdr *cmsg;
   int retval;
   
   int types_msg[pipe_count * 2];
-  data.iov_base = &types_msg;
+  data.iov_base = types_msg;
   data.iov_len = sizeof(types_msg);
 
   memset(&hdr, 0, sizeof(hdr));
   hdr.msg_name = NULL;
   hdr.msg_namelen = 0;
   hdr.msg_iov = &data;
-  hdr.msg_iovlen = sizeof(types_msg); // 1;
+  hdr.msg_iovlen = 1; // number of iovec data structs, here only one
   hdr.msg_flags = 0;
 
   cmsg = (cmsghdr*)malloc(CMSG_LEN(sizeof(int) * pipe_count));
   hdr.msg_control = cmsg;
   hdr.msg_controllen = CMSG_LEN(sizeof(int) * pipe_count);
 
-  retval = recvmsg(sock, &hdr, 0);
+  retval = recvmsg(sock_fd, &hdr, 0);
   if (retval < 0) {
-    perror("FD_client RECVMSG error");
+    perror("FD_client: RECVMSG error");
     return -1;
   }
 
@@ -56,7 +56,7 @@ int requestFDS(int sock, struct typed_pipe* pipes, int pipe_count) {
   }
 
   free(cmsg);
-  return 0;
+  return retval;
 }
 
 int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const char* name) {
@@ -67,9 +67,8 @@ int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const ch
   const char* pre_name = "./";
   const char* post_name = "_fd_server";
   char* actual_name;
-  
-  asprintf(&actual_name, "%s%s%s", pre_name, name, post_name);
 
+  retval = asprintf(&actual_name, "%s%s%s", pre_name, name, post_name);
 
   sock_fd = socket(PF_UNIX, SOCK_STREAM, 0);
   if(sock_fd < 0) {
@@ -89,12 +88,18 @@ int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const ch
   }
 
   retval = requestFDS(sock_fd, pipes, pipe_count);
-  // TODO: check retval
+  if (retval < 0) {
+    close(sock_fd);
+    return -1;
+  }
 
   // Send pid
-  write(sock_fd, &pid, sizeof(pid_t));
+  retval = write(sock_fd, &pid, sizeof(pid_t));
+  if (retval < 0) {
+    perror("FD_client write for pid failed");
+  }
 
   close(sock_fd);
 
-  return 0;
+  return retval;
 }

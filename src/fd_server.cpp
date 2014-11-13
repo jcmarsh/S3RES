@@ -24,14 +24,14 @@ int sendFDS(int connection_fd, struct typed_pipe* pipes, int pipe_count) { // pi
       types_msg[i + 1] = 1;
     }
   }
-  data.iov_base = &types_msg;
+  data.iov_base = types_msg;
   data.iov_len = sizeof(types_msg);
 
   memset(&hdr, 0, sizeof(hdr));
   hdr.msg_name = NULL;
   hdr.msg_namelen = 0;
   hdr.msg_iov = &data;
-  hdr.msg_iovlen = sizeof(types_msg); // 1;
+  hdr.msg_iovlen =  1; // number of iovec items in data
   hdr.msg_flags = 0;
 
   hdr.msg_control = cmsgbuf;
@@ -50,13 +50,13 @@ int sendFDS(int connection_fd, struct typed_pipe* pipes, int pipe_count) { // pi
     }
   }
 
-  int n = sendmsg(connection_fd, &hdr, 0);
+  int retval = sendmsg(connection_fd, &hdr, 0);
 
-  if(n == -1) {
-    perror("sendmsg() failed");
+  if(retval < 0) {
+    perror("FD_server sendmsg() failed");
   }
 
-  return n;
+  return retval;
 }
 
 // Name is ./<name>_fd_server
@@ -73,8 +73,6 @@ int createFDS(struct server_data * sd, const char* name) {
     perror("Socket creation failed.");
     return 1;
   }
-
-  printf("Making fd_server: %s\n", actual_name);
 
   // should delete previous remnants
   unlink(actual_name);

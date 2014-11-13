@@ -4,7 +4,6 @@
 
 void initReplicas(struct replica reps[], int rep_num, char* name) {  
   // Init three replicas
-  printf("Reps, initing %d, named %s\n", rep_num, name);
   for (int index = 0; index < rep_num; index++) {
     struct replica* new_rep = &reps[index];
     new_rep->name = name;
@@ -40,7 +39,6 @@ void createPipes(struct replica reps[], int rep_num, struct typed_pipe ext_pipes
           rep->rep_pipes[rep->pipe_count].fd_in = 0;
           rep->rep_pipes[rep->pipe_count].fd_out = pipe_fds[1];
         }
-        printf("Replica new pipe vot: %s\trep: %s\n", serializePipe(rep->vot_pipes[rep->pipe_count]), serializePipe(rep->rep_pipes[rep->pipe_count]));
         rep->pipe_count++;
       }
     }

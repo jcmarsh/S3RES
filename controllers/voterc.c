@@ -86,17 +86,26 @@ void restartReplica() {
       
       // clean up old data about dearly departed
       // TODO: migrate to replicas.cpp in a sane fashion
-      // TODO: Am I closing 0?
       for (int i = 0; i < replicas[index].pipe_count; i++) {
-        close(replicas[index].vot_pipes[index].fd_in);
-        close(replicas[index].vot_pipes[index].fd_out);
-        close(replicas[index].rep_pipes[index].fd_in);
-        close(replicas[index].rep_pipes[index].fd_out);        
+        if (replicas[index].vot_pipes[i].fd_in != 0) {
+          close(replicas[index].vot_pipes[i].fd_in);  
+        } else {
+          close(replicas[index].vot_pipes[i].fd_out);  
+        }
+        
+        if (replicas[index].rep_pipes[i].fd_in != 0) {
+          close(replicas[index].rep_pipes[i].fd_in);
+        } else {
+          close(replicas[index].rep_pipes[i].fd_out);        
+        }
       }
       
+      perror("VoterC error check 0");
       // re-init failed rep, create pipes
-      initReplicas(replicas, 1, controller_name);
-      createPipes(replicas, 1, ext_pipes, pipe_count);
+      initReplicas(&(replicas[index]), 1, controller_name);
+      createPipes(&(replicas[index]), 1, ext_pipes, pipe_count);
+
+      perror("VoterC error check 1");
 
       // send new pipe through fd server (should have a request)
       acceptSendFDS(&sd, &(replicas[index].pid), replicas[index].rep_pipes, replicas[index].pipe_count);
