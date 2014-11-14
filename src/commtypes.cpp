@@ -44,6 +44,18 @@ void deserializePipe(const char* serial, struct typed_pipe *pipe) {
   free(type);
 }
 
+void resetPipe(struct typed_pipe* pipe) {
+  pipe->type = COMM_ERROR;
+  if (pipe->fd_in != 0) {
+    close(pipe->fd_in);
+    pipe->fd_in = 0;
+  }
+  if (pipe->fd_out != 0) {
+    close(pipe->fd_out);
+    pipe->fd_out = 0;
+  }
+}
+
 int commSendWaypoints(struct typed_pipe pipe, double way_x, double way_y, double way_a) {
   if (pipe.fd_out == 0 || pipe.type != WAY_RES) {
     printf("Error: pipe does not match type or have a valid fd.");

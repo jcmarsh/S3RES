@@ -46,36 +46,32 @@ void command();
 int initReplica();
 
 void restartHandler(int signo) {
-  pid_t currentPID = 0;
   // fork
-  currentPID = fork();
-
+  pid_t currentPID = fork();
+  
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
+      //signal(SIGUSR2, restartHandler);
       // child sets new id, recreates connects, loops
       initReplica();
       // Get own pid, send to voter
       currentPID = getpid();
       connectRecvFDS(currentPID, pipes, 2, "ArtPot");
-      command(); // recalculate missed command TODO DON"T NEED
+      //command(); // recalculate missed command TODO DON'T NEED
       enterLoop(); // return to normal
     } else {   // Parent just returns
       return;
     }
   } else {
-    printf("Fork error!\n");
+    perror("ArtPot Fork error\n");
     return;
   }
 }
 
 int parseArgs(int argc, const char **argv) {
-  int i;
-  pid_t pid;
-
   // TODO: error checking
   if (argc < 3) { // Must request fds
-    pid = getpid();
-    //connectRecvFDS(pid, &read_in_fd, &write_out_fd, "ArtPot");
+    printf("Useful usage message here. Or something.\n");
   } else {
     deserializePipe(argv[1], &pipes[0]);
     deserializePipe(argv[2], &pipes[1]);
@@ -93,12 +89,13 @@ int initReplica() {
   InitTAS(DEFAULT_CPU, &cpu_speed, 5);
 
   scheduler = sched_getscheduler(0);
-  printf("Art_Pot Scheduler: %d\n", scheduler);
 
-  if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
+  sighandler_t retval = signal(SIGUSR1, restartHandler);
+  if (retval == SIG_ERR) {
     puts("Failed to register the restart handler");
     return -1;
   }
+
   return 0;
 }
 
@@ -165,25 +162,41 @@ void command() {
 }
 
 void enterLoop() {
-  void * update_id;
-  int index;
-
   int read_ret;
   // TODO: Right now can only handle range data incoming
   struct comm_range_pose_data recv_msg;
 
   while(1) {
+    struct timeval select_timeout;
+    fd_set select_set;
+    int max_fd;
+
+    // TODO: This will be needed to allow multiple read pipes
+    // such as commands from the path planner
+    select_timeout.tv_sec = 1;
+    select_timeout.tv_usec = 0;
+
+    FD_ZERO(&select_set);
+    FD_SET(pipes[0].fd_in, &select_set);
+    max_fd = pipes[0].fd_in;
+
     // Blocking, but that's okay with me
-    read_ret = read(pipes[0].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
-    if (read_ret > 0) {
-      // TODO check for erros
-      commCopyRanger(&recv_msg, ranges, pos);
-      // Calculates and sends the new command
-      command();
-    } else if (read_ret == -1) {
-      perror("ArtPot - read blocking");
-    } else {
-      perror("ArtPot read_ret == 0?");
+    //read_ret = read(pipes[0].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
+    int retval = select(max_fd + 1, &select_set, NULL, NULL, &select_timeout);
+    if (retval > 0) {
+      if (FD_ISSET(pipes[0].fd_in, &select_set)) {
+        read_ret = read(pipes[0].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
+        if (read_ret > 0) {
+          // TODO check for erros
+          commCopyRanger(&recv_msg, ranges, pos);
+          // Calculates and sends the new command
+          command();
+        } else if (read_ret == -1) {
+          perror("ArtPot - read blocking");
+        } else {
+          perror("ArtPot read_ret == 0?");
+        }
+      }
     }
   }
 }
@@ -203,4 +216,3 @@ int main(int argc, const char **argv) {
 
   return 0;
 }
-

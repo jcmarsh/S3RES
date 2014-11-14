@@ -60,6 +60,7 @@ comm_message_t commToEnum(char* name);
 // Typed pipes
 char* serializePipe(struct typed_pipe pipe);
 void deserializePipe(const char* serial, struct typed_pipe* pipe);
+void resetPipe(struct typed_pipe* pipe);
 
 int commSendWaypoints(struct typed_pipe pipe, double way_x, double way_y, double way_a);
 void commCopyWaypoints(struct comm_way_res * recv_msg, double * waypoints);

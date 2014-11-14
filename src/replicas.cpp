@@ -10,6 +10,15 @@ void initReplicas(struct replica reps[], int rep_num, char* name) {
     new_rep->pid = -1;
     new_rep->priority = -1;
     new_rep->status = RUNNING;
+
+    // clean up pipes if this replica is not fresh
+    if (new_rep->pipe_count != 0) {
+      for (int i = 0; i < new_rep->pipe_count; i++) {
+        resetPipe(&(new_rep->vot_pipes[i]));
+        resetPipe(&(new_rep->rep_pipes[i]));
+      }
+    }
+
     new_rep->pipe_count = 0;
   }
 }

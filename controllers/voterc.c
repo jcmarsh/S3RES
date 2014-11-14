@@ -6,9 +6,11 @@
  */
 
 #include <assert.h>
+#include <errno.h>
 #include <math.h>
 #include <signal.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -64,6 +66,7 @@ int main(int argc, const char **argv);
 void doOneUpdate();
 void processData(struct typed_pipe pipe);
 void resetVotingState();
+void checkSend();
 void processFromRep(struct typed_pipe pipe, int replica_num);
 
 void timeout_sighandler(int signum) {//, siginfo_t *si, void *data) {
@@ -76,39 +79,31 @@ void restartReplica() {
   int restart_id;
   int index;
 
+  // Assuming that only one of the reps has failed.
   for (index = 0; index < REP_COUNT; index++) {
     if (reporting[index] == false) {
+      int status;
+      waitpid(replicas[index].pid, &status, WNOHANG); // cleans up the zombie
+
       // This is the failed replica, restart it
       // Send a signal to the rep's friend
       restart_id = (index + (REP_COUNT - 1)) % REP_COUNT; // Plus 2 is minus 1!
-      printf("Restarting %d, %d now!\n", index, restart_id);
-      kill(replicas[restart_id].pid, SIGUSR1);
-      
-      // clean up old data about dearly departed
-      // TODO: migrate to replicas.cpp in a sane fashion
-      for (int i = 0; i < replicas[index].pipe_count; i++) {
-        if (replicas[index].vot_pipes[i].fd_in != 0) {
-          close(replicas[index].vot_pipes[i].fd_in);  
-        } else {
-          close(replicas[index].vot_pipes[i].fd_out);  
-        }
-        
-        if (replicas[index].rep_pipes[i].fd_in != 0) {
-          close(replicas[index].rep_pipes[i].fd_in);
-        } else {
-          close(replicas[index].rep_pipes[i].fd_out);        
-        }
+      printf("Restarting through %d\n", replicas[restart_id].pid);
+      int retval = kill(replicas[restart_id].pid, SIGUSR1);
+      if (retval < 0) {
+        perror("VoterC Signal Problem");
       }
-      
-      perror("VoterC error check 0");
+            
       // re-init failed rep, create pipes
       initReplicas(&(replicas[index]), 1, controller_name);
       createPipes(&(replicas[index]), 1, ext_pipes, pipe_count);
-
-      perror("VoterC error check 1");
-
       // send new pipe through fd server (should have a request)
       acceptSendFDS(&sd, &(replicas[index].pid), replicas[index].rep_pipes, replicas[index].pipe_count);
+
+      // Should send along the response from the other two replicas.
+      reporting[index] = true;
+      checkSend();
+      return;
     }
   }
 }
@@ -177,10 +172,8 @@ int parseArgs(int argc, const char **argv) {
     return -1;
   }
 
-  printf("VoterC pipes:\n");
   controller_name = const_cast<char*>(argv[1]);
   for (int i = 0; i < argc - 2; i++) {
-    printf("\t%s\n", argv[i+2]);
     deserializePipe(argv[i + 2], &ext_pipes[pipe_count]);
     pipe_count++;
   }
@@ -189,7 +182,6 @@ int parseArgs(int argc, const char **argv) {
 }
 
 int main(int argc, const char **argv) {
-  printf("Starting VoterC!\n");
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");
     return -1;
@@ -286,6 +278,10 @@ void doOneUpdate() {
         }
       }
     }
+  } else if (errno == EINTR) {
+    // Timer likely expired. Will loop back so no worries.
+  } else {
+    perror("VoterC select in main control loop");
   }
 }
 
@@ -295,6 +291,9 @@ void doOneUpdate() {
 void processData(struct typed_pipe pipe) {
   int index = 0;
 
+  if (vote_stat == RECOVERY) { // Bad things: a replica is still recovering!
+    printf("VoterC: New data while in recovery mode.");
+  }
   // TODO Voting should be per-pipe
   vote_stat = VOTING;
 
@@ -338,12 +337,37 @@ void resetVotingState() {
 // TODO: Should be per pipe as well
 char rep_outputs[REP_COUNT][1024];
 int rep_output_c[REP_COUNT];
+// Checks if all are "reporting" and sends if two agree
+void checkSend() {
+  bool all_reporting = true;
+
+  for (int index = 0; index < REP_COUNT; index++) {
+    // Check that all have reported
+    all_reporting = all_reporting && reporting[index];
+  }
+
+  if (!all_reporting) {
+    return;
+  }
+
+  // Send the solution that at least two agree on
+  for (int index = 0; index < REP_COUNT; index++) {
+    if (memcmp(rep_outputs[index], rep_outputs[(index+1) % REP_COUNT], rep_output_c[index]) == 0) {
+      for (int i = 0; i < pipe_count; i++) {
+        if (ext_pipes[i].fd_out != 0) { // TODO: This bad. Writes to every out pipe.
+          write(ext_pipes[i].fd_out, rep_outputs[index], rep_output_c[index]);
+        }
+      }
+      resetVotingState();
+      return;
+    }
+  }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Process output from replica; vote on it
 void processFromRep(struct typed_pipe pipe, int replica_num) {
   int index = 0;
-  bool all_reporting = true;
-  bool all_agree = true;
 
   if (reporting[replica_num] == true) {
     printf("ERROR: Replica already voted\n");
@@ -353,38 +377,6 @@ void processFromRep(struct typed_pipe pipe, int replica_num) {
     rep_output_c[replica_num] = pipe.buff_count;
     memcpy(rep_outputs[replica_num], pipe.buffer, pipe.buff_count);
   }
- 
-  for (index = 0; index < REP_COUNT - 1; index++) {
-    // Check that all have reported
-    all_reporting = all_reporting && reporting[index];
 
-    // Check that all agree
-    if (memcmp(rep_outputs[index], rep_outputs[index+1], rep_output_c[replica_num]) == 0) {
-      // all_agree stays true
-    } else {
-      all_agree = false;
-    }
-  }
-  all_reporting = all_reporting && reporting[REP_COUNT - 1];
-
-  if (all_reporting && all_agree) {
-    // Voting was successful
-    // TODO, this should be matched from ext pipe to int pipes
-    // Right now this just outputs to any matching pipe
-    for (index = 0; index < pipe_count; index++) {
-      if (ext_pipes[index].fd_out != 0 &&
-          ext_pipes[index].type == pipe.type) {
-        write(ext_pipes[index].fd_out, rep_outputs[0], rep_output_c[0]);
-      }
-    }
-    resetVotingState();
-  } else if (all_reporting) {
-    // Should put the correct command
-    // restart failed rep
-    // reset voting state.
-
-    // For now the timer will go off and trigger a recovery.
-  } else {
-    // Awaiting at least one more replica
-  }
+  checkSend();
 }
