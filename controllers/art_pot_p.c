@@ -51,13 +51,18 @@ void restartHandler(int signo) {
   
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
-      //signal(SIGUSR2, restartHandler);
       // child sets new id, recreates connects, loops
       initReplica();
       // Get own pid, send to voter
       currentPID = getpid();
       connectRecvFDS(currentPID, pipes, 2, "ArtPot");
-      //command(); // recalculate missed command TODO DON'T NEED
+      
+      // unblock the signal
+      sigset_t signal_set;
+      sigemptyset(&signal_set);
+      sigaddset(&signal_set, SIGUSR1);
+      sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
+
       enterLoop(); // return to normal
     } else {   // Parent just returns
       return;
