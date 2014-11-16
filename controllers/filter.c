@@ -105,8 +105,9 @@ void command() {
   }
 
   // Write out averaged range data (with pose)
-  for (int i = 0; i < pipe_count; i++) {
-    commSendRanger(data_out[i], range_average, pose);
+  commSendRanger(data_out[0], range_average, pose);
+  if (pipe_count > 1) {
+    commSendRanger(data_out[1], ranges[WINDOW_SIZE - 1], pose);
   }
 }
 

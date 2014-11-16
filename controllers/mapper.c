@@ -19,7 +19,7 @@
 #define MAP_SIZE 16
 #define OFFSET_X  8
 #define OFFSET_Y  8
-#define GRID_NUM 32
+#define GRID_NUM 64
 
 #define RANGE_COUNT 16
 
@@ -84,14 +84,6 @@ int parseArgs(int argc, const char **argv) {
 // TODO: Should probably separate this out correctly
 // Basically the init function
 int initReplica() {
-  int scheduler;
-  struct sched_param param;
-
-  InitTAS(DEFAULT_CPU, &cpu_speed, 5);
-
-  scheduler = sched_getscheduler(0);
-  printf("Mapper Scheduler: %d\n", scheduler);
-
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     puts("Failed to register the restart handler");
     return -1;
@@ -103,8 +95,8 @@ struct point_i* gridify(struct point_d* p) {
   struct point_i* new_point = (struct point_i*) malloc(sizeof(struct point_i));
   int x, y;
   double interval = MAP_SIZE / (double)GRID_NUM;
-  x = (int)(p->x + OFFSET_X) / interval;
-  y = (int)(p->y + OFFSET_Y) / interval;
+  x = (int)((p->x + OFFSET_X) / interval);
+  y = (int)((p->y + OFFSET_Y) / interval);
 
   // Account for edge of map
   if (x == GRID_NUM) {
@@ -126,7 +118,6 @@ bool addObstacle(struct point_i* obs) {
     free(obs);
     return false;
   } else {
-    printf("\tadded Obstacle at (%d, %d)\n", obs->x, obs->y);
     obstacle_map[obs->x][obs->y] = true;
     free(obs);
     return true;
@@ -134,7 +125,6 @@ bool addObstacle(struct point_i* obs) {
 }
 
 void updateMap(struct comm_range_pose_data * data) {
-  printf("\tUpdate Map\n");
   double x_pose, y_pose, theta_pose;
   // Read pose
   x_pose = data->pose[INDEX_X];
@@ -163,12 +153,12 @@ void updateMap(struct comm_range_pose_data * data) {
 
   // send new map out
   if (changed) {
-    for (int i = 0; i < GRID_NUM; i++) {
+    for (int i = GRID_NUM - 1; i >= 0; i--) {
       for (int j = 0; j < GRID_NUM; j++) {
-        if (obstacle_map[i][j]) {
+        if (obstacle_map[j][i]) {
           fprintf(out_file, "X");
         } else {
-          fprintf(out_file, " ");
+          fprintf(out_file, ".");
         }
       }
       fprintf(out_file, "\n");
@@ -196,10 +186,8 @@ void enterLoop() {
   }
  
   while(1) {
-    printf("The Mapper is waiting to Map on fd: %d\n", data_in.fd_in);
     // Blocking, but that's okay with me
     read_ret = read(data_in.fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
-    printf("Start said mapping.\n");
     if (read_ret > 0) {
       // TODO: Error checking
       updateMap(&recv_msg);
