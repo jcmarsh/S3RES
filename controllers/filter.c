@@ -26,8 +26,9 @@ double ranges[WINDOW_SIZE][RANGER_COUNT] = {0};
 // range and pose data is sent together...
 double pose[3];
 
+int pipe_count;
 struct typed_pipe data_in;
-struct typed_pipe data_out;
+struct typed_pipe* data_out;
 
 // TAS related
 cpu_speed_t cpu_speed;
@@ -60,16 +61,16 @@ void restartHandler(int signo) {
 }
 
 int parseArgs(int argc, const char **argv) {
-  int i;
-  pid_t pid;
-
   // TODO: error checking
   if (argc < 3) { // Must request fds
-    pid = getpid();
-    //connectRecvFDS(pid, &read_in_fd, &write_out_fd, "Filter");
+    printf("Usage: Filter <pipe_in> <pipe_out_0> <pipe_out_1> ... <pipe_out_n>\n");
   } else {
     deserializePipe(argv[1], &data_in);
-    deserializePipe(argv[2], &data_out);
+    pipe_count = argc - 2;
+    data_out = (struct typed_pipe*) malloc(sizeof(struct typed_pipe) * pipe_count);
+    for (int i = 2; i < argc; i++) {
+      deserializePipe(argv[i], &(data_out[i - 2]));
+    }
   }
 
   return 0;
@@ -104,7 +105,9 @@ void command() {
   }
 
   // Write out averaged range data (with pose)
-  commSendRanger(data_out, range_average, pose);
+  for (int i = 0; i < pipe_count; i++) {
+    commSendRanger(data_out[i], range_average, pose);
+  }
 }
 
 void enterLoop() {

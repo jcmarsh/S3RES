@@ -24,6 +24,7 @@
 #define RANGE_COUNT 16
 
 struct typed_pipe data_in;
+struct typed_pipe data_out;
 
 FILE * out_file;
 
@@ -39,8 +40,8 @@ struct point_i {
 };
 
 struct point_d {
-  int x;
-  int y;
+  double x;
+  double y;
 };
 
 bool obstacle_map[GRID_NUM][GRID_NUM];
@@ -68,15 +69,13 @@ void restartHandler(int signo) {
 }
 
 int parseArgs(int argc, const char **argv) {
-  int i;
-  pid_t pid;
-
   // TODO: error checking
-  if (argc < 3) { // Must request fds
-    pid = getpid();
-    //connectRecvFDS(pid, &read_in_fd, &write_out_fd, "Mapper");
+  if (argc < 2) { // Must request fds
+    printf("Mapper usage message.\n");
   } else {
+    printf("Mapper pipe - %s\n", argv[1]);
     deserializePipe(argv[1], &data_in);
+    // deserializePipe(argv[2], &data_out);
   }
 
   return 0;
@@ -100,35 +99,42 @@ int initReplica() {
   return 0;
 }
 
-struct point_i gridify(struct point_d p) {
-  struct point_i new_point;
-  double interval = MAP_SIZE / GRID_NUM;
-  new_point.x = (int)((p.x + OFFSET_X) / interval);
-  new_point.y = (int)((p.y + OFFSET_Y) / interval);
+struct point_i* gridify(struct point_d* p) {
+  struct point_i* new_point = (struct point_i*) malloc(sizeof(struct point_i));
+  int x, y;
+  double interval = MAP_SIZE / (double)GRID_NUM;
+  x = (int)(p->x + OFFSET_X) / interval;
+  y = (int)(p->y + OFFSET_Y) / interval;
 
   // Account for edge of map
-  if (new_point.x == GRID_NUM) {
-    new_point.x--;
+  if (x == GRID_NUM) {
+    x--;
   }
-  if (new_point.y == GRID_NUM) {
-    new_point.y--;
+  if (y == GRID_NUM) {
+    y--;
   }
-  
+  new_point->x = x;
+  new_point->y = y;
+
   return new_point;
 }
 
 // return true if something changed
-bool addObstacle(struct point_i obs) {
-  if (obstacle_map[obs.x][obs.y]) {
+bool addObstacle(struct point_i* obs) {
+  if (obstacle_map[obs->x][obs->y]) {
     // obstacle already there, return false (no changes)
+    free(obs);
     return false;
   } else {
-    obstacle_map[obs.x][obs.y] = true;
+    printf("\tadded Obstacle at (%d, %d)\n", obs->x, obs->y);
+    obstacle_map[obs->x][obs->y] = true;
+    free(obs);
     return true;
   }
 }
 
 void updateMap(struct comm_range_pose_data * data) {
+  printf("\tUpdate Map\n");
   double x_pose, y_pose, theta_pose;
   // Read pose
   x_pose = data->pose[INDEX_X];
@@ -152,14 +158,14 @@ void updateMap(struct comm_range_pose_data * data) {
     obstacle_g.y = obstacle_l.x * sin(theta_pose) + obstacle_l.y * cos(theta_pose);
     obstacle_g.y += y_pose;
 
-    changed = addObstacle(gridify(obstacle_g));
+    changed = addObstacle(gridify(&obstacle_g)) || changed;
   }
 
   // send new map out
   if (changed) {
     for (int i = 0; i < GRID_NUM; i++) {
       for (int j = 0; j < GRID_NUM; j++) {
-        if (obstacle_map) {
+        if (obstacle_map[i][j]) {
           fprintf(out_file, "X");
         } else {
           fprintf(out_file, " ");
@@ -190,8 +196,10 @@ void enterLoop() {
   }
  
   while(1) {
+    printf("The Mapper is waiting to Map on fd: %d\n", data_in.fd_in);
     // Blocking, but that's okay with me
     read_ret = read(data_in.fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
+    printf("Start said mapping.\n");
     if (read_ret > 0) {
       // TODO: Error checking
       updateMap(&recv_msg);
