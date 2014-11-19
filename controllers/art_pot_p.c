@@ -36,7 +36,10 @@ double pos[3];
 int ranger_count = 16;
 double ranges[16]; // 16 is the size in commtypes.h
 
-struct typed_pipe pipes[2]; // 0 is data_in, 1 is cmd_out
+struct typed_pipe pipes[3]; // 0 is data_in, 1 is cmd_out
+int out_index;
+int way_index;
+int data_index;
 
 // TAS related
 cpu_speed_t cpu_speed;
@@ -44,6 +47,23 @@ cpu_speed_t cpu_speed;
 void enterLoop();
 void command();
 int initReplica();
+
+// Set indexes based on pipe types
+void setPipeIndexes() {
+  for (int i = 0; i < 3; i++) {
+    switch (pipes[i].type) {
+      case RANGE_POSE_DATA:
+        data_index = i;
+        break;
+      case WAY_RES:
+        way_index = i;
+        break;
+      case MOV_CMD:
+        out_index = i;
+        break;
+    }
+  }
+}
 
 void restartHandler(int signo) {
   // fork
@@ -55,8 +75,9 @@ void restartHandler(int signo) {
       initReplica();
       // Get own pid, send to voter
       currentPID = getpid();
-      connectRecvFDS(currentPID, pipes, 2, "ArtPot");
-      
+      connectRecvFDS(currentPID, pipes, 3, "ArtPot");
+      setPipeIndexes();
+
       // unblock the signal
       sigset_t signal_set;
       sigemptyset(&signal_set);
@@ -78,8 +99,10 @@ int parseArgs(int argc, const char **argv) {
   if (argc < 3) { // Must request fds
     printf("Useful usage message here. Or something.\n");
   } else {
-    deserializePipe(argv[1], &pipes[0]);
-    deserializePipe(argv[2], &pipes[1]);
+    for (int i = 0; (i < argc - 1 && i < 3); i++) {
+      deserializePipe(argv[i + 1], &pipes[i]);
+    }
+    setPipeIndexes();
   }
 
   return 0;
@@ -163,7 +186,7 @@ void command() {
   }
 
   // Write move command
-  commSendMoveCommand(pipes[1], vel_cmd[0], vel_cmd[1]);
+  commSendMoveCommand(pipes[out_index], vel_cmd[0], vel_cmd[1]);
 }
 
 void enterLoop() {
@@ -182,15 +205,15 @@ void enterLoop() {
     select_timeout.tv_usec = 0;
 
     FD_ZERO(&select_set);
-    FD_SET(pipes[0].fd_in, &select_set);
-    max_fd = pipes[0].fd_in;
+    FD_SET(pipes[data_index].fd_in, &select_set);
+    max_fd = pipes[data_index].fd_in;
 
     // Blocking, but that's okay with me
     //read_ret = read(pipes[0].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
     int retval = select(max_fd + 1, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
-      if (FD_ISSET(pipes[0].fd_in, &select_set)) {
-        read_ret = read(pipes[0].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
+      if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
+        read_ret = read(pipes[data_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
         if (read_ret > 0) {
           // TODO check for erros
           commCopyRanger(&recv_msg, ranges, pos);

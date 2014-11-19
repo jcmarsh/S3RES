@@ -1,13 +1,14 @@
 RESEARCH=/home/jcmarsh/research
 SRC=../src/commtypes.cpp
 LIB=-lrt -lTASLimited
-FLAGS=-O3
+#FLAGS=-O3
+FLAGS=-g
 
 all: regular
 
 regular:
 	g++ $(FLAGS) -o ArtPot art_pot_p.c $(SRC) ../src/fd_client.cpp $(LIB)
-#	g++ $(FLAGS) -o AStar a_star.c $(SRC) ../src/fd_client.cpp $(LIB)
+	g++ $(FLAGS) -o AStar a_star.c $(SRC) ../src/fd_client.cpp $(LIB)
 	g++ $(FLAGS) -o BenchMarker benchmarker.c $(SRC) ../src/replicas.cpp $(LIB)
 	g++ $(FLAGS) -o Empty empty.c $(SRC) ../src/fd_client.cpp $(LIB) 
 	g++ $(FLAGS) -o Filter filter.c $(SRC) ../src/fd_client.cpp $(LIB) 
@@ -17,7 +18,7 @@ regular:
 
 copy: regular
 	cp ArtPot ../../stage/experiments/
-#	cp AStar ../../stage/experiments/
+	cp AStar ../../stage/experiments/
 	cp BenchMarker ../../stage/experiments/
 	cp Empty ../../stage/experiments/
 	cp Filter ../../stage/experiments/
@@ -27,7 +28,7 @@ copy: regular
 
 clean:
 	rm -f ArtPot
-#	rm -f AStar
+	rm -f AStar
 	rm -f BenchMarker
 	rm -f Empty
 	rm -f Filter

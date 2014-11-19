@@ -26,9 +26,9 @@ double ranges[WINDOW_SIZE][RANGER_COUNT] = {0};
 // range and pose data is sent together...
 double pose[3];
 
-int pipe_count;
-struct typed_pipe data_in;
-struct typed_pipe* data_out;
+int pipe_count = 3;
+// pipe 0 is data in, 1 is filtered (averaged) out, 2 is just regular out
+struct typed_pipe pipes[3];
 
 // TAS related
 cpu_speed_t cpu_speed;
@@ -48,8 +48,14 @@ void restartHandler(int signo) {
       initReplica();
       // Get own pid, send to voter
       currentPID = getpid();
-      //connectRecvFDS(currentPID, &read_in_fd, &write_out_fd, "Filter");
-      command(); // recalculate missed command TODO DON"T NEED
+      connectRecvFDS(currentPID, pipes, pipe_count, "Filter");
+
+      // unblock the signal
+      sigset_t signal_set;
+      sigemptyset(&signal_set);
+      sigaddset(&signal_set, SIGUSR1);
+      sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
+
       enterLoop(); // return to normal
     } else {   // Parent just returns
       return;
@@ -63,13 +69,11 @@ void restartHandler(int signo) {
 int parseArgs(int argc, const char **argv) {
   // TODO: error checking
   if (argc < 3) { // Must request fds
-    printf("Usage: Filter <pipe_in> <pipe_out_0> <pipe_out_1> ... <pipe_out_n>\n");
+    printf("Usage: Filter <pipe_in> <pipe_out_0> <pipe_out_1>\n");
   } else {
-    deserializePipe(argv[1], &data_in);
-    pipe_count = argc - 2;
-    data_out = (struct typed_pipe*) malloc(sizeof(struct typed_pipe) * pipe_count);
-    for (int i = 2; i < argc; i++) {
-      deserializePipe(argv[i], &(data_out[i - 2]));
+    deserializePipe(argv[1], &pipes[0]);
+    for (int i = 2; (i <= pipe_count && i < argc); i++) {
+      deserializePipe(argv[i], &pipes[i - 1]);
     }
   }
 
@@ -85,7 +89,6 @@ int initReplica() {
   InitTAS(DEFAULT_CPU, &cpu_speed, 5);
 
   scheduler = sched_getscheduler(0);
-  printf("Filter Scheduler: %d\n", scheduler);
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     puts("Failed to register the restart handler");
@@ -105,10 +108,10 @@ void command() {
   }
 
   // Write out averaged range data (with pose)
-  commSendRanger(data_out[0], range_average, pose);
-  if (pipe_count > 1) {
-    commSendRanger(data_out[1], ranges[WINDOW_SIZE - 1], pose);
-  }
+  commSendRanger(pipes[1], range_average, pose);
+  // TODO: check that this exists before write
+  // TODO: write the most recent; this data could be stale
+  commSendRanger(pipes[2], ranges[WINDOW_SIZE - 1], pose);
 }
 
 void enterLoop() {
@@ -120,7 +123,7 @@ void enterLoop() {
 
   while(1) {
     // Blocking, but that's okay with me
-    read_ret = read(data_in.fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
+    read_ret = read(pipes[0].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
     if (read_ret > 0) {
       // TODO: Error checking
       commCopyRanger(&recv_msg, ranges[window_index], pose);
@@ -147,7 +150,6 @@ int main(int argc, const char **argv) {
   }
 
   enterLoop();
-
   return 0;
 }
 

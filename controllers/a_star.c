@@ -1,6 +1,5 @@
 /*
- * An empty controller for debugging
- * This variation uses file descriptors for I/O (for now just ranger and command out).
+ * A Star controller
  *
  * James Marshall
  */
@@ -17,14 +16,22 @@
 #include "../include/statstime.h"
 #include "../include/fd_client.h"
 
-struct typed_pipe pipes[2];
+// Configuration parameters
+#define GRID_NUM = 64
 
-// TAS related
-cpu_speed_t cpu_speed;
+// Controller state
+double goal[3] = {7.0, 7.0, 0.0};
+
+// Position
+double pose[3];
+
+struct typed_pipe pipes[2]; // Map updates in 0, waypoints out 1
 
 void enterLoop();
+void command();
 int initReplica();
 
+// TODO: move to library
 void restartHandler(int signo) {
   pid_t currentPID = 0;
   // fork
@@ -36,8 +43,8 @@ void restartHandler(int signo) {
       initReplica();
       // Get own pid, send to voter
       currentPID = getpid();
-      connectRecvFDS(currentPID, pipes, 2, "Empty");
-      
+      connectRecvFDS(currentPID, pipes, 2, "AStar");
+
       // unblock the signal
       sigset_t signal_set;
       sigemptyset(&signal_set);
@@ -55,13 +62,9 @@ void restartHandler(int signo) {
 }
 
 int parseArgs(int argc, const char **argv) {
-  int i;
-  pid_t pid;
-
   // TODO: error checking
   if (argc < 3) { // Must request fds
-    pid = getpid();
-    //connectRecvFDS(pid, &read_in_fd, &write_out_fd, "Empty");
+
   } else {
     deserializePipe(argv[1], &pipes[0]);
     deserializePipe(argv[2], &pipes[1]);
@@ -70,16 +73,9 @@ int parseArgs(int argc, const char **argv) {
   return 0;
 }
 
-// TODO: Should probably separate this out correctly
+// Should probably separate this out correctly
 // Basically the init function
 int initReplica() {
-  int scheduler;
-  struct sched_param param;
-
-  InitTAS(DEFAULT_CPU, &cpu_speed, 5);
-
-  scheduler = sched_getscheduler(0);
-
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     puts("Failed to register the restart handler");
     return -1;
@@ -87,19 +83,26 @@ int initReplica() {
   return 0;
 }
 
+void command() {
+  printf("AStar knows not what it does\n");
+  // Write move command
+  commSendWaypoints(pipes[1], goal[0], goal[1], goal[2]);
+}
+
 void enterLoop() {
   int read_ret;
-  struct comm_range_pose_data recv_msg;
- 
+  struct comm_map_update recv_msg;
+
   while(1) {
     // Blocking, but that's okay with me
-    read_ret = read(pipes[0].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
+    read_ret = read(pipes[0].fd_in, &recv_msg, sizeof(struct comm_map_update));
     if (read_ret > 0) {
-      commSendMoveCommand(pipes[1], 0.1, 0.0);
+      // Update with data?
+      command();
     } else if (read_ret == -1) {
-      perror("Empty - read blocking");
+      perror("Blocking, eh?");
     } else {
-      puts("Empty read_ret == 0?");
+      perror("ArtPot read_ret == 0?");
     }
   }
 }
@@ -119,3 +122,4 @@ int main(int argc, const char **argv) {
 
   return 0;
 }
+

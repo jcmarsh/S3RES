@@ -23,13 +23,9 @@
 
 #define RANGE_COUNT 16
 
-struct typed_pipe data_in;
-struct typed_pipe data_out;
+struct typed_pipe pipes[2];
 
 FILE * out_file;
-
-// TAS related
-cpu_speed_t cpu_speed;
 
 void enterLoop();
 int initReplica();
@@ -57,7 +53,14 @@ void restartHandler(int signo) {
       initReplica();
       // Get own pid, send to voter
       currentPID = getpid();
-      //connectRecvFDS(currentPID, &read_in_fd, &write_out_fd, "Mapper");
+      connectRecvFDS(currentPID, pipes, 2, "Mapper");
+      
+      // unblock the signal
+      sigset_t signal_set;
+      sigemptyset(&signal_set);
+      sigaddset(&signal_set, SIGUSR1);
+      sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
+
       enterLoop(); // return to normal
     } else {   // Parent just returns
       return;
@@ -73,9 +76,8 @@ int parseArgs(int argc, const char **argv) {
   if (argc < 2) { // Must request fds
     printf("Mapper usage message.\n");
   } else {
-    printf("Mapper pipe - %s\n", argv[1]);
-    deserializePipe(argv[1], &data_in);
-    // deserializePipe(argv[2], &data_out);
+    deserializePipe(argv[1], &pipes[0]);
+    deserializePipe(argv[2], &pipes[1]);
   }
 
   return 0;
@@ -119,6 +121,7 @@ bool addObstacle(struct point_i* obs) {
     return false;
   } else {
     obstacle_map[obs->x][obs->y] = true;
+    commSendMapUpdate(pipes[1], obs->x, obs->y);
     free(obs);
     return true;
   }
@@ -151,6 +154,7 @@ void updateMap(struct comm_range_pose_data * data) {
     changed = addObstacle(gridify(&obstacle_g)) || changed;
   }
 
+  // TODO: This should send out on a pipe
   // send new map out
   if (changed) {
     for (int i = GRID_NUM - 1; i >= 0; i--) {
@@ -187,7 +191,7 @@ void enterLoop() {
  
   while(1) {
     // Blocking, but that's okay with me
-    read_ret = read(data_in.fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
+    read_ret = read(pipes[0].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
     if (read_ret > 0) {
       // TODO: Error checking
       updateMap(&recv_msg);

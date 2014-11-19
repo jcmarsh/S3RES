@@ -15,11 +15,12 @@ typedef enum {
   WAY_RES,
   MOV_CMD,
   RANGE_POSE_DATA,
+  MAP_UPDATE,
   COMM_ERROR
 } comm_message_t;
 
 // TODO: consider generating with macros: http://stackoverflow.com/questions/9907160/how-to-convert-enum-names-to-string-in-c
-static const char* MESSAGE_T[] = {"WAY_REQ", "WAY_RES", "MOV_CMD", "RANGE_POSE_DATA"};
+static const char* MESSAGE_T[] = {"WAY_REQ", "WAY_RES", "MOV_CMD", "RANGE_POSE_DATA", "MAP_UPDATE"};
 
 #define INDEX_X 0
 #define INDEX_Y 1
@@ -53,6 +54,13 @@ struct comm_range_pose_data {
   double pose[3];
 };
 
+// Coordinate sent, parameters are hard coded.
+struct comm_map_update {
+  int x;
+  int y;
+
+};
+
 // Hack to check when parsing
 // Also need for deserialization
 comm_message_t commToEnum(char* name);
@@ -68,6 +76,8 @@ void commCopyWaypoints(struct comm_way_res * recv_msg, double * waypoints);
 int commSendWaypointRequest(struct typed_pipe pipe);
 
 int commSendMoveCommand(struct typed_pipe pipe, double vel_0, double vel_1);
+
+int commSendMapUpdate(struct typed_pipe pipe, int x, int y);
 
 int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_data);
 void commCopyRanger(struct comm_range_pose_data * recv_msg, double * range_data, double * pose_data);
