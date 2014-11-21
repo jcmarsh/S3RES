@@ -110,7 +110,7 @@ int commSendMoveCommand(struct typed_pipe pipe, double vel_0, double vel_1) {
   return write(pipe.fd_out, &msg, sizeof(struct comm_mov_cmd));
 }
 
-int commSendMapUpdate(struct typed_pipe pipe, int x, int y) {
+int commSendMapUpdate(struct typed_pipe pipe, int obs_x, int obs_y, int pose_x, int pose_y) {
   if (pipe.fd_out == 0 || pipe.type != MAP_UPDATE) {
     printf("commSendMapUpdate Error: pipe does not match type or have a valid fd.");
     return 0;
@@ -119,9 +119,11 @@ int commSendMapUpdate(struct typed_pipe pipe, int x, int y) {
   struct comm_map_update msg;
   memset(&msg, 0, sizeof(struct comm_map_update));
 
-  msg.x = y;
-  msg.y = y;
-
+  msg.obs_x = obs_x;
+  msg.obs_y = obs_y;
+  msg.pose_x = pose_x;
+  msg.pose_y = pose_y;
+  
   return write(pipe.fd_out, &msg, sizeof(struct comm_map_update));
 } 
 

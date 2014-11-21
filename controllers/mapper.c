@@ -40,6 +40,8 @@ struct point_d {
   double y;
 };
 
+struct point_i* current_pose;
+// Count to 3 method worked great before
 bool obstacle_map[GRID_NUM][GRID_NUM];
 
 void restartHandler(int signo) {
@@ -121,7 +123,7 @@ bool addObstacle(struct point_i* obs) {
     return false;
   } else {
     obstacle_map[obs->x][obs->y] = true;
-    commSendMapUpdate(pipes[1], obs->x, obs->y);
+    commSendMapUpdate(pipes[1], obs->x, obs->y, current_pose->x, current_pose->y);
     free(obs);
     return true;
   }
@@ -130,11 +132,15 @@ bool addObstacle(struct point_i* obs) {
 void updateMap(struct comm_range_pose_data * data) {
   double x_pose, y_pose, theta_pose;
   // Read pose
-  x_pose = data->pose[INDEX_X];
-  y_pose = data->pose[INDEX_Y];
+  struct point_d pose;
+  pose.x = data->pose[INDEX_X];
+  pose.y = data->pose[INDEX_Y];
   theta_pose = data->pose[INDEX_A];
 
   bool changed = false;
+
+  free(current_pose);
+  current_pose = gridify(&pose);
 
   // Convert ranges absolute positions
   for (int i = 0; i < RANGE_COUNT; i++) {
@@ -154,9 +160,9 @@ void updateMap(struct comm_range_pose_data * data) {
     changed = addObstacle(gridify(&obstacle_g)) || changed;
   }
 
-  // TODO: This should send out on a pipe
   // send new map out
   if (changed) {
+    /*
     for (int i = GRID_NUM - 1; i >= 0; i--) {
       for (int j = 0; j < GRID_NUM; j++) {
         if (obstacle_map[j][i]) {
@@ -168,6 +174,7 @@ void updateMap(struct comm_range_pose_data * data) {
       fprintf(out_file, "\n");
     }
     fprintf(out_file, "\n");
+    */
   }
 }
 

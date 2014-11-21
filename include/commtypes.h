@@ -56,9 +56,8 @@ struct comm_range_pose_data {
 
 // Coordinate sent, parameters are hard coded.
 struct comm_map_update {
-  int x;
-  int y;
-
+  int obs_x, obs_y;
+  int pose_x, pose_y;
 };
 
 // Hack to check when parsing
@@ -77,7 +76,7 @@ int commSendWaypointRequest(struct typed_pipe pipe);
 
 int commSendMoveCommand(struct typed_pipe pipe, double vel_0, double vel_1);
 
-int commSendMapUpdate(struct typed_pipe pipe, int x, int y);
+int commSendMapUpdate(struct typed_pipe pipe, int obs_x, int obs_y, int pose_x, int pose_y);
 
 int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_data);
 void commCopyRanger(struct comm_range_pose_data * recv_msg, double * range_data, double * pose_data);
