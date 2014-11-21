@@ -86,7 +86,7 @@ int initReplica() {
   int scheduler;
   struct sched_param param;
 
-  InitTAS(DEFAULT_CPU, &cpu_speed, 5);
+  InitTAS(DEFAULT_CPU, &cpu_speed, 4);
 
   scheduler = sched_getscheduler(0);
 

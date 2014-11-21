@@ -88,6 +88,8 @@ int parseArgs(int argc, const char **argv) {
 // TODO: Should probably separate this out correctly
 // Basically the init function
 int initReplica() {
+  optOutRT();
+
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     puts("Failed to register the restart handler");
     return -1;
@@ -181,14 +183,6 @@ void updateMap(struct comm_range_pose_data * data) {
 void enterLoop() {
   int read_ret;
   struct comm_range_pose_data recv_msg;
-
-  // For now I'm goint to write out everything to a file
-  out_file = fopen("map_output.txt", "w");
-  if (out_file == NULL)
-  {
-    printf("Error opening file!\n");
-    exit(1);
-  }
 
   for (int i = 0; i < GRID_NUM; i++) {
     for (int j = 0; j < GRID_NUM; j++) {

@@ -13,121 +13,36 @@
 
 #include "../include/taslimited.h"
 #include "../include/commtypes.h"
-#include "../include/statstime.h"
 #include "../include/fd_client.h"
+#include "../include/mapping.h"
+#include "../include/statstime.h"
 
-// Configuration parameters
-#define GRID_NUM 64
 
 bool obstacle_map[GRID_NUM][GRID_NUM];
 
 // Controller state
+// TODO: gridify
 double goal[3] = {7.0, 7.0, 0.0};
 
 // Position
 double pose[3];
 
-struct typed_pipe pipes[2]; // Map updates in 0, waypoints out 1
-
-//typedef struct node_t node_t;
-//typedef struct l_list_t l_list_t;
-
-struct node_t {
-  int x, y;
-  double g_score;
-  node_t* back_link;
-};
-
-struct l_list_t {
-  node_t* head;
-  double sort_val;
-  l_list_t* tail;
-};
-
-l_list_t* newList() {
-  l_list_t* new_list = (l_list_t*) malloc(sizeof(l_list_t));
-  new_list->head = NULL;
-  new_list->sort_val = 0.0;
-  new_list->tail = NULL;
-  return new_list;
-}
-
-void addNode(l_list_t** list, node_t* node, double sort_val) {
-  if ((*list)->head == NULL) {
-    // Empty list: add node to head
-    (*list)->head = node;
-    (*list)->sort_val = sort_val;
-  } else if ((*list)->sort_val > sort_val) {
-    // current is greater than new: swap
-    l_list_t* new_list = newList();
-    new_list->head = (*list)->head;
-    (*list)->head = node;
-    new_list->sort_val = (*list)->sort_val;
-    (*list)->sort_val = sort_val;
-    new_list->tail = (*list)->tail;
-    (*list)->tail = new_list;
-  } else {
-    // current is smaller: keep going
-    if ((*list)->tail == NULL) {
-      (*list)->tail = newList();
-    }
-    addNode(&((*list)->tail), node, sort_val);
-  }
-}
-
-bool nodeEqauls(node_t* a, node_t* b) {
-  return ((a->x == b->x) && (a->y == b->y));
-}
-
-bool findNode(l_list_t* list, node_t* node) {
-  if (list == NULL || list->head == NULL) {
-    return false; // not found
-  } else if (nodeEqauls(node, list->head)) {
-    return true;
-  } else {
-    return findNode(list->tail, node);
-  }
-}
-
-l_list_t* pop(l_list_t** list) {
-  l_list_t* ret_val = *list;
-  *list = (*list)->tail;
-  ret_val->tail = NULL;
-  return ret_val;
-}
-
-void printList(l_list_t* list) {
-  if (list == NULL || list->head == NULL) {
-    printf("X\n");
-  } else {
-    printf("(Val: %f, (%d,%d)) -> ", list->sort_val, list->head->x, list->head->y);
-    printList(list->tail);
-  }
-}
-
-node_t* newNode(int x, int y, double g_score) {
-  node_t* new_node = (node_t*) malloc(sizeof(node_t));
-  new_node->x = x;
-  new_node->y = y;
-  new_node->g_score = g_score;
-  new_node->back_link = NULL;
-  return new_node;
-}
+struct typed_pipe pipes[3]; // Map updates in 0, waypoint request in 1, waypoints out 2
 
 l_list_t* genNeighbors(node_t* node) {
   l_list_t* list = newList();
 
-  node_t* n_node;
-
   for (int i = -1; i <= 1; i++) {
     for (int j = -1; j <= 1; j++) {
-      int n_x = n_node->x + i;
-      int n_y = n_node->y + j;
+      int n_x = node->x + i;
+      int n_y = node->y + j;
       if (j == 0 && i == 0) {
         // skip
       } else if ((abs(i) + abs(j)) == 2) { // corner
         if (!obstacle_map[n_x][n_y]) {
-          // Need to check two adjacent (no jumping gaps!).
+          if (!obstacle_map[n_x][0] || !obstacle_map[0][n_y]) { // Need to check two adjacent (no jumping gaps!).
+            addNode(&list, newNode(n_x, n_y, 0), 0.0);
+          }
         }
       } else {
         if (!obstacle_map[n_x][n_y]) {
@@ -189,6 +104,8 @@ int parseArgs(int argc, const char **argv) {
 // Should probably separate this out correctly
 // Basically the init function
 int initReplica() {
+  optOutRT();
+
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     puts("Failed to register the restart handler");
     return -1;
@@ -197,36 +114,67 @@ int initReplica() {
 }
 
 // straight line distance from goal
-double estDistance(int x, int y) {
-  return sqrt(((x - goal[0]) * (x - goal[0])) + ((y - goal[1]) * (y - goal[1])));
+double estDistance(int x_1, int y_1, int x_2, int y_2) {
+  return sqrt(((x_1 - x_2) * (x_1 - x_2)) + ((y_1 - y_2) * (y_1 - y_2)));
+}
+double estDistanceG(int x, int y) {
+  return estDistance(x, y, goal[0], goal[1]);
 }
 
 void command() {
   l_list_t* closed_set = newList();
   l_list_t* open_set = newList();
-  addNode(&open_set, newNode(pose[0], pose[1], 0), estDistance(pose[0], pose[1]));
+  addNode(&open_set, newNode(pose[0], pose[1], 0), estDistanceG(pose[0], pose[1]));
   node_t* goal_node = newNode(goal[0], goal[1], 0);
+  bool solution = false;
 
   while(open_set != NULL) { // set empty // TODO: check remove functions
     l_list_t* current = pop(&open_set);
     if (nodeEqauls(current->head, goal_node)) {
-      printf("SUCCESS!\n");
       // All done! Extract path
+      //printf("SUCCESS!\n");
+      node_t* curr = current->head;
+      while (curr != NULL) {
+        //printf("(%d,%d) <- ", curr->x, curr->y);
+        curr = curr->back_link;
+      }
+      //printf("\n");
+      solution = true;
+      break;
     }
 
     // add current to closedset
     node_t* current_n = current->head;
     free(current);
-    addNode(&closed_set, current_n, estDistance(current_n->x, current_n->y));
-
-    // for each neighbor of current
-      // if neighbor in closed - already explored so skip
-      // calculate tent_g_score 
-
+    addNode(&closed_set, current_n, estDistanceG(current_n->x, current_n->y));
+    l_list_t *neighbors = genNeighbors(current_n);
+    while(neighbors != NULL && neighbors->head != NULL) {
+      l_list_t* curr_l = pop(&neighbors);
+      node_t* curr_neigh = curr_l->head;
+      free(curr_l);
+      if (findNode(closed_set, curr_neigh) != NULL) {
+        // if neighbor in closed - already explored so skip
+      } else {
+        double tent_g_score = curr_neigh->g_score + estDistance(curr_neigh->x, curr_neigh->y, current_n->x, current_n->y);
+        node_t* neigh_from_open = findNode(open_set, curr_neigh);
+        if (neigh_from_open == NULL || tent_g_score < neigh_from_open->g_score) {
+          curr_neigh->back_link = current_n;
+          curr_neigh->g_score = tent_g_score;
+          double f_score = tent_g_score + estDistanceG(curr_neigh->x, curr_neigh->y);
+          removeNode(&open_set, curr_neigh); // remove so g_score and f_score are updated.
+          addNode(&open_set, curr_neigh, f_score);
+        }
+      }
+    } 
   }
 
-  // Write move command (need to de-gridify)
-  commSendWaypoints(pipes[1], goal[0], goal[1], goal[2]);
+  if (solution) {
+    // Write move command (need to de-gridify)
+    commSendWaypoints(pipes[1], goal[0], goal[1], goal[2]);
+  } else {
+    printf("You have failed, as expected.\n");
+    // Not sure what to do in this case
+  }
 }
 
 void enterLoop() {
@@ -250,31 +198,55 @@ void enterLoop() {
     } else if (read_ret == -1) {
       perror("Blocking, eh?");
     } else {
-      perror("ArtPot read_ret == 0?");
+      perror("AStar read_ret == 0?");
     }
   }
 }
 
 int main(int argc, const char **argv) {
+  /*
   printf("Testing list basics\n");
   l_list_t* open_set = newList();
   printf("Open: %p\n", open_set);
-  addNode(&open_set, newNode(1, 2, 10000), 100);
-  printf("Open: %p\n", open_set);
+  //addNode(&open_set, newNode(1, 2, 10000), 100);
+  //printf("Open: %p\n", open_set);
   addNode(&open_set, newNode(5, 6, 7), 50);
   printf("Open: %p\n", open_set);
   addNode(&open_set, newNode(7, 8, 755555), 160);
 
-  if (!findNode(open_set, newNode(1, 2, 0))) {
-    printf("Bad\n");
-  } else { printf("GOOD!\n"); }
-  if (!findNode(open_set, newNode(7, 8, 0))) {
-    printf("Bad\n");
-  } else { printf("GOOD!\n"); }
-  if (findNode(open_set, newNode(87, 8, 0))) {
-    printf("Bad\n");
-  } else { printf("GOOD!\n"); }
+  printList(open_set);
+  removeNode(&open_set, newNode(5,6,0));
+  printList(open_set);
+  removeNode(&open_set, newNode(99,88,0));
+  printList(open_set);
+  removeNode(&open_set, newNode(7,8,0));
+  printList(open_set);
 
+  removeNode(&open_set, newNode(1,2,0));
+  printList(open_set);
+
+  removeNode(&open_set, newNode(1,2,0));
+  printList(open_set);
+  */ 
+
+  /* test genNeighbors... neglects test obstacles
+  l_list_t* neighs = genNeighbors(newNode(4,4,0));
+  printList(neighs);
+  */
+
+  /* findNode testing
+  if (findNode(open_set, newNode(1, 2, 0)) == NULL) {
+    printf("Bad\n");
+  } else { printf("GOOD!\n"); }
+  if (findNode(open_set, newNode(7, 8, 0)) == NULL) {
+    printf("Bad\n");
+  } else { printf("GOOD!\n"); }
+  if (findNode(open_set, newNode(87, 8, 0)) != NULL) {
+    printf("Bad\n");
+  } else { printf("GOOD!\n"); }
+  */
+
+  /* pop testing
   printList(open_set);
   l_list_t* pop0 = pop(&open_set);
   printList(open_set);
@@ -287,8 +259,9 @@ int main(int argc, const char **argv) {
   printList(pop1);
   printList(pop2);
 
-  l_list_t* pop_fail = pop(&open_set);
-
+  l_list_t* pop_fail = pop(&open_set); // This segfaults. Not sure how I feel about that.
+  */
+  
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");
     return -1;

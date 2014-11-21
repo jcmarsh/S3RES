@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h> // TODO: remove
 
 #include "../include/taslimited.h"
 #include "../include/commtypes.h"
@@ -210,6 +211,7 @@ void enterLoop() {
 
     // Blocking, but that's okay with me
     //read_ret = read(pipes[0].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
+    errno = 0;
     int retval = select(max_fd + 1, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
       if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
