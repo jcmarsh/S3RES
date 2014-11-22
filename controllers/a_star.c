@@ -170,7 +170,8 @@ void command() {
 
   if (solution) {
     // Write move command (need to de-gridify)
-    commSendWaypoints(pipes[1], goal[0], goal[1], goal[2]);
+    printf("AStar Solution.\n");
+    //commSendWaypoints(pipes[1], goal[0], goal[1], goal[2]);
   } else {
     printf("You have failed, as expected.\n");
     // Not sure what to do in this case

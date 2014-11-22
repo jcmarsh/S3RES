@@ -205,7 +205,6 @@ void doOneUpdate() {
 
   struct timeval select_timeout;
   fd_set select_set;
-  int max_fd;
   int rep_pipe_r;
 
   // See if any of the read pipes have anything
@@ -215,15 +214,11 @@ void doOneUpdate() {
   FD_ZERO(&select_set);
   // Check for timeouts
   FD_SET(timeout_fd[0], &select_set);
-  max_fd = timeout_fd[0];
   // Check external in pipes
   for (index = 0; index < pipe_count; index++) {
     if (ext_pipes[index].fd_in != 0) {
       int e_pipe_fd = ext_pipes[index].fd_in;
       FD_SET(e_pipe_fd, &select_set);
-      if (e_pipe_fd > max_fd) {
-        max_fd = e_pipe_fd;
-      }
     }
   }
   // Check pipes from replicas
@@ -232,15 +227,12 @@ void doOneUpdate() {
       rep_pipe_r = replicas[index].vot_pipes[p_index].fd_in;
       if (rep_pipe_r != 0) {
         FD_SET(rep_pipe_r, &select_set);      
-        if (rep_pipe_r > max_fd) {
-          max_fd = rep_pipe_r;
-        }
       }
     }
   }
 
   // This will wait at least timeout until return. Returns earlier if something has data.
-  retval = select(max_fd + 1, &select_set, NULL, NULL, &select_timeout);
+  retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
 
   if (retval > 0) {
     // Check for failed replica (time out)

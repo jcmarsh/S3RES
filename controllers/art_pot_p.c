@@ -191,14 +191,13 @@ void command() {
 }
 
 void enterLoop() {
-  int read_ret;
-  // TODO: Right now can only handle range data incoming
-  struct comm_range_pose_data recv_msg;
-
   while(1) {
+    int read_ret;
+    // TODO: Right now can only handle range data incoming
+    struct comm_range_pose_data recv_msg;
+
     struct timeval select_timeout;
     fd_set select_set;
-    int max_fd;
 
     // TODO: This will be needed to allow multiple read pipes
     // such as commands from the path planner
@@ -207,12 +206,11 @@ void enterLoop() {
 
     FD_ZERO(&select_set);
     FD_SET(pipes[data_index].fd_in, &select_set);
-    max_fd = pipes[data_index].fd_in;
 
     // Blocking, but that's okay with me
     //read_ret = read(pipes[0].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
     errno = 0;
-    int retval = select(max_fd + 1, &select_set, NULL, NULL, &select_timeout);
+    int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
       if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
         read_ret = read(pipes[data_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
