@@ -28,19 +28,19 @@
 #define OBST_EXTENT 1
 #define OBST_SCALE .3
 
+#define PIPE_COUNT 4
+
 // Controller state
-bool active_goal;
-double goal[] = {7.0, 7.0, 0.0};
+double goal[] = {0.0, 0.0, 0.0};
+bool waiting_on_way = false;
 
 // Position
 double pos[3];
 int ranger_count = 16;
 double ranges[16]; // 16 is the size in commtypes.h
 
-struct typed_pipe pipes[3]; // 0 is data_in, 1 is cmd_out
-int out_index;
-int way_index;
-int data_index;
+struct typed_pipe pipes[PIPE_COUNT]; // 0 is data_in, 1 is cmd_out
+int data_index, out_index, way_req_index, way_res_index;
 
 // TAS related
 cpu_speed_t cpu_speed;
@@ -51,16 +51,19 @@ int initReplica();
 
 // Set indexes based on pipe types
 void setPipeIndexes() {
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < PIPE_COUNT; i++) {
     switch (pipes[i].type) {
       case RANGE_POSE_DATA:
         data_index = i;
         break;
-      case WAY_RES:
-        way_index = i;
-        break;
       case MOV_CMD:
         out_index = i;
+        break;
+      case WAY_RES:
+        way_res_index = i;
+        break;
+      case WAY_REQ:
+        way_req_index = i;
         break;
     }
   }
@@ -76,7 +79,7 @@ void restartHandler(int signo) {
       initReplica();
       // Get own pid, send to voter
       currentPID = getpid();
-      connectRecvFDS(currentPID, pipes, 3, "ArtPot");
+      connectRecvFDS(currentPID, pipes, PIPE_COUNT, "ArtPot");
       setPipeIndexes();
 
       // unblock the signal
@@ -100,7 +103,7 @@ int parseArgs(int argc, const char **argv) {
   if (argc < 3) { // Must request fds
     printf("Useful usage message here. Or something.\n");
   } else {
-    for (int i = 0; (i < argc - 1 && i < 3); i++) {
+    for (int i = 0; (i < argc - 1) && (i < PIPE_COUNT); i++) {
       deserializePipe(argv[i + 1], &pipes[i]);
     }
     setPipeIndexes();
@@ -182,6 +185,11 @@ void command() {
     vel_cmd[0] = VEL_SCALE * vel_cmd[0] * (abs(M_PI - vel_cmd[1]) / M_PI);
     vel_cmd[1] = VEL_SCALE * vel_cmd[1];
   } else { // within distance epsilon. Give it up, man.
+    if (!waiting_on_way) {
+      commSendWaypointRequest(pipes[way_req_index]);
+      printf("Requesting new waypoint.\n");
+      waiting_on_way = true;
+    }
     vel_cmd[0] = 0.0;
     vel_cmd[1] = 0.0;
   }
@@ -191,32 +199,28 @@ void command() {
 }
 
 void enterLoop() {
+  int read_ret;
+  struct comm_range_pose_data recv_msg_data;
+  struct comm_way_res recv_msg_way;
+
+  struct timeval select_timeout;
+  fd_set select_set;
+  
   while(1) {
-    int read_ret;
-    // TODO: Right now can only handle range data incoming
-    struct comm_range_pose_data recv_msg;
-
-    struct timeval select_timeout;
-    fd_set select_set;
-
-    // TODO: This will be needed to allow multiple read pipes
-    // such as commands from the path planner
     select_timeout.tv_sec = 1;
     select_timeout.tv_usec = 0;
 
     FD_ZERO(&select_set);
     FD_SET(pipes[data_index].fd_in, &select_set);
+    FD_SET(pipes[way_res_index].fd_in, &select_set);
 
-    // Blocking, but that's okay with me
-    //read_ret = read(pipes[0].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
-    errno = 0;
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
       if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
-        read_ret = read(pipes[data_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
+        read_ret = read(pipes[data_index].fd_in, &recv_msg_data, sizeof(struct comm_range_pose_data));
         if (read_ret > 0) {
           // TODO check for erros
-          commCopyRanger(&recv_msg, ranges, pos);
+          commCopyRanger(&recv_msg_data, ranges, pos);
           // Calculates and sends the new command
           command();
         } else if (read_ret == -1) {
@@ -224,6 +228,20 @@ void enterLoop() {
         } else {
           perror("ArtPot read_ret == 0?");
         }
+      }
+      if (FD_ISSET(pipes[way_res_index].fd_in, &select_set)) {
+        read_ret = read(pipes[way_res_index].fd_in, &recv_msg_way, sizeof(struct comm_way_res));
+        if (read_ret > 0) {
+          // TODO check for erros
+          waiting_on_way = false;
+          printf("waypoints recieved!\n");
+          commCopyWaypoints(&recv_msg_way, goal);
+          // Calculates and sends the new command
+        } else if (read_ret == -1) {
+          perror("ArtPot - read blocking");
+        } else {
+          perror("ArtPot read_ret == 0?");
+        } 
       }
     }
   }
@@ -239,6 +257,10 @@ int main(int argc, const char **argv) {
     puts("ERROR: failure in setup function.");
     return -1;
   }
+
+  printf("Requesting Waypoints for first time\n");
+  commSendWaypointRequest(pipes[way_req_index]);
+  waiting_on_way = true;
 
   enterLoop();
 

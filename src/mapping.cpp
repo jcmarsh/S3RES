@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include "../include/mapping.h"
 
 l_list_t* newList() {
@@ -9,8 +10,6 @@ l_list_t* newList() {
   return new_list;
 }
 
-
-/*
 void printList(l_list_t* list) {
   if (list == NULL) {
     printf("N\n");
@@ -20,7 +19,7 @@ void printList(l_list_t* list) {
     printf("(Val: %f, (%d,%d)) -> ", list->sort_val, list->head->x, list->head->y);
     printList(list->tail);
   }
-} */
+}
 
 bool nodeEqauls(node_t* a, node_t* b) {
   return ((a->x == b->x) && (a->y == b->y));
@@ -75,13 +74,25 @@ node_t* findNode(l_list_t* list, node_t* node) {
   }
 }
 
-l_list_t* pop(l_list_t** list) {
-  l_list_t* ret_val = *list;
+// SHOULD NEVER BE USED IN CONJUNCTION WITH addNode
+void push(l_list_t** list, node_t* node) {
+  l_list_t* new_list = newList();
+  new_list->head = node;
+  new_list->sort_val = 0.0; // Not used. Do not use with addNode
+  new_list->tail = *list;
+  (*list) = new_list;
+}
+
+node_t* pop(l_list_t** list) {
+  l_list_t* popped = *list;
+  node_t* ret_val = popped->head;
+  free(popped);
+
   *list = (*list)->tail;
-  if ((*list) == NULL) {
+  if ((*list) == NULL) { // Never an empty list
     (*list) = newList();
   }
-  ret_val->tail = NULL;
+  
   return ret_val;
 }
 
