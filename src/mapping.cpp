@@ -2,6 +2,33 @@
 #include <stdio.h>
 #include "../include/mapping.h"
 
+/*               */
+struct point_i* gridify(struct point_d* p) {
+  struct point_i* new_point = (struct point_i*) malloc(sizeof(struct point_i));
+  double interval = MAP_SIZE / (double)GRID_NUM;
+  new_point->x = (int)((p->x + OFFSET_X) / interval);
+  new_point->y = (int)((p->y + OFFSET_Y) / interval);
+
+  // Account for edge of map
+  if (new_point->x == GRID_NUM) {
+    new_point->x--;
+  }
+  if (new_point->y == GRID_NUM) {
+    new_point->y--;
+  }
+
+  return new_point;
+}
+
+struct point_d* degridify(int x, int y) {
+  struct point_d* new_point = (struct point_d*) malloc(sizeof(struct point_d));
+  double interval = MAP_SIZE / (double)GRID_NUM;
+  new_point->x = x * interval + (interval / 2.0) - OFFSET_X;
+  new_point->y = y * interval + (interval / 2.0) - OFFSET_Y;
+  return new_point;
+}
+
+/*              */
 l_list_t* newList() {
   l_list_t* new_list = (l_list_t*) malloc(sizeof(l_list_t));
   new_list->head = NULL;

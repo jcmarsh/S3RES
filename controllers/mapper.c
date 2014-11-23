@@ -11,15 +11,11 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "../include/taslimited.h"
 #include "../include/commtypes.h"
-#include "../include/statstime.h"
 #include "../include/fd_client.h"
-
-#define MAP_SIZE 16
-#define OFFSET_X  8
-#define OFFSET_Y  8
-#define GRID_NUM 64
+#include "../include/mapping.h"
+#include "../include/statstime.h"
+#include "../include/taslimited.h"
 
 #define RANGE_COUNT 16
 
@@ -29,16 +25,6 @@ FILE * out_file;
 
 void enterLoop();
 int initReplica();
-
-struct point_i {
-  int x;
-  int y;
-};
-
-struct point_d {
-  double x;
-  double y;
-};
 
 struct point_i* current_pose;
 // Count to 3 method worked great before
@@ -97,28 +83,13 @@ int initReplica() {
   return 0;
 }
 
-struct point_i* gridify(struct point_d* p) {
-  struct point_i* new_point = (struct point_i*) malloc(sizeof(struct point_i));
-  int x, y;
-  double interval = MAP_SIZE / (double)GRID_NUM;
-  x = (int)((p->x + OFFSET_X) / interval);
-  y = (int)((p->y + OFFSET_Y) / interval);
-
-  // Account for edge of map
-  if (x == GRID_NUM) {
-    x--;
-  }
-  if (y == GRID_NUM) {
-    y--;
-  }
-  new_point->x = x;
-  new_point->y = y;
-
-  return new_point;
-}
-
 // return true if something changed
 bool addObstacle(struct point_i* obs) {
+  if (obs->x < 0 || obs->x > GRID_NUM || obs->y < 0 || obs->y > GRID_NUM) {
+    // erroneous, ignore
+    free(obs);
+    return false;
+  }
   if (obstacle_map[obs->x][obs->y]) {
     // obstacle already there, return false (no changes)
     free(obs);
@@ -132,7 +103,7 @@ bool addObstacle(struct point_i* obs) {
 }
 
 void updateMap(struct comm_range_pose_data * data) {
-  double x_pose, y_pose, theta_pose;
+  double theta_pose;
   // Read pose
   struct point_d pose;
   pose.x = data->pose[INDEX_X];
@@ -149,34 +120,19 @@ void updateMap(struct comm_range_pose_data * data) {
     struct point_d obstacle_l, obstacle_g;
 
     // obstacle location relative to the robot
-    double tao = (2 * M_PI * i) / RANGE_COUNT;
+    double tao = (2.0 * M_PI * i) / RANGE_COUNT;
     obstacle_l.x = data->ranges[i] * cos(tao);
     obstacle_l.y = data->ranges[i] * sin(tao);
     
     // obstacle location in global coords
     obstacle_g.x = obstacle_l.x * cos(theta_pose) - obstacle_l.y * sin(theta_pose);
-    obstacle_g.x += x_pose;
+    obstacle_g.x += pose.x;
     obstacle_g.y = obstacle_l.x * sin(theta_pose) + obstacle_l.y * cos(theta_pose);
-    obstacle_g.y += y_pose;
+    obstacle_g.y += pose.y;
+
+
 
     changed = addObstacle(gridify(&obstacle_g)) || changed;
-  }
-
-  // send new map out
-  if (changed) {
-    /*
-    for (int i = GRID_NUM - 1; i >= 0; i--) {
-      for (int j = 0; j < GRID_NUM; j++) {
-        if (obstacle_map[j][i]) {
-          fprintf(out_file, "X");
-        } else {
-          fprintf(out_file, ".");
-        }
-      }
-      fprintf(out_file, "\n");
-    }
-    fprintf(out_file, "\n");
-    */
   }
 }
 

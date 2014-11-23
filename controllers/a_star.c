@@ -22,11 +22,10 @@
 bool obstacle_map[GRID_NUM][GRID_NUM];
 
 // Controller state
-// TODO: gridify
-double goal[3] = {7.0, 7.0, 0.0};
+struct point_i* goal;
 
 // Position
-double pose[3];
+struct point_i* pose;
 
 struct typed_pipe pipes[PIPE_COUNT]; // Map updates in 0, waypoint request in 1, waypoints out 2
 int updates_index, way_req_index, way_res_index;
@@ -142,18 +141,18 @@ double estDistance(int x_1, int y_1, int x_2, int y_2) {
   return sqrt(((x_1 - x_2) * (x_1 - x_2)) + ((y_1 - y_2) * (y_1 - y_2)));
 }
 double estDistanceG(int x, int y) {
-  return estDistance(x, y, goal[0], goal[1]);
+  return estDistance(x, y, goal->x, goal->y);
 }
 
 void command() {
   l_list_t* closed_set = newList();
   l_list_t* open_set = newList();
-  addNode(&open_set, newNode(pose[0], pose[1], 0), estDistanceG(pose[0], pose[1]));
-  node_t* goal_node = newNode(goal[0], goal[1], 0);
+
+  addNode(&open_set, newNode(pose->x, pose->y, 0), estDistanceG(pose->x, pose->y));
+  node_t* goal_node = newNode(goal->x, goal->y, 0);
   bool solution = false;
 
   while(open_set != NULL) { // set empty // TODO: check remove functions
-
     node_t* current = pop(&open_set);
     if ((current != NULL) && nodeEqauls(current, goal_node)) {
       // erase old path
@@ -164,6 +163,7 @@ void command() {
         push(&goal_path, current);
         current = current->back_link;
       }
+
       solution = true;
       break;
     }
@@ -187,7 +187,7 @@ void command() {
         }
       }
       curr_neigh = pop(&neighbors);
-    } 
+    }
   }
 
   if (!solution) {
@@ -224,8 +224,8 @@ void enterLoop() {
         read_ret = read(pipes[updates_index].fd_in, &recv_msg_update, sizeof(struct comm_map_update));
         if (read_ret > 0) {
           obstacle_map[recv_msg_update.obs_x][recv_msg_update.obs_y] = true;
-          pose[0] = recv_msg_update.pose_x;
-          pose[1] = recv_msg_update.pose_y;
+          pose->x = recv_msg_update.pose_x;
+          pose->y = recv_msg_update.pose_y;
           command();
         } else if (read_ret == -1) {
           perror("Blocking, eh?");
@@ -240,9 +240,13 @@ void enterLoop() {
             commSendWaypoints(pipes[way_res_index], -7.0, -7.0, 0.0);
             // none yet
           } else {
+            // Toss first... because fuck it.
+            pop(&goal_path);
             node_t* new_goal = pop(&goal_path);
-            // degridify?
-            commSendWaypoints(pipes[way_res_index], new_goal->x, new_goal->y, 0.0);
+            point_d *goal_p = degridify(new_goal->x, new_goal->y);
+            printf("Sending goal %d,%d or %f, %f\n", new_goal->x, new_goal->y, goal_p->x, goal_p->y);
+            commSendWaypoints(pipes[way_res_index], goal_p->x, goal_p->y, 0.0);
+            free(goal_p);
           }
         } else if (read_ret == -1) {
           perror("Blocking, eh?");
@@ -266,6 +270,12 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
+  pose = (struct point_i*) malloc(sizeof(struct point_i));
+  struct point_d* goal_d = (struct point_d*) malloc(sizeof(struct point_d));
+  goal_d->x = 7.0;
+  goal_d->y = 7.0;
+  goal = gridify(goal_d);
+  free(goal_d);
   goal_path = newList();
   enterLoop();
 

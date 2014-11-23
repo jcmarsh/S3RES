@@ -1,5 +1,18 @@
 // Configuration parameters
-#define GRID_NUM 64
+#define GRID_NUM 32
+#define MAP_SIZE 16
+#define OFFSET_X  8
+#define OFFSET_Y  8
+
+struct point_i {
+  int x;
+  int y;
+};
+
+struct point_d {
+  double x;
+  double y;
+};
 
 struct node_t {
   int x, y;
@@ -12,6 +25,9 @@ struct l_list_t {
   double sort_val;
   l_list_t* tail;
 };
+
+struct point_i* gridify(struct point_d* p);
+struct point_d* degridify(int x, int y);
 
 l_list_t* newList();
 void printList(l_list_t* list);
