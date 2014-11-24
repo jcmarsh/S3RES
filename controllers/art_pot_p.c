@@ -20,7 +20,7 @@
 
 // Configuration parameters
 #define VEL_SCALE 1
-#define DIST_EPSILON .1
+#define DIST_EPSILON .2
 #define GOAL_RADIUS 0
 #define GOAL_EXTENT 1
 #define GOAL_SCALE 1
@@ -187,7 +187,6 @@ void command() {
   } else { // within distance epsilon. Give it up, man.
     if (!waiting_on_way) {
       commSendWaypointRequest(pipes[way_req_index]);
-      printf("Requesting new waypoint.\n");
       waiting_on_way = true;
     }
     vel_cmd[0] = 0.0;
@@ -234,7 +233,6 @@ void enterLoop() {
         if (read_ret > 0) {
           // TODO check for erros
           waiting_on_way = false;
-          printf("waypoints recieved!\n");
           commCopyWaypoints(&recv_msg_way, goal);
           // Calculates and sends the new command
         } else if (read_ret == -1) {
@@ -258,7 +256,6 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
-  printf("Requesting Waypoints for first time\n");
   commSendWaypointRequest(pipes[way_req_index]);
   waiting_on_way = true;
 

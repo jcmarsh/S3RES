@@ -28,7 +28,8 @@ int initReplica();
 
 struct point_i* current_pose;
 // Count to 3 method worked great before
-bool obstacle_map[GRID_NUM][GRID_NUM];
+#define OBS_THRES 3
+int obstacle_map[GRID_NUM][GRID_NUM];
 
 void restartHandler(int signo) {
   pid_t currentPID = 0;
@@ -90,13 +91,15 @@ bool addObstacle(struct point_i* obs) {
     free(obs);
     return false;
   }
-  if (obstacle_map[obs->x][obs->y]) {
+  if (obstacle_map[obs->x][obs->y] > OBS_THRES) {
     // obstacle already there, return false (no changes)
     free(obs);
     return false;
   } else {
-    obstacle_map[obs->x][obs->y] = true;
-    commSendMapUpdate(pipes[1], obs->x, obs->y, current_pose->x, current_pose->y);
+    obstacle_map[obs->x][obs->y]++;
+    if (obstacle_map[obs->x][obs->y] > OBS_THRES) {
+      commSendMapUpdate(pipes[1], obs->x, obs->y, current_pose->x, current_pose->y);
+    }
     free(obs);
     return true;
   }

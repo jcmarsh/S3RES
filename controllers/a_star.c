@@ -64,7 +64,7 @@ l_list_t* genNeighbors(node_t* node) {
         // skip
       } else if ((abs(i) + abs(j)) == 2) { // corner
         if (!obstacle_map[n_x][n_y]) {
-          if (!obstacle_map[n_x][0] || !obstacle_map[0][n_y]) { // Need to check two adjacent (no jumping gaps!).
+          if (!obstacle_map[n_x][node->y] || !obstacle_map[node->x][n_y]) { // Need to check two adjacent (no jumping gaps!).
             addNode(&list, newNode(n_x, n_y, 0), 0.0);
           }
         }
@@ -240,11 +240,9 @@ void enterLoop() {
             commSendWaypoints(pipes[way_res_index], -7.0, -7.0, 0.0);
             // none yet
           } else {
-            // Toss first... because fuck it.
             pop(&goal_path);
             node_t* new_goal = pop(&goal_path);
             point_d *goal_p = degridify(new_goal->x, new_goal->y);
-            printf("Sending goal %d,%d or %f, %f\n", new_goal->x, new_goal->y, goal_p->x, goal_p->y);
             commSendWaypoints(pipes[way_res_index], goal_p->x, goal_p->y, 0.0);
             free(goal_p);
           }

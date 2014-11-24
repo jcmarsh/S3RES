@@ -1,5 +1,5 @@
 // Configuration parameters
-#define GRID_NUM 32
+#define GRID_NUM 64
 #define MAP_SIZE 16
 #define OFFSET_X  8
 #define OFFSET_Y  8
