@@ -12,6 +12,7 @@ void injectRegError(pid_t pid) //struct user_regs_struct * regs)
   int reg_pick = 0;
   int bit_pick = 0;
 
+  perror("Just checking");
   if (ptrace(PTRACE_GETREGS, pid, NULL, &copy_regs) < 0) {
     perror("GETREGS error.");
   }

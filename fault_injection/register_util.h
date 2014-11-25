@@ -13,6 +13,7 @@
 
 // For the printfs...
 #include <stdio.h>
+#include <stdlib.h>
 
 // Modify the register structure to have one (uniformily distributed) bit flip.
 /*
