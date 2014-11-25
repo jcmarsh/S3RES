@@ -63,7 +63,7 @@ int main(int argc, const char **argv);
 void doOneUpdate();
 void processData(struct typed_pipe pipe, int pipe_index);
 void resetVotingState();
-void checkSend(int pipe_num);
+void checkSend(int pipe_num, bool checkSDC);
 void processFromRep(int replica_num, int pipe_num);
 
 void timeout_sighandler(int signum) {//, siginfo_t *si, void *data) {
@@ -71,6 +71,8 @@ void timeout_sighandler(int signum) {//, siginfo_t *si, void *data) {
     assert(write(timeout_fd[1], timeout_byte, 1) == 1);
   }
 }
+
+
 
 void restartReplica() {
   int restart_id;
@@ -101,7 +103,7 @@ void restartReplica() {
 
         // Should send along the response from the other two replicas.
         replicas[r_index].voted[p_index] = true;
-        checkSend(p_index);
+        checkSend(p_index, false); // DO NOT check for SDC (one has failed)
         return;
       }
     }
@@ -335,7 +337,8 @@ void resetVotingState() {
   }
 }
 
-void checkSend(int pipe_num) {
+bool doOnce = false;
+void checkSend(int pipe_num, bool checkSDC) {
   bool all_reporting = true;
   for (int r_index = 0; r_index < REP_COUNT; r_index++) {
     // Check that all have reported
@@ -347,6 +350,7 @@ void checkSend(int pipe_num) {
   }
   
   // Send the solution that at least two agree on
+  // TODO: What if buff_count is off?
   for (int r_index = 0; r_index < REP_COUNT; r_index++) {
     if (memcmp(replicas[r_index].vot_pipes[pipe_num].buffer,
                replicas[(r_index+1) % REP_COUNT].vot_pipes[pipe_num].buffer,
@@ -360,10 +364,37 @@ void checkSend(int pipe_num) {
       if (ext_pipes[pipe_num].type == MOV_CMD) {
         vote_stat = WAITING;
       }
+
+      if (checkSDC) {
+        // If the third doesn't agree, it should be restarted.
+        if (memcmp(replicas[r_index].vot_pipes[pipe_num].buffer,
+                   replicas[(r_index + 2) % REP_COUNT].vot_pipes[pipe_num].buffer,
+                   replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
+          printf("Voting disagreement: caught SDC\n");
+
+          if (kill(replicas[(r_index + 2) % REP_COUNT].pid, SIGKILL) < 0) {
+            perror("VoterC failed to kill minority report");
+          }
+
+          // reset the timer
+          its.it_interval.tv_sec = 0;
+          its.it_interval.tv_nsec = 0;
+          its.it_value.tv_sec = 0;
+          its.it_value.tv_nsec = 0;
+
+          if (timer_settime(timerid, 0, &its, NULL) == -1) {
+            perror("VoterC timer_settime failed");
+          }
+
+          // how restart rep finds failed reps
+          replicas[(r_index + 2) % REP_COUNT].voted[pipe_num] = false;
+          restartReplica();
+        }
+      }
       resetVotingState(pipe_num);
 
       return;
-    }
+    } 
   }
 
   printf("VoterC: No two replicas agreed.\n");
@@ -382,5 +413,5 @@ void processFromRep(int replica_num, int pipe_num) {
     replicas[replica_num].voted[pipe_num] = true;
   }
 
-  checkSend(pipe_num);
+  checkSend(pipe_num, true);
 }

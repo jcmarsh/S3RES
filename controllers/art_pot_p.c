@@ -82,10 +82,15 @@ void restartHandler(int signo) {
       connectRecvFDS(currentPID, pipes, PIPE_COUNT, "ArtPot");
       setPipeIndexes();
 
-      // unblock the signal
+      // unblock the signal (restart handler)
       sigset_t signal_set;
       sigemptyset(&signal_set);
       sigaddset(&signal_set, SIGUSR1);
+      sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
+
+      // unblock the signal (test SDC)
+      sigemptyset(&signal_set);
+      sigaddset(&signal_set, SIGUSR2);
       sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
 
       enterLoop(); // return to normal
@@ -96,6 +101,12 @@ void restartHandler(int signo) {
     perror("ArtPot Fork error\n");
     return;
   }
+}
+
+bool insertSDC;
+// Need a way to simulate SDC (rare)
+void testSDCHandler(int signo) {
+  insertSDC = true;
 }
 
 int parseArgs(int argc, const char **argv) {
@@ -125,6 +136,12 @@ int initReplica() {
   sighandler_t retval = signal(SIGUSR1, restartHandler);
   if (retval == SIG_ERR) {
     puts("Failed to register the restart handler");
+    return -1;
+  }
+
+  retval = signal(SIGUSR2, testSDCHandler);
+  if (retval == SIG_ERR) {
+    puts("Failed to register the SDC handler");
     return -1;
   }
 
@@ -193,6 +210,11 @@ void command() {
     vel_cmd[1] = 0.0;
   }
 
+  if (insertSDC) {
+    vel_cmd[0] += 1;
+    insertSDC = false;
+  }
+
   // Write move command
   commSendMoveCommand(pipes[out_index], vel_cmd[0], vel_cmd[1]);
 }
@@ -256,6 +278,7 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
+  insertSDC = false;
   commSendWaypointRequest(pipes[way_req_index]);
   waiting_on_way = true;
 
