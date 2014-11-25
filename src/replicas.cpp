@@ -2,6 +2,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+// TODO: voting state?
+
 void initReplicas(struct replica reps[], int rep_num, char* name) {  
   // Init three replicas
   for (int index = 0; index < rep_num; index++) {

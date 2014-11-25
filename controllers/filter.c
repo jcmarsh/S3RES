@@ -110,8 +110,7 @@ void command() {
   // Write out averaged range data (with pose)
   commSendRanger(pipes[1], range_average, pose);
   // TODO: check that this exists before write
-  // TODO: write the most recent; this data could be stale
-  commSendRanger(pipes[2], ranges[WINDOW_SIZE - 1], pose);
+  commSendRanger(pipes[2], ranges[window_index], pose);
 }
 
 void enterLoop() {
