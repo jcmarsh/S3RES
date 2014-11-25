@@ -18,6 +18,7 @@ struct node {
  	
 	replication_t rep_strat;
 	char* voter_name; // from config file: local_nav = (ArtPot)VoterB
+	char* voter_timer; // easier to keep as a char* - needs to be to pass as an arg anyways
 
 	// comm will need to be changed to multiple named pipes
 	int pipe_count;
@@ -29,7 +30,7 @@ struct nodelist {
 	struct nodelist* next;
 };
 
-bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep_type, char* voter_name);
+bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep_type, char* voter_name, char* voter_timer);
 
 struct node* get_node(struct nodelist* nodes, char* Name);
 

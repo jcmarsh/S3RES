@@ -33,6 +33,8 @@ typedef enum {
   WAITING
 } voting_status;
 
+int voting_timeout;
+
 // Replica related data
 struct replica replicas[REP_COUNT];
 
@@ -164,14 +166,18 @@ int initVoterC() {
 }
 
 int parseArgs(int argc, const char **argv) {
-  if (argc < 3) {
-    puts("Usage: VoterC <controller_name> <message_type:fd_in:fd_out> <...>");
+  if (argc < 4) {
+    puts("Usage: VoterC <controller_name> <timeout> <message_type:fd_in:fd_out> <...>");
     return -1;
   }
 
   controller_name = const_cast<char*>(argv[1]);
-  for (int i = 0; (i < argc - 2 && i < PIPE_LIMIT); i++) {
-    deserializePipe(argv[i + 2], &ext_pipes[pipe_count]);
+  voting_timeout = atoi(argv[2]);
+  if (voting_timeout == 0) {
+    voting_timeout = PERIOD_NSEC;
+  }
+  for (int i = 0; (i < argc - 3 && i < PIPE_LIMIT); i++) {
+    deserializePipe(argv[i + 3], &ext_pipes[pipe_count]);
     pipe_count++;
   }
   if (pipe_count >= PIPE_LIMIT) {
@@ -293,7 +299,7 @@ void processData(struct typed_pipe pipe, int pipe_index) {
     its.it_interval.tv_sec = 0;
     its.it_interval.tv_nsec = 0;
     its.it_value.tv_sec = 0;
-    its.it_value.tv_nsec = PERIOD_NSEC;
+    its.it_value.tv_nsec = voting_timeout;
 
     if (timer_settime(timerid, 0, &its, NULL) == -1) {
       perror("VoterC timer_settime failed");

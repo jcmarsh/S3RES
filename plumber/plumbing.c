@@ -9,7 +9,9 @@
 #include "plumbing.h"
 
 // True if succeeds, false otherwise.
-bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep_type, char* voter_name) {
+// TODO: DMR vs TMR are not used here (yet).
+// TODO: should eventually allow an arbitrary number of arguments to be passed in. For now, just one for ease
+bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep_type, char* voter_name, char* voter_timer) {
 	// if current is null, add new node
 	if (nodes->current == NULL) {
 		struct node *new_node = malloc(sizeof(struct node));
@@ -26,8 +28,11 @@ bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep
 		if (rep_type != NONE) {
 			new_node->voter_name = malloc(strlen(voter_name));
 			strcpy(new_node->voter_name, voter_name);
+			new_node->voter_timer = malloc(strlen(voter_timer));
+			strcpy(new_node->voter_timer, voter_timer);
 		} else {
 			new_node->voter_name = NULL;
+			new_node->voter_timer = NULL;
 		}
 
 		nodes->current = new_node;
@@ -38,7 +43,7 @@ bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep
 		printf("PLUMBING ERROR: Re-defining component: %s\n", Name);
 		return false;
 	} else {
-		return add_node(nodes->next, Name, Value, rep_type, voter_name);
+		return add_node(nodes->next, Name, Value, rep_type, voter_name, voter_timer);
 	}
 }
 
@@ -115,11 +120,12 @@ int launch_node(struct nodelist* nodes) {
 			printf("pb.y: No support for DMR\n");
 		} else if (curr->rep_strat == TMR) {
 			// launch with voter
-			int rep_count = 3 + curr->pipe_count;
+			int rep_count = 4 + curr->pipe_count;
 			rep_argv = malloc(sizeof(char *) * rep_count);
 			rep_argv[0] = curr->voter_name;
 			rep_argv[1] = curr->value;
-			other_arg = 2;
+			rep_argv[2] = curr->voter_timer;
+			other_arg = 3;
 			rep_argv[rep_count - 1] = NULL;
 		}
 

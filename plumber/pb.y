@@ -23,8 +23,10 @@ struct typed_pipe cmd_out;
 %token START_VOTE
 %token END_VOTE
 %token ASSIGN
+%token DELIM
 %token <str> VAR_NAME
 %token <str> NAMED_OB
+%token <str> TIMEOUT_VAL
 %token EOL
 %type <str> arrow
 %type <str> rep_comp
@@ -39,10 +41,13 @@ line
 
 declaration
   : VAR_NAME ASSIGN NAMED_OB { 
-      add_node(&all_nodes, $1, $3, NONE, NULL); }
+      add_node(&all_nodes, $1, $3, NONE, NULL, 0); }
 
   | VAR_NAME ASSIGN rep_comp NAMED_OB { 
-      add_node(&all_nodes, $1, $3, TMR, $4); }
+      add_node(&all_nodes, $1, $3, TMR, $4, "0"); }
+
+  | VAR_NAME ASSIGN rep_comp NAMED_OB DELIM TIMEOUT_VAL {
+      add_node(&all_nodes, $1, $3, TMR, $4, $6); }
   ;
 
 rep_comp
