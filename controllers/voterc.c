@@ -67,49 +67,54 @@ void processData(struct typed_pipe pipe, int pipe_index);
 void resetVotingState();
 void checkSend(int pipe_num, bool checkSDC);
 void processFromRep(int replica_num, int pipe_num);
+void restartReplica(int restarter, int restartee);
 
-void timeout_sighandler(int signum) {//, siginfo_t *si, void *data) {
-  //if (vote_stat == VOTING) {
-    assert(write(timeout_fd[1], timeout_byte, 1) == 1);
-  //}
+void timeout_sighandler(int signum) {
+  assert(write(timeout_fd[1], timeout_byte, 1) == 1);
 }
 
+void restartHandler() {
+  // Timer went off, so the timer_stop_index is the pipe which is awaiting a rep
+  for (int r_index = 0; r_index < REP_COUNT; r_index++) {
+    if (replicas[r_index].voted[timer_stop_index] == false) {
+      int status;
+      waitpid(replicas[r_index].pid, &status, WNOHANG); // cleans up the zombie
 
+      // Send along the response from the other two replicas.
+      replicas[r_index].voted[timer_stop_index] = true;
+      checkSend(timer_stop_index, false); // DO NOT check for SDC (one has failed)
 
-void restartReplica() {
-  int restart_id;
+      // This is the failed replica, restart it
+      // Send a signal to the rep's friend
+      int restarter = (r_index + (REP_COUNT - 1)) % REP_COUNT;
+      int restartee = r_index;
+      restartReplica(restarter, restartee);
 
-  // no real way to do this well unless every pipe has its own timer.
-  // Assuming that only one of the reps has failed.
-  for (int p_index = 0; p_index < pipe_count; p_index++) {
-    for (int r_index = 0; r_index < REP_COUNT; r_index++) {
-      if (replicas[r_index].vot_pipes[p_index].type == MOV_CMD &&
-          replicas[r_index].voted[p_index] == false) {
-        int status;
-        waitpid(replicas[r_index].pid, &status, WNOHANG); // cleans up the zombie
-
-        // This is the failed replica, restart it
-        // Send a signal to the rep's friend
-        restart_id = (r_index + (REP_COUNT - 1)) % REP_COUNT; // Plus 2 is minus 1!
-        //printf("Restarting through %d\n", replicas[restart_id].pid);
-        int retval = kill(replicas[restart_id].pid, SIGUSR1);
-        if (retval < 0) {
-          perror("VoterC Signal Problem");
-        }
-            
-        // re-init failed rep, create pipes
-        initReplicas(&(replicas[r_index]), 1, controller_name);
-        createPipes(&(replicas[r_index]), 1, ext_pipes, pipe_count);
-        // send new pipe through fd server (should have a request)
-        acceptSendFDS(&sd, &(replicas[r_index].pid), replicas[r_index].rep_pipes, replicas[r_index].pipe_count);
-
-        // Should send along the response from the other two replicas.
-        replicas[r_index].voted[p_index] = true;
-        checkSend(p_index, false); // DO NOT check for SDC (one has failed)
-        return;
+      // also copy over the previous vote state and pipe buffers
+      for (int i = 0; i < replicas[restarter].pipe_count; i++) {
+        replicas[restartee].voted[i] = replicas[restarter].voted[i];
+        // void *memcpy(void *dest, const void *src, size_t n);
+        memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
+        replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
+        checkSend(i, false);
       }
+      return;
     }
   }
+}
+
+void restartReplica(pid_t restarter, pid_t restartee) {
+  //printf("Restarting through %d\n", replicas[restart_id].pid);
+  int retval = kill(replicas[restarter].pid, SIGUSR1);
+  if (retval < 0) {
+    perror("VoterC Signal Problem");
+  }
+        
+  // re-init failed rep, create pipes
+  initReplicas(&(replicas[restartee]), 1, controller_name);
+  createPipes(&(replicas[restartee]), 1, ext_pipes, pipe_count);
+  // send new pipe through fd server (should have a request)
+  acceptSendFDS(&sd, &(replicas[restartee].pid), replicas[restartee].rep_pipes, replicas[restartee].pipe_count);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -129,10 +134,6 @@ int initVoterC() {
 
   // create timer
   /* Establish handler for timer signal */
-  //  sa.sa_flags = SA_SIGINFO;
-  //sa.sa_sigaction = timeout_sighandler;
-  //sigemptyset(&sa.sa_mask);
-  //if (sigaction(SIG, &sa, NULL) == -1) {
   if (signal(SIG, timeout_sighandler) == SIG_ERR) {
     perror("VoterC sigaction failed");
     return -1;
@@ -181,7 +182,6 @@ int parseArgs(int argc, const char **argv) {
     voting_timeout = PERIOD_NSEC;
   }
   for (int i = 0; (i < argc - 3 && i < PIPE_LIMIT); i++) {
-    printf("All about the pipes: %s\n", argv[i+3]);
     deserializePipe(argv[i + 3], &ext_pipes[pipe_count]);
     if (ext_pipes[pipe_count].timed) {
       if (ext_pipes[pipe_count].fd_in != 0) {
@@ -192,7 +192,7 @@ int parseArgs(int argc, const char **argv) {
     }
     pipe_count++;
   }
-  printf("Timers start on: %d\t end on: %d\n", timer_start_index, timer_stop_index);
+  
   if (pipe_count >= PIPE_LIMIT) {
     printf("VoterC: Raise pipe limit.\n");
   }
@@ -257,7 +257,7 @@ void doOneUpdate() {
       retval = read(timeout_fd[0], timeout_byte, 1);
       if (retval > 0) {
         printf("Restarting Rep.\n");
-        restartReplica();
+        restartHandler();
       } else {
         // TODO: Do I care about this?
       }
@@ -297,7 +297,6 @@ void doOneUpdate() {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process data
-// TODO: This isn't really meant to handle multiple inputs yet
 // Voting is only done on incoming RANGE_POSE_DATA
 void processData(struct typed_pipe pipe, int pipe_index) {
   if (pipe_index == timer_start_index) {
@@ -384,10 +383,10 @@ void checkSend(int pipe_num, bool checkSDC) {
           if (kill(replicas[(r_index + 2) % REP_COUNT].pid, SIGKILL) < 0) {
             perror("VoterC failed to kill minority report");
           }
+          int status;
+          waitpid(replicas[r_index].pid, &status, WNOHANG);
 
-          // how restart rep finds failed reps
-          replicas[(r_index + 2) % REP_COUNT].voted[pipe_num] = false;
-          restartReplica();
+          restartReplica(r_index, (r_index + 2) % REP_COUNT);
         }
       }
       resetVotingState(pipe_num);
@@ -401,7 +400,6 @@ void checkSend(int pipe_num, bool checkSDC) {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process output from replica; vote on it
-// TODO: right now voting only works for outgoing MOV_CMD
 void processFromRep(int replica_num, int pipe_num) {
   int index = 0;
 
