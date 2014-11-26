@@ -60,14 +60,15 @@ struct node* get_node(struct nodelist* nodes, char* Name) {
 
 // stupid bench making everything a pain
 // Bench already has fds, one passed in should be 0
-void link_bench(struct node* n, comm_message_t type, int fd_in, int fd_out) {
+void link_bench(struct node* n, comm_message_t type, int fd_in, int fd_out, bool timed) {
 	n->pipes[n->pipe_count].type = type;
 	n->pipes[n->pipe_count].fd_in = fd_in;
 	n->pipes[n->pipe_count].fd_out = fd_out;
+	n->pipes[n->pipe_count].timed = timed;
 	n->pipe_count++;
 }
 
-void link_node(comm_message_t type, struct node* fromNode, struct node* toNode) {
+void link_node(comm_message_t type, struct node* fromNode, bool fromTimed, struct node* toNode, bool toTimed) {
 	// create pipe
 	int pipe_fds[2];
 	if (pipe(pipe_fds) == -1) {
@@ -77,11 +78,13 @@ void link_node(comm_message_t type, struct node* fromNode, struct node* toNode) 
 		fromNode->pipes[fromNode->pipe_count].type = type;
 		fromNode->pipes[fromNode->pipe_count].fd_in = 0;
 		fromNode->pipes[fromNode->pipe_count].fd_out = pipe_fds[1];
+		fromNode->pipes[fromNode->pipe_count].timed = fromTimed;
 		fromNode->pipe_count++;
 		// other half to toNode
 		toNode->pipes[toNode->pipe_count].type = type;
 		toNode->pipes[toNode->pipe_count].fd_in = pipe_fds[0];
 		toNode->pipes[toNode->pipe_count].fd_out = 0;
+		toNode->pipes[toNode->pipe_count].timed = toTimed;
 		toNode->pipe_count++;
 	}
 }

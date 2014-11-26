@@ -34,6 +34,9 @@ typedef enum {
 } voting_status;
 
 int voting_timeout;
+int timer_start_index;
+int timer_stop_index;
+bool timer_started;
 
 // Replica related data
 struct replica replicas[REP_COUNT];
@@ -48,7 +51,6 @@ char* controller_name;
 // pipes to external components (not replicas)
 int pipe_count = 0;
 struct typed_pipe ext_pipes[PIPE_LIMIT];
-voting_status vote_stat;
 
 // restart timer fd
 char timeout_byte[1] = {'*'};
@@ -67,9 +69,9 @@ void checkSend(int pipe_num, bool checkSDC);
 void processFromRep(int replica_num, int pipe_num);
 
 void timeout_sighandler(int signum) {//, siginfo_t *si, void *data) {
-  if (vote_stat == VOTING) {
+  //if (vote_stat == VOTING) {
     assert(write(timeout_fd[1], timeout_byte, 1) == 1);
-  }
+  //}
 }
 
 
@@ -179,11 +181,20 @@ int parseArgs(int argc, const char **argv) {
     voting_timeout = PERIOD_NSEC;
   }
   for (int i = 0; (i < argc - 3 && i < PIPE_LIMIT); i++) {
+    printf("All about the pipes: %s\n", argv[i+3]);
     deserializePipe(argv[i + 3], &ext_pipes[pipe_count]);
+    if (ext_pipes[pipe_count].timed) {
+      if (ext_pipes[pipe_count].fd_in != 0) {
+        timer_start_index = pipe_count;
+      } else {
+        timer_stop_index = pipe_count;
+      }
+    }
     pipe_count++;
   }
+  printf("Timers start on: %d\t end on: %d\n", timer_start_index, timer_stop_index);
   if (pipe_count >= PIPE_LIMIT) {
-    printf("VoterC: Raise pipe limie.\n");
+    printf("VoterC: Raise pipe limit.\n");
   }
 
   return 0;
@@ -289,36 +300,26 @@ void doOneUpdate() {
 // TODO: This isn't really meant to handle multiple inputs yet
 // Voting is only done on incoming RANGE_POSE_DATA
 void processData(struct typed_pipe pipe, int pipe_index) {
-  if (pipe.type == RANGE_POSE_DATA) {
-    if (vote_stat == RECOVERY) { // Bad things: a replica is still recovering!
-      printf("VoterC: New data while in recovery mode.");
-    }
+  if (pipe_index == timer_start_index) {
+    if (!timer_started) {
+      timer_started = true;
+      // Arm timer
+      its.it_interval.tv_sec = 0;
+      its.it_interval.tv_nsec = 0;
+      its.it_value.tv_sec = 0;
+      its.it_value.tv_nsec = voting_timeout;
 
-    // TODO Voting should be per-pipe
-    vote_stat = VOTING;
-
-    // Arm timer
-    its.it_interval.tv_sec = 0;
-    its.it_interval.tv_nsec = 0;
-    its.it_value.tv_sec = 0;
-    its.it_value.tv_nsec = voting_timeout;
-
-    if (timer_settime(timerid, 0, &its, NULL) == -1) {
-      perror("VoterC timer_settime failed");
+      if (timer_settime(timerid, 0, &its, NULL) == -1) {
+        perror("VoterC timer_settime failed");
+      }
     }
   }
 
   for (int r_index = 0; r_index < REP_COUNT; r_index++) {
-    // TODO: this just matches direction and type
-    for (int p_index = 0; p_index < replicas[r_index].pipe_count; p_index++) {
-      if (replicas[r_index].vot_pipes[p_index].fd_out != 0 &&
-          replicas[r_index].vot_pipes[p_index].type == pipe.type) {
-        int written = write(replicas[r_index].vot_pipes[p_index].fd_out, pipe.buffer, pipe.buff_count);
-        if (written != pipe.buff_count) {
-          printf("VoterC: bytes written: %d\texpected: %d\n", written, pipe.buff_count);
-          perror("VoterC failed write to replica\n");
-        }
-      }
+    int written = write(replicas[r_index].vot_pipes[pipe_index].fd_out, pipe.buffer, pipe.buff_count);
+    if (written != pipe.buff_count) {
+      printf("VoterC: bytes written: %d\texpected: %d\n", written, pipe.buff_count);
+      perror("VoterC failed write to replica\n");
     }
   }
 }
@@ -337,7 +338,6 @@ void resetVotingState() {
   }
 }
 
-bool doOnce = false;
 void checkSend(int pipe_num, bool checkSDC) {
   bool all_reporting = true;
   for (int r_index = 0; r_index < REP_COUNT; r_index++) {
@@ -348,7 +348,20 @@ void checkSend(int pipe_num, bool checkSDC) {
   if (!all_reporting) {
     return;
   }
-  
+
+  if (pipe_num == timer_stop_index) {  
+    // reset the timer
+    its.it_interval.tv_sec = 0;
+    its.it_interval.tv_nsec = 0;
+    its.it_value.tv_sec = 0;
+    its.it_value.tv_nsec = 0;
+
+    if (timer_settime(timerid, 0, &its, NULL) == -1) {
+      perror("VoterC timer_settime failed");
+    }
+    timer_started = false;
+  }
+
   // Send the solution that at least two agree on
   // TODO: What if buff_count is off?
   for (int r_index = 0; r_index < REP_COUNT; r_index++) {
@@ -361,10 +374,6 @@ void checkSend(int pipe_num, bool checkSDC) {
         perror("Seriously Voter?");
       }
 
-      if (ext_pipes[pipe_num].type == MOV_CMD) {
-        vote_stat = WAITING;
-      }
-
       if (checkSDC) {
         // If the third doesn't agree, it should be restarted.
         if (memcmp(replicas[r_index].vot_pipes[pipe_num].buffer,
@@ -374,16 +383,6 @@ void checkSend(int pipe_num, bool checkSDC) {
 
           if (kill(replicas[(r_index + 2) % REP_COUNT].pid, SIGKILL) < 0) {
             perror("VoterC failed to kill minority report");
-          }
-
-          // reset the timer
-          its.it_interval.tv_sec = 0;
-          its.it_interval.tv_nsec = 0;
-          its.it_value.tv_sec = 0;
-          its.it_value.tv_nsec = 0;
-
-          if (timer_settime(timerid, 0, &its, NULL) == -1) {
-            perror("VoterC timer_settime failed");
           }
 
           // how restart rep finds failed reps

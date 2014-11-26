@@ -30,6 +30,7 @@ struct typed_pipe cmd_out;
 %token EOL
 %type <str> arrow
 %type <str> rep_comp
+%type <str> rep_name
 
 %%
 line
@@ -57,11 +58,19 @@ rep_comp
 relationship
   : BENCH arrow VAR_NAME {
       struct node * node_a = get_node(&all_nodes, $3);
-      link_bench(node_a, commToEnum($2), data_in.fd_in, 0); }
+      link_bench(node_a, commToEnum($2), data_in.fd_in, 0, false); }
+
+  | BENCH arrow rep_name {
+      struct node * node_a = get_node(&all_nodes, $3);
+      link_bench(node_a, commToEnum($2), data_in.fd_in, 0, true); }
 
   | VAR_NAME arrow BENCH {
       struct node * node_a = get_node(&all_nodes, $1);
-      link_bench(node_a, commToEnum($2), 0, cmd_out.fd_out); }
+      link_bench(node_a, commToEnum($2), 0, cmd_out.fd_out, false); }
+
+  | rep_name arrow BENCH {
+      struct node * node_a = get_node(&all_nodes, $1);
+      link_bench(node_a, commToEnum($2), 0, cmd_out.fd_out, true); }
 
   | VAR_NAME arrow VAR_NAME {
       struct node * node_a = get_node(&all_nodes, $1);
@@ -70,7 +79,38 @@ relationship
         printf("Comm type doesn't exist! %s\n", $2);
         return -1;
       }
-      link_node(commToEnum($2), node_a, node_b); }
+      link_node(commToEnum($2), node_a, false, node_b, false); }
+  
+  | rep_name arrow rep_name {
+      struct node * node_a = get_node(&all_nodes, $1);
+      struct node * node_b = get_node(&all_nodes, $3);
+      if (commToEnum($2) == COMM_ERROR) {
+        printf("Comm type doesn't exist! %s\n", $2);
+        return -1;
+      }
+      link_node(commToEnum($2), node_a, true, node_b, true); }
+
+  | VAR_NAME arrow rep_name {
+      struct node * node_a = get_node(&all_nodes, $1);
+      struct node * node_b = get_node(&all_nodes, $3);
+      if (commToEnum($2) == COMM_ERROR) {
+        printf("Comm type doesn't exist! %s\n", $2);
+        return -1;
+      }
+      link_node(commToEnum($2), node_a, false, node_b, true); }
+
+  | rep_name arrow VAR_NAME {
+      struct node * node_a = get_node(&all_nodes, $1);
+      struct node * node_b = get_node(&all_nodes, $3);
+      if (commToEnum($2) == COMM_ERROR) {
+        printf("Comm type doesn't exist! %s\n", $2);
+        return -1;
+      }
+      link_node(commToEnum($2), node_a, true, node_b, false); }
+  ;
+
+rep_name
+  : START_VOTE VAR_NAME END_VOTE { $$ = $2; }
   ;
 
 arrow

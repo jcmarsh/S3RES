@@ -5,6 +5,7 @@
 #ifndef _COMM_TYPES_H_
 #define _COMM_TYPES_H_
 
+#include <stdbool.h>
 #include <unistd.h>
 
 // Why 10? No reason.
@@ -29,6 +30,8 @@ static const char* MESSAGE_T[] = {"WAY_REQ", "WAY_RES", "MOV_CMD", "RANGE_POSE_D
 // Not sure... each component will only have half of this pipe.
 struct typed_pipe {
   comm_message_t type;
+
+  bool timed; // timers start on input timed pipe reads, reset on output timed pipe writes
   // Only one of these will be set at a time
   int fd_in;
   int fd_out;

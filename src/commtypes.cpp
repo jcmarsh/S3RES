@@ -22,9 +22,9 @@ comm_message_t commToEnum(char* name) {
 char* serializePipe(struct typed_pipe pipe) {
   char* serial;
   if (pipe.fd_in == 0) {
-    asprintf(&serial, "%s:%d:%d", MESSAGE_T[pipe.type], 0, pipe.fd_out);
+    asprintf(&serial, "%s:%d:%d:%d", MESSAGE_T[pipe.type], 0, pipe.fd_out, pipe.timed);
   } else {
-    asprintf(&serial, "%s:%d:%d", MESSAGE_T[pipe.type], pipe.fd_in, 0);
+    asprintf(&serial, "%s:%d:%d:%d", MESSAGE_T[pipe.type], pipe.fd_in, 0, pipe.timed);
   }
   return serial;  
 }
@@ -33,10 +33,12 @@ void deserializePipe(const char* serial, struct typed_pipe *pipe) {
   char* type = (char*)malloc(sizeof(char) * 100);
   int in = 0;
   int out = 0;
+  int timed = 0;
 
-  sscanf(serial, "%[^:]:%d:%d", type, &in, &out);
+  sscanf(serial, "%[^:]:%d:%d:%d", type, &in, &out, &timed);
   pipe->fd_in = in;
   pipe->fd_out = out;
+  pipe->timed = timed;
 
   pipe->type = commToEnum(type);
 
