@@ -17,7 +17,7 @@
 #include "../include/mapping.h"
 #include "../include/statstime.h"
 
-#define PIPE_COUNT 3
+#define PIPE_COUNT 4
 
 bool obstacle_map[GRID_NUM][GRID_NUM];
 
@@ -28,7 +28,7 @@ struct point_i* goal;
 struct point_i* pose;
 
 struct typed_pipe pipes[PIPE_COUNT]; // Map updates in 0, waypoint request in 1, waypoints out 2
-int updates_index, way_req_index, way_res_index;
+int updates_index, ack_index, way_req_index, way_res_index;
 
 l_list_t* goal_path;
 
@@ -42,6 +42,9 @@ void setPipeIndexes() {
     switch (pipes[i].type) {
       case MAP_UPDATE:
         updates_index = i;
+        break;
+      case COMM_ACK:
+        ack_index = i;
         break;
       case WAY_RES:
         way_res_index = i;
@@ -91,7 +94,7 @@ void restartHandler(int signo) {
       initReplica();
       // Get own pid, send to voter
       currentPID = getpid();
-      connectRecvFDS(currentPID, pipes, 2, "AStar");
+      connectRecvFDS(currentPID, pipes, PIPE_COUNT, "AStar");
 
       // unblock the signal
       sigset_t signal_set;
@@ -123,7 +126,7 @@ void testSDCHandler(int signo) {
 // TODO: move to library?
 int parseArgs(int argc, const char **argv) {
   // TODO: error checking
-  if (argc < 4) {
+  if (argc < 5) {
     printf("Useful usage message here. Or something.\n");
   } else {
     for (int i = 0; (i < argc - 1) && (i < PIPE_COUNT); i++) {
@@ -247,6 +250,7 @@ void enterLoop() {
             obstacle_map[recv_msg_buffer[obs_index++]][recv_msg_buffer[obs_index++]] = true;
           }
           command();
+          commSendAck(pipes[ack_index]);
         } else if (read_ret == -1) {
           perror("Blocking, eh?");
         } else {
@@ -274,6 +278,7 @@ void enterLoop() {
           perror("Blocking, eh?");
         } else {
           perror("AStar read_ret == 0?");
+          exit(0);
         }
       }  
     } else {

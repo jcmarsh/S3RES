@@ -18,24 +18,41 @@
 #include "../include/taslimited.h"
 
 #define RANGE_COUNT 16
+#define PIPE_COUNT 3
+#define OBS_THRES 3
 
-struct typed_pipe pipes[2];
+struct typed_pipe pipes[PIPE_COUNT];
+int data_index, update_index, ack_index; // Data from range pose, updates to planner, planner acks.
 
 FILE * out_file;
 
 // TAS related
 cpu_speed_t cpu_speed;
 
-void enterLoop();
-int initReplica();
-
 struct point_i* current_pose;
 // Count to 3 method worked great before
-#define OBS_THRES 3
 int obstacle_map[GRID_NUM][GRID_NUM];
 
 struct comm_map_update send_msg;
 
+void enterLoop();
+int initReplica();
+
+void setPipeIndexes() {
+  for (int i = 0; i < PIPE_COUNT; i++) {
+    switch (pipes[i].type) {
+      case RANGE_POSE_DATA:
+        data_index = i;
+        break;
+      case MAP_UPDATE:
+        update_index = i;
+        break;
+      case COMM_ACK:
+        ack_index = i;
+        break;
+    }
+  }
+}
 void restartHandler(int signo) {
   pid_t currentPID = 0;
   // fork
@@ -47,7 +64,7 @@ void restartHandler(int signo) {
       initReplica();
       // Get own pid, send to voter
       currentPID = getpid();
-      connectRecvFDS(currentPID, pipes, 2, "Mapper");
+      connectRecvFDS(currentPID, pipes, PIPE_COUNT, "Mapper");
       
       // unblock the signal
       sigset_t signal_set;
@@ -78,11 +95,13 @@ void testSDCHandler(int signo) {
 
 int parseArgs(int argc, const char **argv) {
   // TODO: error checking
-  if (argc < 2) { // Must request fds
+  if (argc < 4) { // Must request fds
     printf("Mapper usage message.\n");
   } else {
-    deserializePipe(argv[1], &pipes[0]);
-    deserializePipe(argv[2], &pipes[1]);
+    for (int i = 0; (i < argc - 1) && (i < PIPE_COUNT); i++) {
+      deserializePipe(argv[i + 1], &pipes[i]);
+    }
+    setPipeIndexes();
   }
 
   return 0;
@@ -140,7 +159,7 @@ void updateMap(struct comm_range_pose_data * data) {
 
   free(current_pose);
   current_pose = gridify(&pose);
-
+  //printf("Mapper pose %f -> %d, %f -> %d\n", pose.x, current_pose->x, pose.y, current_pose->y);
   send_msg.obs_count = 0;
 
   // Convert ranges absolute positions
@@ -168,12 +187,17 @@ void updateMap(struct comm_range_pose_data * data) {
   }
   send_msg.pose_x = current_pose->x;
   send_msg.pose_y = current_pose->y;
-  commSendMapUpdate(pipes[1], &send_msg);
+
+  commSendMapUpdate(pipes[update_index], &send_msg);
 }
 
 void enterLoop() {
   int read_ret;
   struct comm_range_pose_data recv_msg;
+  struct comm_ack ack_msg;
+
+  struct timeval select_timeout;
+  fd_set select_set;
 
   for (int i = 0; i < GRID_NUM; i++) {
     for (int j = 0; j < GRID_NUM; j++) {
@@ -182,15 +206,39 @@ void enterLoop() {
   }
  
   while(1) {
-    // Blocking, but that's okay with me
-    read_ret = read(pipes[0].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
-    if (read_ret > 0) {
-      // TODO: Error checking
-      updateMap(&recv_msg);
-    } else if (read_ret == -1) {
-      perror("Blocking, eh?");
-    } else {
-      puts("Mapper read_ret == 0?");
+    select_timeout.tv_sec = 1;
+    select_timeout.tv_usec = 0;
+
+    FD_ZERO(&select_set);
+    FD_SET(pipes[data_index].fd_in, &select_set);
+    FD_SET(pipes[ack_index].fd_in, &select_set);
+
+    int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
+    if (retval > 0) {
+      if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
+        read_ret = read(pipes[data_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
+        if (read_ret > 0) {
+          if (read_ret != sizeof(struct comm_range_pose_data)) {
+            perror("Mapper read insufficient data");
+          }
+          updateMap(&recv_msg);
+        } else if (read_ret == -1) {
+          perror("Blocking, eh?");
+        } else {
+          puts("Mapper read_ret == 0?");
+        }
+      }
+      if (FD_ISSET(pipes[ack_index].fd_in, &select_set)) {
+        read_ret = read(pipes[ack_index].fd_in, &ack_msg, sizeof(struct comm_ack));
+        if (read_ret > 0) {
+          if (read_ret != sizeof(struct comm_ack)) {
+            perror("Mapper read insufficient data");
+          }
+          // Do nothing
+        } else if (read_ret <= 0) {
+          perror("Something wrong in Mapper read ack");
+        }
+      }
     }
   }
 }

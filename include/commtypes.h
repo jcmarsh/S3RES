@@ -17,11 +17,12 @@ typedef enum {
   MOV_CMD,
   RANGE_POSE_DATA,
   MAP_UPDATE,
+  COMM_ACK,
   COMM_ERROR
 } comm_message_t;
 
 // TODO: consider generating with macros: http://stackoverflow.com/questions/9907160/how-to-convert-enum-names-to-string-in-c
-static const char* MESSAGE_T[] = {"WAY_REQ", "WAY_RES", "MOV_CMD", "RANGE_POSE_DATA", "MAP_UPDATE"};
+static const char* MESSAGE_T[] = {"WAY_REQ", "WAY_RES", "MOV_CMD", "RANGE_POSE_DATA", "MAP_UPDATE", "COMM_ACK"};
 
 #define INDEX_X 0
 #define INDEX_Y 1
@@ -41,7 +42,7 @@ struct typed_pipe {
 };
 
 struct comm_way_req {
-  double padding;
+  int padding;
 };
 
 struct comm_way_res {
@@ -63,6 +64,10 @@ struct comm_map_update {
   int obs_count;
   int* obs_x;
   int* obs_y;
+};
+
+struct comm_ack {
+  int padding;
 };
 
 // Hack to check when parsing
@@ -87,4 +92,5 @@ int commSendMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg);
 int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_data);
 void commCopyRanger(struct comm_range_pose_data * recv_msg, double * range_data, double * pose_data);
 
+int commSendAck(struct typed_pipe pipe);
 #endif // _COMM_TYPES_H_

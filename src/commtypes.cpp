@@ -4,9 +4,9 @@
 #include <string.h>
 
 comm_message_t commToEnum(char* name) {
-  if (strcmp(name, "WAY_RES") == 0) {
+  if (strcmp(name, "WAY_REQ") == 0) {
     return WAY_RES;
-  } else if (strcmp(name, "WAY_REQ") == 0) {
+  } else if (strcmp(name, "WAY_RES") == 0) {
     return WAY_REQ;
   } else if (strcmp(name, "MOV_CMD") == 0) {
     return MOV_CMD;
@@ -14,6 +14,8 @@ comm_message_t commToEnum(char* name) {
     return RANGE_POSE_DATA;
   } else if (strcmp(name, "MAP_UPDATE") == 0) {
     return MAP_UPDATE;
+  } else if (strcmp(name, "COMM_ACK") == 0) {
+    return COMM_ACK;
   } else {
     return COMM_ERROR;
   }
@@ -62,7 +64,7 @@ void resetPipe(struct typed_pipe* pipe) {
 
 int commSendWaypoints(struct typed_pipe pipe, double way_x, double way_y, double way_a) {
   if (pipe.fd_out == 0 || pipe.type != WAY_RES) {
-    printf("commSendWaypoints Error: pipe does not match type or have a valid fd.");
+    printf("commSendWaypoints Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe.type], pipe.fd_out);
     return 0;
   }
 
@@ -86,7 +88,7 @@ void commCopyWaypoints(struct comm_way_res * recv_msg, double * waypoints) {
 
 int commSendWaypointRequest(struct typed_pipe pipe) {
   if (pipe.fd_out == 0 || pipe.type != WAY_REQ) {
-    printf("commSendWaypointsRequest Error: pipe does not match type or have a valid fd.");
+    printf("commSendWaypointsRequest Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe.type], pipe.fd_out);
     return 0;
   }
 
@@ -99,7 +101,7 @@ int commSendWaypointRequest(struct typed_pipe pipe) {
 
 int commSendMoveCommand(struct typed_pipe pipe, double vel_0, double vel_1) {
   if (pipe.fd_out == 0 || pipe.type != MOV_CMD) {
-    printf("commSendMoveCommand Error: pipe does not match type or have a valid fd.");
+    printf("commSendMoveCommand Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe.type], pipe.fd_out);
     return 0;
   }
 
@@ -114,7 +116,7 @@ int commSendMoveCommand(struct typed_pipe pipe, double vel_0, double vel_1) {
 
 int commSendMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg) {
   if (pipe.fd_out == 0 || pipe.type != MAP_UPDATE) {
-    printf("commSendMapUpdate Error: pipe does not match type or have a valid fd.");
+    printf("commSendMapUpdate Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe.type], pipe.fd_out);
     return 0;
   }
 
@@ -136,7 +138,7 @@ int commSendMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg) {
 
 int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_data) {
   if (pipe.fd_out == 0 || pipe.type != RANGE_POSE_DATA) {
-    printf("commSendRanger Error: pipe type (%s) does not match type or have a valid fd (%d).", MESSAGE_T[pipe.type], pipe.fd_out);
+    printf("commSendRanger Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe.type], pipe.fd_out);
     return 0;
   }
 
@@ -153,6 +155,18 @@ int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_d
   }
 
   return write(pipe.fd_out, &msg, sizeof(struct comm_range_pose_data));
+}
+
+int commSendAck(struct typed_pipe pipe) {
+  if (pipe.fd_out == 0 || pipe.type != COMM_ACK) {
+    printf("commSendAck Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe.type], pipe.fd_out);
+    return 0;
+  }
+
+  struct comm_ack msg;
+  memset(&msg, 0, sizeof(struct comm_ack));
+
+  return write(pipe.fd_out, &msg, sizeof(struct comm_ack));
 }
 
 void commCopyRanger(struct comm_range_pose_data * recv_msg, double * range_data, double * pose_data) {

@@ -15,6 +15,7 @@
 [a-z][a-zA-Z_]+	{ yylval.str = strdup(yytext); return VAR_NAME; }
 [A-Z][a-zA-Z_]+ { yylval.str = strdup(yytext); return NAMED_OB; }
 [0-9]+			{ yylval.str = strdup(yytext); return TIMEOUT_VAL; }
+"//".*			{ return EOL; }
 \n				{ return EOL; }
 .				{ printf("Mystery character %c, %s\n", *yytext, yytext); }
 %%
