@@ -112,22 +112,27 @@ int commSendMoveCommand(struct typed_pipe pipe, double vel_0, double vel_1) {
   return write(pipe.fd_out, &msg, sizeof(struct comm_mov_cmd));
 }
 
-int commSendMapUpdate(struct typed_pipe pipe, int obs_x, int obs_y, int pose_x, int pose_y) {
+int commSendMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg) {
   if (pipe.fd_out == 0 || pipe.type != MAP_UPDATE) {
     printf("commSendMapUpdate Error: pipe does not match type or have a valid fd.");
     return 0;
   }
 
-  struct comm_map_update msg;
-  memset(&msg, 0, sizeof(struct comm_map_update));
+  int index = 0;
+  int buffer[1024] = {0}; // TODO Max size should be set somewhere
+  int buff_count = 0;
 
-  msg.obs_x = obs_x;
-  msg.obs_y = obs_y;
-  msg.pose_x = pose_x;
-  msg.pose_y = pose_y;
+  buffer[buff_count++] = msg->pose_x;
+  buffer[buff_count++] = msg->pose_y;
+  buffer[buff_count++] = msg->obs_count;
+
+  for (index = 0; index < msg->obs_count; index++) {
+    buffer[buff_count++] = msg->obs_x[index];
+    buffer[buff_count++] = msg->obs_y[index];
+  }
   
-  return write(pipe.fd_out, &msg, sizeof(struct comm_map_update));
-} 
+  return write(pipe.fd_out, buffer, sizeof(int) * buff_count);
+}
 
 int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_data) {
   if (pipe.fd_out == 0 || pipe.type != RANGE_POSE_DATA) {
@@ -136,6 +141,7 @@ int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_d
   }
 
   int index = 0;
+
   struct comm_range_pose_data msg;
   memset(&msg, 0, sizeof(struct comm_range_pose_data));
 

@@ -56,6 +56,11 @@ void restartHandler(int signo) {
       sigaddset(&signal_set, SIGUSR1);
       sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
 
+      // unblock the signal (test SDC)
+      sigemptyset(&signal_set);
+      sigaddset(&signal_set, SIGUSR2);
+      sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
+
       enterLoop(); // return to normal
     } else {   // Parent just returns
       return;
@@ -64,6 +69,12 @@ void restartHandler(int signo) {
     printf("Fork error!\n");
     return;
   }
+}
+
+bool insertSDC;
+// Need a way to simulate SDC (rare)
+void testSDCHandler(int signo) {
+  insertSDC = true;
 }
 
 int parseArgs(int argc, const char **argv) {
@@ -83,22 +94,32 @@ int parseArgs(int argc, const char **argv) {
 // Should probably separate this out correctly
 // Basically the init function
 int initReplica() {
-  int scheduler;
   struct sched_param param;
 
   InitTAS(DEFAULT_CPU, &cpu_speed, 4);
 
-  scheduler = sched_getscheduler(0);
+  sched_getscheduler(0);
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
-    puts("Failed to register the restart handler");
+    perror("Failed to register the restart handler");
     return -1;
   }
+
+  if (signal(SIGUSR2, testSDCHandler) == SIG_ERR) {
+    perror("Failed to register the SDC handler");
+    return -1;
+  }
+
   return 0;
 }
 
 void command() {
   double range_average[RANGER_COUNT] = {0};
+
+  if (insertSDC) {
+    insertSDC = false;
+    ranges[0][0]++;
+  }
 
   for (int j = 0; j < RANGER_COUNT; j++) {
     for (int i = 0; i < WINDOW_SIZE; i++) {

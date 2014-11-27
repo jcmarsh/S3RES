@@ -99,6 +99,11 @@ void restartHandler(int signo) {
       sigaddset(&signal_set, SIGUSR1);
       sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
 
+      // unblock the signal (test SDC)
+      sigemptyset(&signal_set);
+      sigaddset(&signal_set, SIGUSR2);
+      sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
+
       enterLoop(); // return to normal
     } else {   // Parent just returns
       return;
@@ -107,6 +112,12 @@ void restartHandler(int signo) {
     printf("Fork error!\n");
     return;
   }
+}
+
+bool insertSDC;
+// Need a way to simulate SDC (rare)
+void testSDCHandler(int signo) {
+  insertSDC = true;
 }
 
 // TODO: move to library?
@@ -130,9 +141,15 @@ int initReplica() {
   optOutRT();
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
-    puts("Failed to register the restart handler");
+    perror("Failed to register the restart handler");
     return -1;
   }
+
+  if (signal(SIGUSR2, testSDCHandler) == SIG_ERR) {
+    perror("Failed to register the SDC handler");
+    return -1;
+  }
+
   return 0;
 }
 
@@ -198,7 +215,7 @@ void command() {
 
 void enterLoop() {
   int read_ret;
-  struct comm_map_update recv_msg_update;
+  int recv_msg_buffer[1024] = {0};
   struct comm_way_req recv_msg_req;
 
   struct timeval select_timeout;
@@ -221,11 +238,14 @@ void enterLoop() {
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
       if (FD_ISSET(pipes[updates_index].fd_in, &select_set)) {
-        read_ret = read(pipes[updates_index].fd_in, &recv_msg_update, sizeof(struct comm_map_update));
+        read_ret = read(pipes[updates_index].fd_in, &recv_msg_buffer, sizeof(recv_msg_buffer));
         if (read_ret > 0) {
-          obstacle_map[recv_msg_update.obs_x][recv_msg_update.obs_y] = true;
-          pose->x = recv_msg_update.pose_x;
-          pose->y = recv_msg_update.pose_y;
+          pose->x = recv_msg_buffer[0];
+          pose->y = recv_msg_buffer[1];
+          int obs_index = 3;
+          for (int index = 0; index < recv_msg_buffer[2]; index++) {
+            obstacle_map[recv_msg_buffer[obs_index++]][recv_msg_buffer[obs_index++]] = true;
+          }
           command();
         } else if (read_ret == -1) {
           perror("Blocking, eh?");
@@ -243,6 +263,10 @@ void enterLoop() {
             pop(&goal_path);
             node_t* new_goal = pop(&goal_path);
             point_d *goal_p = degridify(new_goal->x, new_goal->y);
+            if (insertSDC) {
+              insertSDC = false;
+              goal_p->x++;
+            }
             commSendWaypoints(pipes[way_res_index], goal_p->x, goal_p->y, 0.0);
             free(goal_p);
           }

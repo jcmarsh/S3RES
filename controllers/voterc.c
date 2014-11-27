@@ -193,6 +193,7 @@ int parseArgs(int argc, const char **argv) {
     pipe_count++;
   }
   
+  printf("Voter inited with timeout of %dns on pipes %d -> %d\n", voting_timeout, timer_start_index, timer_stop_index);
   if (pipe_count >= PIPE_LIMIT) {
     printf("VoterC: Raise pipe limit.\n");
   }
@@ -383,8 +384,6 @@ void checkSend(int pipe_num, bool checkSDC) {
           if (kill(replicas[(r_index + 2) % REP_COUNT].pid, SIGKILL) < 0) {
             perror("VoterC failed to kill minority report");
           }
-          int status;
-          waitpid(replicas[r_index].pid, &status, WNOHANG);
 
           restartReplica(r_index, (r_index + 2) % REP_COUNT);
         }

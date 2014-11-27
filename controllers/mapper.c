@@ -23,6 +23,9 @@ struct typed_pipe pipes[2];
 
 FILE * out_file;
 
+// TAS related
+cpu_speed_t cpu_speed;
+
 void enterLoop();
 int initReplica();
 
@@ -30,6 +33,8 @@ struct point_i* current_pose;
 // Count to 3 method worked great before
 #define OBS_THRES 3
 int obstacle_map[GRID_NUM][GRID_NUM];
+
+struct comm_map_update send_msg;
 
 void restartHandler(int signo) {
   pid_t currentPID = 0;
@@ -50,6 +55,11 @@ void restartHandler(int signo) {
       sigaddset(&signal_set, SIGUSR1);
       sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
 
+      // unblock the signal (test SDC)
+      sigemptyset(&signal_set);
+      sigaddset(&signal_set, SIGUSR2);
+      sigprocmask(SIG_UNBLOCK, &signal_set, NULL);      
+
       enterLoop(); // return to normal
     } else {   // Parent just returns
       return;
@@ -58,6 +68,12 @@ void restartHandler(int signo) {
     printf("Fork error!\n");
     return;
   }
+}
+
+bool insertSDC;
+// Need a way to simulate SDC (rare)
+void testSDCHandler(int signo) {
+  insertSDC = true;
 }
 
 int parseArgs(int argc, const char **argv) {
@@ -75,12 +91,19 @@ int parseArgs(int argc, const char **argv) {
 // TODO: Should probably separate this out correctly
 // Basically the init function
 int initReplica() {
-  optOutRT();
+  //optOutRT();
+  InitTAS(DEFAULT_CPU, &cpu_speed, 15);
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
-    puts("Failed to register the restart handler");
+    perror("Failed to register the restart handler");
     return -1;
   }
+
+  if (signal(SIGUSR2, testSDCHandler) == SIG_ERR) {
+    perror("Failed to register the SDC handler");
+    return -1;
+  }
+
   return 0;
 }
 
@@ -98,7 +121,9 @@ bool addObstacle(struct point_i* obs) {
   } else {
     obstacle_map[obs->x][obs->y]++;
     if (obstacle_map[obs->x][obs->y] > OBS_THRES) {
-      commSendMapUpdate(pipes[1], obs->x, obs->y, current_pose->x, current_pose->y);
+      send_msg.obs_x[send_msg.obs_count] = obs->x;
+      send_msg.obs_y[send_msg.obs_count] = obs->y;
+      send_msg.obs_count++;
     }
     free(obs);
     return true;
@@ -113,10 +138,10 @@ void updateMap(struct comm_range_pose_data * data) {
   pose.y = data->pose[INDEX_Y];
   theta_pose = data->pose[INDEX_A];
 
-  bool changed = false;
-
   free(current_pose);
   current_pose = gridify(&pose);
+
+  send_msg.obs_count = 0;
 
   // Convert ranges absolute positions
   for (int i = 0; i < RANGE_COUNT; i++) {
@@ -133,10 +158,17 @@ void updateMap(struct comm_range_pose_data * data) {
     obstacle_g.y = obstacle_l.x * sin(theta_pose) + obstacle_l.y * cos(theta_pose);
     obstacle_g.y += pose.y;
 
-
-
-    changed = addObstacle(gridify(&obstacle_g)) || changed;
+    addObstacle(gridify(&obstacle_g));
   }
+
+  // TODO: What if a SDC messed with the obs_count sent?
+  if (insertSDC) {
+    insertSDC = false;
+    current_pose->x++;
+  }
+  send_msg.pose_x = current_pose->x;
+  send_msg.pose_y = current_pose->y;
+  commSendMapUpdate(pipes[1], &send_msg);
 }
 
 void enterLoop() {
@@ -173,6 +205,12 @@ int main(int argc, const char **argv) {
     puts("ERROR: failure in setup function.");
     return -1;
   }
+
+  send_msg.pose_x = 0;
+  send_msg.pose_y = 0;
+  send_msg.obs_count = 0;
+  send_msg.obs_x = (int*)malloc(sizeof(int) * 128);
+  send_msg.obs_y = (int*)malloc(sizeof(int) * 128);
 
   enterLoop();
 

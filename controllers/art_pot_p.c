@@ -126,22 +126,15 @@ int parseArgs(int argc, const char **argv) {
 // Should probably separate this out correctly
 // Basically the init function
 int initReplica() {
-  int scheduler;
-  struct sched_param param;
-
   InitTAS(DEFAULT_CPU, &cpu_speed, 5);
 
-  scheduler = sched_getscheduler(0);
-
-  sighandler_t retval = signal(SIGUSR1, restartHandler);
-  if (retval == SIG_ERR) {
-    puts("Failed to register the restart handler");
+  if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
+    perror("Failed to register the restart handler");
     return -1;
   }
 
-  retval = signal(SIGUSR2, testSDCHandler);
-  if (retval == SIG_ERR) {
-    puts("Failed to register the SDC handler");
+  if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
+    perror("Failed to register the SDC handler");
     return -1;
   }
 
