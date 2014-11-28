@@ -12,17 +12,17 @@
 #define PIPE_LIMIT 10
 
 typedef enum {
+  COMM_ERROR,
   WAY_REQ,
   WAY_RES,
   MOV_CMD,
   RANGE_POSE_DATA,
   MAP_UPDATE,
-  COMM_ACK,
-  COMM_ERROR
+  COMM_ACK
 } comm_message_t;
 
 // TODO: consider generating with macros: http://stackoverflow.com/questions/9907160/how-to-convert-enum-names-to-string-in-c
-static const char* MESSAGE_T[] = {"WAY_REQ", "WAY_RES", "MOV_CMD", "RANGE_POSE_DATA", "MAP_UPDATE", "COMM_ACK"};
+static const char* MESSAGE_T[] = {"COMM_ERROR", "WAY_REQ", "WAY_RES", "MOV_CMD", "RANGE_POSE_DATA", "MAP_UPDATE", "COMM_ACK"};
 
 #define INDEX_X 0
 #define INDEX_Y 1

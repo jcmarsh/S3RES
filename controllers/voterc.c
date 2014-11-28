@@ -33,7 +33,7 @@ typedef enum {
   WAITING
 } voting_status;
 
-int voting_timeout;
+long voting_timeout;
 int timer_start_index;
 int timer_stop_index;
 bool timer_started;
@@ -192,8 +192,7 @@ int parseArgs(int argc, const char **argv) {
     }
     pipe_count++;
   }
-  
-  printf("Voter inited with timeout of %dns on pipes %d -> %d\n", voting_timeout, timer_start_index, timer_stop_index);
+
   if (pipe_count >= PIPE_LIMIT) {
     printf("VoterC: Raise pipe limit.\n");
   }
@@ -298,7 +297,6 @@ void doOneUpdate() {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process data
-// Voting is only done on incoming RANGE_POSE_DATA
 void processData(struct typed_pipe pipe, int pipe_index) {
   if (pipe_index == timer_start_index) {
     if (!timer_started) {

@@ -281,7 +281,6 @@ void enterLoop() {
           exit(0);
         }
       }  
-    } else {
     }
   }
 }
