@@ -117,7 +117,6 @@ TranslatorDriver::TranslatorDriver(ConfigFile* cf, int section)
   }
 
   // RANGER!
-  ranger_countdown = 5;
   this->ranger = NULL;
   memset(&(this->ranger_addr), 0, sizeof(player_devaddr_t));
   if (cf->ReadDeviceAddr(&(this->ranger_addr), section, "requires",
@@ -346,21 +345,17 @@ void TranslatorDriver::ProcessOdom(player_position2d_data_t &data)
 // Process ranger data
 void TranslatorDriver::ProcessRanger(player_ranger_data_range_t &data)
 {
-  if (ranger_countdown-- < 0) {
-    int index = 0;
-    struct comm_range_pose_data send_msg;
- 
-    for (index = 0; index < 16; index++) {
-      send_msg.ranges[index] = data.ranges[index];
-    }
-    for (index = 0; index < 3; index++) {
-      send_msg.pose[index] = pose[index];
-    }
+  int index = 0;
+  struct comm_range_pose_data send_msg;
 
-    write(rep.vot_pipes[0].fd_out, &send_msg, sizeof(struct comm_range_pose_data));
-  } else {
-    printf("Skipping this one.\n");
+  for (index = 0; index < 16; index++) {
+    send_msg.ranges[index] = data.ranges[index];
   }
+  for (index = 0; index < 3; index++) {
+    send_msg.pose[index] = pose[index];
+  }
+
+  write(rep.vot_pipes[0].fd_out, &send_msg, sizeof(struct comm_range_pose_data));
 }
 
 ////////////////////////////////////////////////////////////////////////////////

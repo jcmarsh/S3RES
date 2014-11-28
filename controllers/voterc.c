@@ -165,8 +165,6 @@ int initVoterC() {
   
   resetVotingState();
 
-  printf("VoterC replicas all launched\n");
-
   return 0;
 }
 
@@ -290,8 +288,6 @@ void doOneUpdate() {
     }
   } else if (errno == EINTR) {
     // Timer likely expired. Will loop back so no worries.
-  } else {
-    perror("VoterC select in main control loop");
   }
 }
 

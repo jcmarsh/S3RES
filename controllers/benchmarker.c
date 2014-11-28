@@ -72,7 +72,6 @@ int parseArgs(int argc, const char **argv) {
 }
 
 int main(int argc, const char **argv) {
-  printf("Inside the BENCHMARKER!\n");
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");
     return -1;

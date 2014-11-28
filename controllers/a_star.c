@@ -249,7 +249,9 @@ void enterLoop() {
           for (int index = 0; index < recv_msg_buffer[2]; index++) {
             obstacle_map[recv_msg_buffer[obs_index++]][recv_msg_buffer[obs_index++]] = true;
           }
-          command();
+          if (recv_msg_buffer[2] > 0) { // New obstacle arrived
+            command();
+          }
           commSendAck(pipes[ack_index]);
         } else if (read_ret == -1) {
           perror("Blocking, eh?");
