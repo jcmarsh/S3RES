@@ -11,21 +11,16 @@ void main(int argc, char** argv) {
 		return;
 	} else {
 		attack_pid = atoi(argv[1]);
-		printf("Attacking pid: %d\n", attack_pid);
 	}
 	
 	// Attach stops the process
-	printf("Attaching\n");
 	if (ptrace(PTRACE_ATTACH, attack_pid, NULL, NULL) < 0) {
 		perror("Failed to attach");
 	}
-	printf("Wait for stop\n");
 	waitpid(attack_pid);
 
-	printf("Inject Error\n");
 	injectRegError(attack_pid);
 
-	printf("Resume (IF YOU CAN! HAHAHAHAHA)\n");
 	if (ptrace(PTRACE_CONT, attack_pid, NULL, NULL) < 0) {
 		perror("Failed to resume");
 	}

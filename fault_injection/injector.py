@@ -34,11 +34,8 @@ while True:
 	getPIDs(victim_pids, victim_names, 'ps -a | grep "ArtPot"')
 	getPIDs(victim_pids, victim_names, 'ps -a | grep "Mapper"')
 
-	for pid in victim_pids:
-		print "Potential: ", pid
-
 	kill_index = random.randint(0, len(victim_pids)-1)
 
-	print "Executing ", cmd_start, " on a ", victim_names[kill_index]
+	print "Executing ", cmd_start, " on a ", victim_names[kill_index], ": ", victim_pids[kill_index]
 
 	Popen(cmd_start + " " + str(victim_pids[kill_index]), shell=True)

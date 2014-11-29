@@ -26,7 +26,7 @@
 #define GOAL_SCALE 1
 #define OBST_RADIUS 0
 #define OBST_EXTENT .5
-#define OBST_SCALE 1
+#define OBST_SCALE 1.5
 
 #define PIPE_COUNT 4
 

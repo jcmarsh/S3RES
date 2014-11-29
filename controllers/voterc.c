@@ -252,7 +252,7 @@ void doOneUpdate() {
     if (FD_ISSET(timeout_fd[0], &select_set)) {
       retval = read(timeout_fd[0], timeout_byte, 1);
       if (retval > 0) {
-        printf("Restarting Rep.\n");
+        //printf("Restarting Rep.\n");
         restartHandler();
       } else {
         // TODO: Do I care about this?
@@ -371,7 +371,7 @@ void checkSend(int pipe_num, bool checkSDC) {
         if (memcmp(replicas[r_index].vot_pipes[pipe_num].buffer,
                    replicas[(r_index + 2) % REP_COUNT].vot_pipes[pipe_num].buffer,
                    replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
-          printf("Voting disagreement: caught SDC\n");
+          //printf("Voting disagreement: caught SDC\n");
 
           if (kill(replicas[(r_index + 2) % REP_COUNT].pid, SIGKILL) < 0) {
             perror("VoterC failed to kill minority report");

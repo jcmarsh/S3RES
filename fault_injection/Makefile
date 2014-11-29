@@ -1,7 +1,7 @@
 main:
 	gcc -o inject_error main.c register_util.c
 
-copy:
+copy: main
 	cp inject_error ../../stage/experiments
 	cp injector.py ../../stage/experiments
 
