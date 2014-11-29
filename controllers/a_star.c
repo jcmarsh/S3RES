@@ -224,12 +224,6 @@ void enterLoop() {
   struct timeval select_timeout;
   fd_set select_set;
 
-  for (int i = 0; i < GRID_NUM; i++) {
-    for (int j = 0; j < GRID_NUM; j++) {
-      obstacle_map[i][j] = false;
-    }
-  }
-
   while(1) {
     select_timeout.tv_sec = 1;
     select_timeout.tv_usec = 0;
@@ -305,6 +299,13 @@ int main(int argc, const char **argv) {
   goal = gridify(goal_d);
   free(goal_d);
   goal_path = newList();
+
+  for (int i = 0; i < GRID_NUM; i++) {
+    for (int j = 0; j < GRID_NUM; j++) {
+      obstacle_map[i][j] = false;
+    }
+  }
+
   enterLoop();
 
   return 0;

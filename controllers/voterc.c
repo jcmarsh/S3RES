@@ -93,7 +93,6 @@ void restartHandler() {
       // also copy over the previous vote state and pipe buffers
       for (int i = 0; i < replicas[restarter].pipe_count; i++) {
         replicas[restartee].voted[i] = replicas[restarter].voted[i];
-        // void *memcpy(void *dest, const void *src, size_t n);
         memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
         replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
         checkSend(i, false);
@@ -104,7 +103,6 @@ void restartHandler() {
 }
 
 void restartReplica(pid_t restarter, pid_t restartee) {
-  //printf("Restarting through %d\n", replicas[restart_id].pid);
   int retval = kill(replicas[restarter].pid, SIGUSR1);
   if (retval < 0) {
     perror("VoterC Signal Problem");

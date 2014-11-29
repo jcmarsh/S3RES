@@ -24,8 +24,6 @@
 struct typed_pipe pipes[PIPE_COUNT];
 int data_index, update_index, ack_index; // Data from range pose, updates to planner, planner acks.
 
-FILE * out_file;
-
 // TAS related
 cpu_speed_t cpu_speed;
 
@@ -159,7 +157,6 @@ void updateMap(struct comm_range_pose_data * data) {
 
   free(current_pose);
   current_pose = gridify(&pose);
-  //printf("Mapper pose %f -> %d, %f -> %d\n", pose.x, current_pose->x, pose.y, current_pose->y);
   send_msg.obs_count = 0;
 
   // Convert ranges absolute positions
@@ -198,12 +195,6 @@ void enterLoop() {
 
   struct timeval select_timeout;
   fd_set select_set;
-
-  for (int i = 0; i < GRID_NUM; i++) {
-    for (int j = 0; j < GRID_NUM; j++) {
-      obstacle_map[i][j] = false;
-    }
-  }
  
   while(1) {
     select_timeout.tv_sec = 1;
@@ -259,6 +250,13 @@ int main(int argc, const char **argv) {
   send_msg.obs_count = 0;
   send_msg.obs_x = (int*)malloc(sizeof(int) * 128);
   send_msg.obs_y = (int*)malloc(sizeof(int) * 128);
+
+  // Remember, don't initialize anything in the loop! (this used to be there... problems)
+  for (int i = 0; i < GRID_NUM; i++) {
+    for (int j = 0; j < GRID_NUM; j++) {
+      obstacle_map[i][j] = 0;
+    }
+  }
 
   enterLoop();
 
