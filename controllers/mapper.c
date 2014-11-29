@@ -214,7 +214,7 @@ void enterLoop() {
           }
           updateMap(&recv_msg);
         } else if (read_ret == -1) {
-          perror("Blocking, eh?");
+          perror("Mapper - read blocking");
         } else {
           puts("Mapper read_ret == 0?");
         }

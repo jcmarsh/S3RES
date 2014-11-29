@@ -28,6 +28,30 @@ struct point_d* degridify(int x, int y) {
   return new_point;
 }
 
+void printMap(bool obs_map[][GRID_NUM], l_list_t* path) {
+  printf("\n");
+  for (int i = GRID_NUM - 1; i >= 0; i--) {
+    for (int j = 0; j < GRID_NUM; j++) {
+      node_t* node = newNode(j, i, 0);
+      if (findNode(path, node) != NULL) {
+        if (obs_map[j][i]) {
+          printf("!"); // Should not happen
+        } else {
+          printf("o");
+        }
+      } else {
+        if (obs_map[j][i]) {
+          printf("X");
+        } else {
+          printf(".");
+        }
+      }
+      free(node);
+    }
+    printf("\n");
+  }
+}
+
 /*              */
 l_list_t* newList() {
   l_list_t* new_list = (l_list_t*) malloc(sizeof(l_list_t));

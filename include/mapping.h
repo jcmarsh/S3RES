@@ -29,6 +29,8 @@ struct l_list_t {
 struct point_i* gridify(struct point_d* p);
 struct point_d* degridify(int x, int y);
 
+void printMap(bool obs_map[][GRID_NUM], l_list_t* path);
+
 l_list_t* newList();
 void printList(l_list_t* list);
 bool nodeEqauls(node_t* a, node_t* b);

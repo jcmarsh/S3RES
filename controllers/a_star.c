@@ -244,14 +244,16 @@ void enterLoop() {
           pose->y = recv_msg_buffer[1];
           int obs_index = 3;
           for (int index = 0; index < recv_msg_buffer[2]; index++) {
-            obstacle_map[recv_msg_buffer[obs_index++]][recv_msg_buffer[obs_index++]] = true;
+            int obs_x = recv_msg_buffer[obs_index + (index * 2)];
+            int obs_y = recv_msg_buffer[obs_index + (index * 2 + 1)];
+            obstacle_map[obs_x][obs_y] = true;
           }
           if (recv_msg_buffer[2] > 0) { // New obstacle arrived
             command();
           }
           commSendAck(pipes[ack_index]);
         } else if (read_ret == -1) {
-          perror("Blocking, eh?");
+          perror("AStar - read blocking");
         } else {
           perror("AStar read_ret == 0?");
         }
@@ -274,7 +276,7 @@ void enterLoop() {
             free(goal_p);
           }
         } else if (read_ret == -1) {
-          perror("Blocking, eh?");
+          perror("AStar - read blocking");
         } else {
           perror("AStar read_ret == 0?");
           exit(0);
