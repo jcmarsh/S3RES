@@ -32,6 +32,8 @@ int updates_index, ack_index, way_req_index, way_res_index;
 
 l_list_t* goal_path;
 
+cpu_speed_t cpu_speed;
+
 void enterLoop();
 void command();
 int initReplica();
@@ -141,7 +143,8 @@ int parseArgs(int argc, const char **argv) {
 // Should probably separate this out correctly
 // Basically the init function
 int initReplica() {
-  optOutRT();
+  // optOutRT();
+  InitTAS(DEFAULT_CPU, &cpu_speed, 15);
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     perror("Failed to register the restart handler");
