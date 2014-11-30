@@ -237,8 +237,8 @@ void enterLoop() {
           commCopyRanger(&recv_msg_data, ranges, pos);
           // Calculates and sends the new command
           command();
-        } else if (read_ret == -1) {
-          perror("ArtPot - read blocking");
+        } else if (read_ret < 0) {
+          perror("ArtPot - read problems");
         } else {
           perror("ArtPot read_ret == 0?");
         }
@@ -250,8 +250,8 @@ void enterLoop() {
           waiting_on_way = false;
           commCopyWaypoints(&recv_msg_way, goal);
           // Calculates and sends the new command
-        } else if (read_ret == -1) {
-          perror("ArtPot - read blocking");
+        } else if (read_ret < 0) {
+          perror("ArtPot - read problems");
         } else {
           perror("ArtPot read_ret == 0?");
         } 

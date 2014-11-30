@@ -12,9 +12,9 @@ void injectRegError(pid_t pid) //struct user_regs_struct * regs)
   int reg_pick = 0;
   int bit_pick = 0;
 
-  perror("Just checking");
   if (ptrace(PTRACE_GETREGS, pid, NULL, &copy_regs) < 0) {
     perror("GETREGS error.");
+    return;
   }
 
   byte_num =  __WORDSIZE / 8;
@@ -29,12 +29,19 @@ void injectRegError(pid_t pid) //struct user_regs_struct * regs)
    * Segment registers are only 16 bits.
    * 4 of the 6 segment register can not be changed (ds, es, fs, and gs)
    * fs_base and gs_base are 47 bits
-   * eflags is 18 bits.
+   * eflags is 18 bits. - Errors when larger bit set... so keeping
+   * Can't seem to set bits 0 and 1 of cs or ss reg
    */
 
   reg_pick = rand() % (reg_num -4); // For now skip the last 4 regs in x86_64
-  bit_pick = rand() % __WORDSIZE;
-  
+  if (17 == reg_pick || 20 == reg_pick) {
+    bit_pick = (rand() % (__WORDSIZE - 2)) + 2; // No 0 or 1 for cs and ss
+  } else if (21 == reg_pick || 22 == reg_pick) { // fs_base and gs_base are 47 bits
+    bit_pick = rand() % 47;
+  } else {
+    bit_pick = rand() % __WORDSIZE;
+  }
+
   printf("reg_pick: %d\tbit_pick: %d\n", reg_pick, bit_pick);
 
   //  printf("hmmm: %lu\n", *((unsigned long *)regs + reg_pick));
@@ -46,6 +53,7 @@ void injectRegError(pid_t pid) //struct user_regs_struct * regs)
   //  *((unsigned long *)regs + reg_pick) = *((unsigned long *)regs + reg_pick) ^ (error_mask << bit_pick);
 
   if(ptrace(PTRACE_SETREGS, pid, NULL, &copy_regs) < 0) {
+    printf("SETREGS error for reg %d, bit %d\n", reg_pick, bit_pick);
     perror("SETREGS error:");
   }
 }

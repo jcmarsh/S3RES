@@ -78,6 +78,10 @@ void restartHandler() {
   for (int r_index = 0; r_index < REP_COUNT; r_index++) {
     if (replicas[r_index].voted[timer_stop_index] == false) {
       int status;
+      int retval = kill(replicas[r_index].pid, SIGKILL); // Make sure it is dead.
+      if (retval < 0) {
+        perror("VoterC killing problem");
+      }
       waitpid(replicas[r_index].pid, &status, WNOHANG); // cleans up the zombie
 
       // Send along the response from the other two replicas.

@@ -150,8 +150,8 @@ void enterLoop() {
       window_index = (window_index + 1) % WINDOW_SIZE;
       // Calculates and sends the new command
       command();
-    } else if (read_ret == -1) {
-      perror("Filter - read blocking");
+    } else if (read_ret < 0) {
+      perror("Filter - read problems");
     } else {
       perror("Filter read_ret == 0?");
     }
