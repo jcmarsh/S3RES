@@ -81,7 +81,8 @@ int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const ch
  
   address.sun_family = AF_UNIX;
   snprintf(address.sun_path, UNIX_PATH_MAX, actual_name);
-
+  free(actual_name);
+  
   if(connect(sock_fd, (struct sockaddr *) &address, sizeof(struct sockaddr_un)) != 0) {
     perror("Replica connect() failed");
     return -1;
