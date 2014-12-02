@@ -129,7 +129,9 @@ void testSDCHandler(int signo) {
 int parseArgs(int argc, const char **argv) {
   // TODO: error checking
   if (argc < 5) {
-    printf("Useful usage message here. Or something.\n");
+    pid_t currentPID = getpid();
+    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "AStar");
+    setPipeIndexes();
   } else {
     for (int i = 0; (i < argc - 1) && (i < PIPE_COUNT); i++) {
       deserializePipe(argv[i + 1], &pipes[i]);
@@ -167,6 +169,19 @@ double estDistanceG(int x, int y) {
   return estDistance(x, y, goal->x, goal->y);
 }
 
+void eraseAllButList(l_list_t** kill_list, l_list_t* save_list) {
+  node_t* clean_n = pop(kill_list);
+  while(clean_n != NULL) {
+    if (findNode(save_list, clean_n) != NULL) {
+      // Found node in save list, don't free
+    } else {
+      free(clean_n);
+    }
+    clean_n = pop(kill_list);
+  }
+  free(*kill_list);
+}
+
 void command() {
   l_list_t* closed_set = newList();
   l_list_t* open_set = newList();
@@ -178,14 +193,22 @@ void command() {
   while(open_set != NULL) { // set empty // TODO: check remove functions
     node_t* current = pop(&open_set);
     if ((current != NULL) && nodeEqauls(current, goal_node)) {
+      free(goal_node);
+
       // erase old path
-      while(pop(&goal_path) != NULL) { };
+      eraseList(&goal_path);
 
       // All done! Extract path
       while (current != NULL) {
         push(&goal_path, current);
         current = current->back_link;
       }
+
+      // clean up memory
+      //eraseAllButList(&open_set, goal_path);
+      eraseList(&open_set);
+      free(open_set);
+      eraseAllButList(&closed_set, goal_path);      
 
       solution = true;
       break;
@@ -198,6 +221,7 @@ void command() {
     while(curr_neigh != NULL) {
       if (findNode(closed_set, curr_neigh) != NULL) {
         // if neighbor in closed - already explored so skip
+        free(curr_neigh);
       } else {
         double tent_g_score = curr_neigh->g_score + estDistance(curr_neigh->x, curr_neigh->y, current->x, current->y);
         node_t* neigh_from_open = findNode(open_set, curr_neigh);
@@ -207,10 +231,13 @@ void command() {
           double f_score = tent_g_score + estDistanceG(curr_neigh->x, curr_neigh->y);
           removeNode(&open_set, curr_neigh); // remove so g_score and f_score are updated.
           addNode(&open_set, curr_neigh, f_score);
+        } else {
+          free(curr_neigh);
         }
       }
       curr_neigh = pop(&neighbors);
     }
+    free(neighbors);
   }
 
   if (!solution) {
@@ -265,9 +292,10 @@ void enterLoop() {
             commSendWaypoints(pipes[way_res_index], -7.0, -7.0, 0.0);
             // none yet
           } else {
-            pop(&goal_path);
+            free(pop(&goal_path)); // Toss closest result
             node_t* new_goal = pop(&goal_path);
             point_d *goal_p = degridify(new_goal->x, new_goal->y);
+            free(new_goal);
             if (insertSDC) {
               insertSDC = false;
               goal_p->x++;

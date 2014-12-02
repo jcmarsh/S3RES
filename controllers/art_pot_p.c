@@ -111,8 +111,10 @@ void testSDCHandler(int signo) {
 
 int parseArgs(int argc, const char **argv) {
   // TODO: error checking
-  if (argc < 3) { // Must request fds
-    printf("Useful usage message here. Or something.\n");
+  if (argc < 4) { // Must request fds
+    pid_t currentPID = getpid();
+    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "ArtPot");
+    setPipeIndexes();
   } else {
     for (int i = 0; (i < argc - 1) && (i < PIPE_COUNT); i++) {
       deserializePipe(argv[i + 1], &pipes[i]);

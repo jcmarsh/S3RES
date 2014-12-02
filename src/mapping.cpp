@@ -76,6 +76,7 @@ bool nodeEqauls(node_t* a, node_t* b) {
   return ((a->x == b->x) && (a->y == b->y));
 }
 
+// Frees the removed node
 void removeNode(l_list_t** list, node_t* node) {
   if ((*list) == NULL || (*list)->head == NULL) {
     return;
@@ -92,6 +93,7 @@ void removeNode(l_list_t** list, node_t* node) {
   }
 }
 
+// node here has already been alloced
 void addNode(l_list_t** list, node_t* node, double sort_val) {
   if ((*list)->head == NULL) {
     // Empty list: add node to head
@@ -137,14 +139,23 @@ void push(l_list_t** list, node_t* node) {
 node_t* pop(l_list_t** list) {
   l_list_t* popped = *list;
   node_t* ret_val = popped->head;
+  
+  *list = popped->tail;
   free(popped);
 
-  *list = (*list)->tail;
   if ((*list) == NULL) { // Never an empty list
     (*list) = newList();
   }
   
   return ret_val;
+}
+
+void eraseList(l_list_t** list) {
+  node_t* curr = pop(list);
+  while (curr != NULL) {
+    free(curr);
+    curr = pop(list);
+  }
 }
 
 node_t* newNode(int x, int y, double g_score) {
