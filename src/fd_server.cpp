@@ -82,6 +82,7 @@ int createFDS(struct server_data * sd, const char* name) {
 
   sd->address.sun_family = AF_UNIX;
   snprintf(sd->address.sun_path, UNIX_PATH_MAX, actual_name);
+  free(actual_name);
 
   if(bind(sd->sock_fd, (struct sockaddr *) &(sd->address), sizeof(struct sockaddr_un)) != 0) {
     printf("bind() failed\n");
@@ -105,6 +106,7 @@ int acceptSendFDS(struct server_data * sd, pid_t *pid, struct typed_pipe* pipes,
     sendFDS(connection_fd, pipes, pipe_count); // send read end to client
   } else {
     perror("FD_Server failed to accept");
+    close(connection_fd);
     return -1;
   }
 
@@ -113,6 +115,8 @@ int acceptSendFDS(struct server_data * sd, pid_t *pid, struct typed_pipe* pipes,
   if (retval != sizeof(pid_t)) {
     perror("FD_Server failed to read pid");
   }
+
+  close(connection_fd);
 
   return 0;
 }

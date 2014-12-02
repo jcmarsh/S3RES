@@ -13,7 +13,8 @@ struct server_data sd;
 
 int main(int argc, const char** argv) {
   // Setup fd server
-  createFDS(&sd, controller_name);
+  //createFDS(&sd, controller_name);
+  createFDS(&sd, "ArtPotTest");
 
   // Setup pipe type and direction
   // Ranger data in

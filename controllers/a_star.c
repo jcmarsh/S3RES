@@ -130,7 +130,7 @@ int parseArgs(int argc, const char **argv) {
   // TODO: error checking
   if (argc < 5) {
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "AStar");
+    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "AStarTest");
     setPipeIndexes();
   } else {
     for (int i = 0; (i < argc - 1) && (i < PIPE_COUNT); i++) {

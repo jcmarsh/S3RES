@@ -19,6 +19,7 @@
 #include "../include/replicas.h"
 #include "../include/commtypes.h"
 #include "../include/fd_server.h"
+#include "../include/fd_client.h" // Used for testing
 
 #define SIG SIGRTMIN + 7
 #define REP_COUNT 3
@@ -124,7 +125,6 @@ void restartReplica(pid_t restarter, pid_t restartee) {
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
 int initVoterC() {
   struct sigevent sev;
-  struct sigaction sa;
   sigset_t mask;
 
   InitTAS(DEFAULT_CPU, &cpu_speed, voter_priority);
@@ -150,6 +150,7 @@ int initVoterC() {
   }
 
   /* Create the timer */
+  memset(&sev, 0, sizeof(sev));
   sev.sigev_notify = SIGEV_SIGNAL;
   sev.sigev_signo = SIG;
   sev.sigev_value.sival_ptr = &timerid;
@@ -172,10 +173,6 @@ int initVoterC() {
 }
 
 int parseArgs(int argc, const char **argv) {
-  if (argc < 4) {
-    puts("Usage: VoterC <controller_name> <timeout> <message_type:fd_in:fd_out> <...>");
-    return -1;
-  }
 
   controller_name = const_cast<char*>(argv[1]);
   voting_timeout = atoi(argv[2]);
@@ -188,20 +185,32 @@ int parseArgs(int argc, const char **argv) {
   if (voting_timeout > PERIOD_NSEC) {
     voter_priority = 5;
   }
-  for (int i = 0; (i < argc - 3 && i < PIPE_LIMIT); i++) {
-    deserializePipe(argv[i + 3], &ext_pipes[pipe_count]);
-    if (ext_pipes[pipe_count].timed) {
-      if (ext_pipes[pipe_count].fd_in != 0) {
-        timer_start_index = pipe_count;
-      } else {
-        timer_stop_index = pipe_count;
-      }
+
+  if (argc < 4) { // In testing mode
+    pid_t currentPID = getpid();
+    pipe_count = 4;  // 4 is the only controller specific bit here... and ArtPotTest
+    connectRecvFDS(currentPID, ext_pipes, pipe_count, "ArtPotTest");
+        // puts("Usage: VoterC <controller_name> <timeout> <message_type:fd_in:fd_out> <...>");
+    // return -1;
+  } else {
+    for (int i = 0; (i < argc - 3 && i < PIPE_LIMIT); i++) {
+      deserializePipe(argv[i + 3], &ext_pipes[pipe_count]);
+      pipe_count++;
     }
-    pipe_count++;
+
+    if (pipe_count >= PIPE_LIMIT) {
+      printf("VoterC: Raise pipe limit.\n");
+    }
   }
 
-  if (pipe_count >= PIPE_LIMIT) {
-    printf("VoterC: Raise pipe limit.\n");
+  for (int i = 0; i < pipe_count; i++) {
+    if (ext_pipes[i].timed) {
+      if (ext_pipes[i].fd_in != 0) {
+        timer_start_index = i;
+      } else {
+        timer_stop_index = i;
+      }
+    }
   }
 
   return 0;

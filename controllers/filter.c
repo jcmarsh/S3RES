@@ -82,7 +82,7 @@ int parseArgs(int argc, const char **argv) {
   if (argc < 3) { // Must request fds
     // printf("Usage: Filter <pipe_in> <pipe_out_0> <pipe_out_1>\n");
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, 3, "Filter");
+    connectRecvFDS(currentPID, pipes, 3, "FilterTest");
   } else {
     deserializePipe(argv[1], &pipes[0]);
     for (int i = 2; (i <= pipe_count && i < argc); i++) {

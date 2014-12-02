@@ -8,10 +8,10 @@ default:
 
 clean:
 	rm -rf MapperTest
-	rm -rf Mapper_fd_server
+	rm -rf MapperTest_fd_server
 	rm -rf FilterTest
-	rm -rf Filter_fd_server
+	rm -rf FilterTest_fd_server
 	rm -rf ArtPotTest
-	rm -rf ArtPot_fd_server
+	rm -rf ArtPotTest_fd_server
 	rm -rf AStarTest
-	rm -rf AStar_fd_server
+	rm -rf AStarTest_fd_server

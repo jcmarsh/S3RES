@@ -95,5 +95,9 @@ void forkReplicas(struct replica replicas[], int rep_num) {
     }
     rep_argv[rep_argc - 1] = NULL;
     curr->pid = forkSingle(rep_argv);
+    for (int a_index = 1; a_index < rep_argc; a_index++) {
+      free(rep_argv[a_index]);
+    }
+    free(rep_argv);
   }
 }

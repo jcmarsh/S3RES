@@ -1,19 +1,19 @@
 RESEARCH=/home/jcmarsh/research
 SRC=../src/commtypes.cpp ../src/fd_client.cpp
 LIB=-lrt -lTASLimited
-FLAGS=-O3
-#FLAGS=-g -O0
+#FLAGS=-O3
+FLAGS=-g -O0
 
 all: regular
 
 regular:
-	g++ $(FLAGS) -o ArtPot art_pot_p.c $(SRC) $(LIB)
+	g++ $(FLAGS) -o ArtPot art_pot.c $(SRC) $(LIB)
 	g++ $(FLAGS) -o AStar a_star.c $(SRC) ../src/mapping.cpp $(LIB)
 	g++ $(FLAGS) -o BenchMarker benchmarker.c ../src/commtypes.cpp ../src/replicas.cpp $(LIB)
 	g++ $(FLAGS) -o Empty empty.c $(SRC) $(LIB) 
 	g++ $(FLAGS) -o Filter filter.c $(SRC) $(LIB) 
 	g++ $(FLAGS) -o Mapper mapper.c $(SRC) ../src/mapping.cpp $(LIB) 
-	g++ $(FLAGS) -o VoterC voterc.c ../src/commtypes.cpp ../src/replicas.cpp ../src/fd_server.cpp $(LIB)
+	g++ $(FLAGS) -o VoterC voterc.c ../src/commtypes.cpp ../src/replicas.cpp ../src/fd_server.cpp ../src/fd_client.cpp $(LIB)
 
 copy: regular
 	cp ArtPot ../../stage/experiments/
