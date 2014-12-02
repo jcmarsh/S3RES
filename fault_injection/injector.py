@@ -29,12 +29,12 @@ while True:
 	victim_pids = []
 	victim_names = []
 
-	#getPIDs(victim_pids, victim_names, 'ps -a | grep "AStar"')
+	getPIDs(victim_pids, victim_names, 'ps -a | grep "AStar"')
 	getPIDs(victim_pids, victim_names, 'ps -a | grep "Filter"')
 	getPIDs(victim_pids, victim_names, 'ps -a | grep "ArtPot"')
-	#getPIDs(victim_pids, victim_names, 'ps -a | grep "Mapper"')
+	getPIDs(victim_pids, victim_names, 'ps -a | grep "Mapper"')
 
-	if (len(victim_pids) < 6):
+	if (len(victim_pids) < (4 * 3)):
 		print "Error: One of the controllers did not successfully restart"
 		sys.exit()
 

@@ -43,6 +43,7 @@ struct replica replicas[REP_COUNT];
 
 // TAS Stuff
 cpu_speed_t cpu_speed;
+int voter_priority = 3;
 
 // FD server
 struct server_data sd;
@@ -126,7 +127,7 @@ int initVoterC() {
   struct sigaction sa;
   sigset_t mask;
 
-  InitTAS(DEFAULT_CPU, &cpu_speed, 3);
+  InitTAS(DEFAULT_CPU, &cpu_speed, voter_priority);
 
   // timeout_fd
   if (pipe(timeout_fd) == -1) {
@@ -180,6 +181,12 @@ int parseArgs(int argc, const char **argv) {
   voting_timeout = atoi(argv[2]);
   if (voting_timeout == 0) {
     voting_timeout = PERIOD_NSEC;
+  }
+  // TODO: THIS IS AN UGLY HACK
+  // if the timeout is long, then assume NOT a reactive controller and thus should
+  // have a lower priority
+  if (voting_timeout > PERIOD_NSEC) {
+    voter_priority = 5;
   }
   for (int i = 0; (i < argc - 3 && i < PIPE_LIMIT); i++) {
     deserializePipe(argv[i + 3], &ext_pipes[pipe_count]);

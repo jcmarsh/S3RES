@@ -128,7 +128,7 @@ int parseArgs(int argc, const char **argv) {
 // Should probably separate this out correctly
 // Basically the init function
 int initReplica() {
-  InitTAS(DEFAULT_CPU, &cpu_speed, 5);
+  InitTAS(DEFAULT_CPU, &cpu_speed, 4);
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     perror("Failed to register the restart handler");
