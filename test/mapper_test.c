@@ -53,16 +53,16 @@ int main(int argc, const char** argv) {
 
   	write(rep.vot_pipes[0].fd_out, &sim_range_data, sizeof(struct comm_range_pose_data));
 
-	// read the map update, should at least have the pose
-  	char buffer[1024];
-	read(rep.vot_pipes[1].fd_in, buffer, sizeof(buffer));
-	printf("Pose returned %d, %d\n", ((int *)buffer)[0], ((int *)buffer)[1]);
+    // read the map update, should at least have the pose
+    char buffer[1024];
+    read(rep.vot_pipes[1].fd_in, buffer, sizeof(buffer));
+    printf("Pose returned %d, %d\n", ((int *)buffer)[0], ((int *)buffer)[1]);
 
-	// write the ack
-	struct comm_ack sim_ack;
-	sim_ack.padding = 0;
-	write(rep.vot_pipes[2].fd_out, &sim_ack, sizeof(struct comm_ack));
+    // write the ack
+    struct comm_ack sim_ack;
+    sim_ack.padding = 0;
+    write(rep.vot_pipes[2].fd_out, &sim_ack, sizeof(struct comm_ack));
 
-	sleep(1);
+    sleep(1);
   }
 }

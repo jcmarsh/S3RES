@@ -20,15 +20,17 @@
 // Configuration parameters
 #define WINDOW_SIZE 3
 #define RANGER_COUNT 16  // 16 is the size in commtypes.h
+#define PIPE_COUNT 3 // But sometimes 2; 2nd out pipe is optional
 
+int pipe_count = PIPE_COUNT;
 int window_index = 0;
 double ranges[WINDOW_SIZE][RANGER_COUNT] = {0};
 // range and pose data is sent together...
 double pose[3];
 
-int pipe_count = 3;
 // pipe 0 is data in, 1 is filtered (averaged) out, 2 is just regular out
-struct typed_pipe pipes[3];
+struct typed_pipe pipes[PIPE_COUNT];
+int data_index, average_index, regular_index;
 
 // TAS related
 cpu_speed_t cpu_speed;
@@ -38,9 +40,8 @@ void command();
 int initReplica();
 
 void restartHandler(int signo) {
-  pid_t currentPID = 0;
   // fork
-  currentPID = fork();
+  pid_t currentPID = fork();
 
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
@@ -82,11 +83,18 @@ int parseArgs(int argc, const char **argv) {
   if (argc < 3) { // Must request fds
     // printf("Usage: Filter <pipe_in> <pipe_out_0> <pipe_out_1>\n");
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, 3, "FilterTest");
+    connectRecvFDS(currentPID, pipes, 2, "FilterTest");
   } else {
-    deserializePipe(argv[1], &pipes[0]);
-    for (int i = 2; (i <= pipe_count && i < argc); i++) {
-      deserializePipe(argv[i], &pipes[i - 1]);
+    data_index = 0;
+    deserializePipe(argv[1], &pipes[data_index]);
+    average_index = 1;
+    deserializePipe(argv[2], &pipes[average_index]);
+    if (4 == argc) {
+      regular_index = 2;
+      deserializePipe(argv[3], &pipes[regular_index]);
+    } else {
+      pipe_count = PIPE_COUNT - 1;
+      regular_index = -1;
     }
   }
 
@@ -96,11 +104,7 @@ int parseArgs(int argc, const char **argv) {
 // Should probably separate this out correctly
 // Basically the init function
 int initReplica() {
-  struct sched_param param;
-
   InitTAS(DEFAULT_CPU, &cpu_speed, 4);
-
-  sched_getscheduler(0);
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     perror("Failed to register the restart handler");
@@ -131,31 +135,42 @@ void command() {
   }
 
   // Write out averaged range data (with pose)
-  commSendRanger(pipes[1], range_average, pose);
-  // TODO: check that this exists before write
-  commSendRanger(pipes[2], ranges[(window_index + (WINDOW_SIZE - 1)) % WINDOW_SIZE], pose);
+  commSendRanger(pipes[average_index], range_average, pose);
+  if (PIPE_COUNT == pipe_count) {
+    commSendRanger(pipes[regular_index], ranges[(window_index + (WINDOW_SIZE - 1)) % WINDOW_SIZE], pose);
+  }
 }
 
 void enterLoop() {
-  void * update_id;
-  int index;
-
   int read_ret;
   struct comm_range_pose_data recv_msg;
 
+  struct timeval select_timeout;
+  fd_set select_set;
+
   while(1) {
-    // Blocking, but that's okay with me
-    read_ret = read(pipes[0].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
-    if (read_ret > 0) {
-      // TODO: Error checking
-      commCopyRanger(&recv_msg, ranges[window_index], pose);
-      window_index = (window_index + 1) % WINDOW_SIZE;
-      // Calculates and sends the new command
-      command();
-    } else if (read_ret < 0) {
-      perror("Filter - read problems");
-    } else {
-      perror("Filter read_ret == 0?");
+    select_timeout.tv_sec = 1;
+    select_timeout.tv_usec = 0;
+
+    FD_ZERO(&select_set);
+    FD_SET(pipes[data_index].fd_in, &select_set);
+
+    int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
+    if (retval > 0) {
+      if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
+        read_ret = read(pipes[data_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
+        if (read_ret > 0) {
+          // TODO: Error checking
+          commCopyRanger(&recv_msg, ranges[window_index], pose);
+          window_index = (window_index + 1) % WINDOW_SIZE;
+          // Calculates and sends the new command
+          command();
+        } else if (read_ret < 0) {
+          perror("Filter - read problems");
+        } else {
+          perror("Filter read_ret == 0?");
+        }
+      }
     }
   }
 }
@@ -174,4 +189,3 @@ int main(int argc, const char **argv) {
   enterLoop();
   return 0;
 }
-

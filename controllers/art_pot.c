@@ -39,6 +39,7 @@ double pos[3];
 int ranger_count = 16;
 double ranges[16]; // 16 is the size in commtypes.h
 
+int pipe_count = PIPE_COUNT; // 4 with a planner, 2 otherwise
 struct typed_pipe pipes[PIPE_COUNT]; // 0 is data_in, 1 is cmd_out
 int data_index, out_index, way_req_index, way_res_index;
 
@@ -51,6 +52,8 @@ int initReplica();
 
 // Set indexes based on pipe types
 void setPipeIndexes() {
+  way_req_index = -1;
+  way_res_index = -1;
   for (int i = 0; i < PIPE_COUNT; i++) {
     switch (pipes[i].type) {
       case RANGE_POSE_DATA:
@@ -79,7 +82,7 @@ void restartHandler(int signo) {
       initReplica();
       // Get own pid, send to voter
       currentPID = getpid();
-      connectRecvFDS(currentPID, pipes, PIPE_COUNT, "ArtPot");
+      connectRecvFDS(currentPID, pipes, pipe_count, "ArtPot");
       setPipeIndexes();
 
       // unblock the signal (restart handler)
@@ -111,13 +114,18 @@ void testSDCHandler(int signo) {
 
 int parseArgs(int argc, const char **argv) {
   // TODO: error checking
-  if (argc < 4) { // Must request fds
+  if (argc < 3) { // Must request fds
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "ArtPotTest");
+    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "ArtPotTest"); // Up to the test prog; could be 4 or 2
     setPipeIndexes();
   } else {
     for (int i = 0; (i < argc - 1) && (i < PIPE_COUNT); i++) {
       deserializePipe(argv[i + 1], &pipes[i]);
+    }
+    if (argc < 5) {
+      pipe_count = 2; // no planner, now waypoint req/res
+    } else {
+      pipe_count = PIPE_COUNT;
     }
     setPipeIndexes();
   }
@@ -198,8 +206,10 @@ void command() {
     vel_cmd[1] = VEL_SCALE * vel_cmd[1];
   } else { // within distance epsilon. Give it up, man.
     if (!waiting_on_way) {
-      commSendWaypointRequest(pipes[way_req_index]);
-      waiting_on_way = true;
+      if (PIPE_COUNT == pipe_count) {
+        commSendWaypointRequest(pipes[way_req_index]);
+        waiting_on_way = true;
+      }
     }
     vel_cmd[0] = 0.0;
     vel_cmd[1] = 0.0;
@@ -228,7 +238,9 @@ void enterLoop() {
 
     FD_ZERO(&select_set);
     FD_SET(pipes[data_index].fd_in, &select_set);
-    FD_SET(pipes[way_res_index].fd_in, &select_set);
+    if (PIPE_COUNT == pipe_count) {
+      FD_SET(pipes[way_res_index].fd_in, &select_set);
+    }
 
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
@@ -245,18 +257,20 @@ void enterLoop() {
           perror("ArtPot read_ret == 0?");
         }
       }
-      if (FD_ISSET(pipes[way_res_index].fd_in, &select_set)) {
-        read_ret = read(pipes[way_res_index].fd_in, &recv_msg_way, sizeof(struct comm_way_res));
-        if (read_ret > 0) {
-          // TODO check for erros
-          waiting_on_way = false;
-          commCopyWaypoints(&recv_msg_way, goal);
-          // Calculates and sends the new command
-        } else if (read_ret < 0) {
-          perror("ArtPot - read problems");
-        } else {
-          perror("ArtPot read_ret == 0?");
-        } 
+      if (PIPE_COUNT == pipe_count) {
+        if (FD_ISSET(pipes[way_res_index].fd_in, &select_set)) {
+          read_ret = read(pipes[way_res_index].fd_in, &recv_msg_way, sizeof(struct comm_way_res));
+          if (read_ret > 0) {
+            // TODO check for erros
+            waiting_on_way = false;
+            commCopyWaypoints(&recv_msg_way, goal);
+            // Calculates and sends the new command
+          } else if (read_ret < 0) {
+            perror("ArtPot - read problems");
+          } else {
+            perror("ArtPot read_ret == 0?");
+          } 
+        }
       }
     }
   }
@@ -274,8 +288,13 @@ int main(int argc, const char **argv) {
   }
 
   insertSDC = false;
-  commSendWaypointRequest(pipes[way_req_index]);
-  waiting_on_way = true;
+  if (PIPE_COUNT == pipe_count) {
+    commSendWaypointRequest(pipes[way_req_index]);
+    waiting_on_way = true;
+  } else {
+    goal[0] = 7.0;
+    goal[1] = 7.0;
+  }
 
   enterLoop();
 

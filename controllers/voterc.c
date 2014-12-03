@@ -79,13 +79,6 @@ void restartHandler() {
   // Timer went off, so the timer_stop_index is the pipe which is awaiting a rep
   for (int r_index = 0; r_index < REP_COUNT; r_index++) {
     if (replicas[r_index].voted[timer_stop_index] == false) {
-      int status;
-      int retval = kill(replicas[r_index].pid, SIGKILL); // Make sure it is dead.
-      if (retval < 0) {
-        perror("VoterC killing problem");
-      }
-      waitpid(replicas[r_index].pid, &status, WNOHANG); // cleans up the zombie
-
       // Send along the response from the other two replicas.
       replicas[r_index].voted[timer_stop_index] = true;
       checkSend(timer_stop_index, false); // DO NOT check for SDC (one has failed)
@@ -108,7 +101,27 @@ void restartHandler() {
   }
 }
 
-void restartReplica(pid_t restarter, pid_t restartee) {
+void restartReplica(int restarter, int restartee) {
+  // Kill old replica
+  kill(replicas[restartee].pid, SIGKILL); // Make sure it is dead.
+  waitpid(replicas[restartee].pid, NULL, WNOHANG); // cleans up the zombie
+
+  // cleanup replica data structure
+  for (int i = 0; i < replicas[restartee].pipe_count; i++) {
+    if (replicas[restartee].vot_pipes[i].fd_in > 0) {
+      close(replicas[restartee].vot_pipes[i].fd_in);
+    }
+    if (replicas[restartee].vot_pipes[i].fd_out > 0) {
+      close(replicas[restartee].vot_pipes[i].fd_out);
+    }
+    if (replicas[restartee].rep_pipes[i].fd_in > 0) {
+      close(replicas[restartee].rep_pipes[i].fd_in);
+    }
+    if (replicas[restartee].rep_pipes[i].fd_out > 0) {
+      close(replicas[restartee].rep_pipes[i].fd_out);
+    }
+  }
+
   int retval = kill(replicas[restarter].pid, SIGUSR1);
   if (retval < 0) {
     perror("VoterC Signal Problem");
@@ -188,8 +201,12 @@ int parseArgs(int argc, const char **argv) {
 
   if (argc < 4) { // In testing mode
     pid_t currentPID = getpid();
-    pipe_count = 4;  // 4 is the only controller specific bit here... and ArtPotTest
-    connectRecvFDS(currentPID, ext_pipes, pipe_count, "ArtPotTest");
+    //pipe_count = 4;  // 4 is the only controller specific bit here... and ArtPotTest
+    //connectRecvFDS(currentPID, ext_pipes, pipe_count, "ArtPotTest");
+    pipe_count = 2;  // 4 is the only controller specific bit here... and ArtPotTest
+    connectRecvFDS(currentPID, ext_pipes, pipe_count, "FilterTest");
+    timer_start_index = 0;
+    timer_stop_index = 1;
         // puts("Usage: VoterC <controller_name> <timeout> <message_type:fd_in:fd_out> <...>");
     // return -1;
   } else {

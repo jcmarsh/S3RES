@@ -64,13 +64,43 @@ int main(int argc, const char** argv) {
   	for (i = 0; i < 16; i++) {
   		sim_range_data.ranges[i] = i * 1.5;
   	}
+    printf("Writing data to pipes\n");
   	write(rep.vot_pipes[0].fd_out, &sim_range_data, sizeof(struct comm_range_pose_data));
 
-	// read the command out
-  	struct comm_mov_cmd mov_cmd;
-	read(rep.vot_pipes[3].fd_in, &mov_cmd, sizeof(mov_cmd));
-	printf("Move Command: %f, %f\n", mov_cmd.vel_cmd[0], mov_cmd.vel_cmd[1]);
+    // check for command out or a new waypoint request
+    int retval = 0;
 
-	sleep(1);
+    struct timeval select_timeout;
+    fd_set select_set;
+
+    // See if any of the read pipes have anything
+    select_timeout.tv_sec = 1;
+    select_timeout.tv_usec = 0;
+
+    FD_ZERO(&select_set);
+    FD_SET(rep.vot_pipes[1].fd_in, &select_set);
+    FD_SET(rep.vot_pipes[3].fd_in, &select_set);
+
+    printf("The select.\n");
+    retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
+
+    if (retval > 0) {
+      if (FD_ISSET(rep.vot_pipes[1].fd_in, &select_set)) {
+        read(rep.vot_pipes[1].fd_in, &way_req, sizeof(way_req));
+        printf("Got waypoint req\n");
+        way_res.point[0] = 8.0;
+        way_res.point[1] = 8.0;
+        way_res.point[2] = 0.0;
+        write(rep.vot_pipes[2].fd_out, &way_res, sizeof(way_res));
+      }
+      if (FD_ISSET(rep.vot_pipes[3].fd_in, &select_set)) {
+        // read the command out
+        struct comm_mov_cmd mov_cmd;
+        read(rep.vot_pipes[3].fd_in, &mov_cmd, sizeof(mov_cmd));
+        printf("Move Command: %f, %f\n", mov_cmd.vel_cmd[0], mov_cmd.vel_cmd[1]);
+      }
+    }
+
+  	sleep(1);
   }
 }
