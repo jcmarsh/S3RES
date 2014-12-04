@@ -34,6 +34,7 @@ int data_index, average_index, regular_index;
 
 // TAS related
 cpu_speed_t cpu_speed;
+int priority;
 
 void enterLoop();
 void command();
@@ -80,18 +81,19 @@ void testSDCHandler(int signo) {
 
 int parseArgs(int argc, const char **argv) {
   // TODO: error checking
-  if (argc < 3) { // Must request fds
+  priority = atoi(argv[1]);
+  if (argc < 4) { // Must request fds
     // printf("Usage: Filter <pipe_in> <pipe_out_0> <pipe_out_1>\n");
     pid_t currentPID = getpid();
     connectRecvFDS(currentPID, pipes, 2, "FilterTest");
   } else {
     data_index = 0;
-    deserializePipe(argv[1], &pipes[data_index]);
+    deserializePipe(argv[2], &pipes[data_index]);
     average_index = 1;
-    deserializePipe(argv[2], &pipes[average_index]);
-    if (4 == argc) {
+    deserializePipe(argv[3], &pipes[average_index]);
+    if (5 == argc) {
       regular_index = 2;
-      deserializePipe(argv[3], &pipes[regular_index]);
+      deserializePipe(argv[4], &pipes[regular_index]);
     } else {
       pipe_count = PIPE_COUNT - 1;
       regular_index = -1;
@@ -104,7 +106,7 @@ int parseArgs(int argc, const char **argv) {
 // Should probably separate this out correctly
 // Basically the init function
 int initReplica() {
-  InitTAS(DEFAULT_CPU, &cpu_speed, 4);
+  InitTAS(DEFAULT_CPU, &cpu_speed, priority);
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     perror("Failed to register the restart handler");

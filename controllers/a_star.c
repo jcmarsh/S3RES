@@ -33,6 +33,7 @@ int updates_index, ack_index, way_req_index, way_res_index;
 l_list_t* goal_path;
 
 cpu_speed_t cpu_speed;
+int priority;
 
 void enterLoop();
 void command();
@@ -128,13 +129,14 @@ void testSDCHandler(int signo) {
 // TODO: move to library?
 int parseArgs(int argc, const char **argv) {
   // TODO: error checking
-  if (argc < 5) {
+  priority = atoi(argv[1]);
+  if (argc < 6) {
     pid_t currentPID = getpid();
     connectRecvFDS(currentPID, pipes, PIPE_COUNT, "AStarTest");
     setPipeIndexes();
   } else {
-    for (int i = 0; (i < argc - 1) && (i < PIPE_COUNT); i++) {
-      deserializePipe(argv[i + 1], &pipes[i]);
+    for (int i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {
+      deserializePipe(argv[i + 2], &pipes[i]);
     }
     setPipeIndexes();
   }
@@ -146,7 +148,7 @@ int parseArgs(int argc, const char **argv) {
 // Basically the init function
 int initReplica() {
   // optOutRT();
-  InitTAS(DEFAULT_CPU, &cpu_speed, 15);
+  InitTAS(DEFAULT_CPU, &cpu_speed, priority);
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     perror("Failed to register the restart handler");

@@ -11,7 +11,7 @@
 // True if succeeds, false otherwise.
 // TODO: DMR vs TMR are not used here (yet).
 // TODO: should eventually allow an arbitrary number of arguments to be passed in. For now, just one for ease
-bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep_type, char* voter_name, char* voter_timer) {
+bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep_type, char* voter_name, char* voter_timer, char* priority) {
 	// if current is null, add new node
 	if (nodes->current == NULL) {
 		struct node *new_node = malloc(sizeof(struct node));
@@ -34,6 +34,8 @@ bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep
 			new_node->voter_name = NULL;
 			new_node->voter_timer = NULL;
 		}
+		new_node->priority = malloc(strlen(priority));
+		strcpy(new_node->priority, priority);
 
 		nodes->current = new_node;
 		nodes->next = malloc(sizeof(struct nodelist));		
@@ -43,7 +45,7 @@ bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep
 		printf("PLUMBING ERROR: Re-defining component: %s\n", Name);
 		return false;
 	} else {
-		return add_node(nodes->next, Name, Value, rep_type, voter_name, voter_timer);
+		return add_node(nodes->next, Name, Value, rep_type, voter_name, voter_timer, priority);
 	}
 }
 
@@ -114,21 +116,23 @@ int launch_node(struct nodelist* nodes) {
 		int other_arg = 0;
 		if (curr->rep_strat == NONE) {
 			// launch with no replication
-			rep_count = 2 + curr->pipe_count;
+			rep_count = 3 + curr->pipe_count;
 			rep_argv = malloc(sizeof(char *) * rep_count);
 			rep_argv[0] = curr->value;
-			other_arg = 1;
+			rep_argv[1] = curr->priority;
+			other_arg = 2;
 			rep_argv[rep_count - 1] = NULL;
 		} else if (curr->rep_strat == DMR) {
 			printf("pb.y: No support for DMR\n");
 		} else if (curr->rep_strat == TMR) {
 			// launch with voter
-			int rep_count = 4 + curr->pipe_count;
+			int rep_count = 5 + curr->pipe_count;
 			rep_argv = malloc(sizeof(char *) * rep_count);
 			rep_argv[0] = curr->voter_name;
 			rep_argv[1] = curr->value;
 			rep_argv[2] = curr->voter_timer;
-			other_arg = 3;
+			rep_argv[3] = curr->priority;
+			other_arg = 4;
 			rep_argv[rep_count - 1] = NULL;
 		}
 

@@ -15,6 +15,7 @@ struct node {
 	// ex. local_nav := ArtPot
 	char* name;
 	char* value;
+	char* priority;
  	
 	replication_t rep_strat;
 	char* voter_name; // from config file: local_nav = (ArtPot)VoterB
@@ -30,7 +31,7 @@ struct nodelist {
 	struct nodelist* next;
 };
 
-bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep_type, char* voter_name, char* voter_timer);
+bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep_type, char* voter_name, char* voter_timer, char* priority);
 
 struct node* get_node(struct nodelist* nodes, char* Name);
 

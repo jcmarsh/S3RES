@@ -21,6 +21,7 @@ struct typed_pipe pipes[2];
 
 // TAS related
 cpu_speed_t cpu_speed;
+int priority;
 
 void enterLoop();
 int initReplica();
@@ -55,16 +56,16 @@ void restartHandler(int signo) {
 }
 
 int parseArgs(int argc, const char **argv) {
-  int i;
   pid_t pid;
 
   // TODO: error checking
+  priority = atoi(argv[1]);
   if (argc < 3) { // Must request fds
     pid = getpid();
     //connectRecvFDS(pid, &read_in_fd, &write_out_fd, "Empty");
   } else {
-    deserializePipe(argv[1], &pipes[0]);
-    deserializePipe(argv[2], &pipes[1]);
+    deserializePipe(argv[2], &pipes[0]);
+    deserializePipe(argv[3], &pipes[1]);
   }
 
   return 0;
@@ -73,12 +74,7 @@ int parseArgs(int argc, const char **argv) {
 // TODO: Should probably separate this out correctly
 // Basically the init function
 int initReplica() {
-  int scheduler;
-  struct sched_param param;
-
-  InitTAS(DEFAULT_CPU, &cpu_speed, 5);
-
-  scheduler = sched_getscheduler(0);
+  InitTAS(DEFAULT_CPU, &cpu_speed, priority);
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     puts("Failed to register the restart handler");

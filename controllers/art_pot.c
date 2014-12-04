@@ -45,6 +45,7 @@ int data_index, out_index, way_req_index, way_res_index;
 
 // TAS related
 cpu_speed_t cpu_speed;
+int priority;
 
 void enterLoop();
 void command();
@@ -114,15 +115,16 @@ void testSDCHandler(int signo) {
 
 int parseArgs(int argc, const char **argv) {
   // TODO: error checking
-  if (argc < 3) { // Must request fds
+  priority = atoi(argv[1]);
+  if (argc < 4) { // Must request fds
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "ArtPotTest"); // Up to the test prog; could be 4 or 2
+    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "ArtPotTest");
     setPipeIndexes();
   } else {
-    for (int i = 0; (i < argc - 1) && (i < PIPE_COUNT); i++) {
-      deserializePipe(argv[i + 1], &pipes[i]);
+    for (int i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {
+      deserializePipe(argv[i + 2], &pipes[i]);
     }
-    if (argc < 5) {
+    if (argc < 6) {
       pipe_count = 2; // no planner, now waypoint req/res
     } else {
       pipe_count = PIPE_COUNT;
@@ -136,7 +138,7 @@ int parseArgs(int argc, const char **argv) {
 // Should probably separate this out correctly
 // Basically the init function
 int initReplica() {
-  InitTAS(DEFAULT_CPU, &cpu_speed, 4);
+  InitTAS(DEFAULT_CPU, &cpu_speed, priority);
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     perror("Failed to register the restart handler");

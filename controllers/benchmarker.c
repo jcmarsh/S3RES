@@ -25,6 +25,7 @@ struct comm_mov_cmd mov_cmd_msg;
 
 // TAS Stuff
 cpu_speed_t cpu_speed;
+int priority;
 
  // These are to your parent (Translator)
 struct typed_pipe trans_pipes[2];
@@ -34,7 +35,7 @@ timestamp_t last;
 // FUNCTIONS!
 int initBenchMarker();
 int parseArgs(int argc, const char **argv);
-void doOneUpdate();
+void enterLoop();
 void sendWaypoints();
 void processOdom();
 void processRanger();
@@ -44,13 +45,13 @@ int initBenchMarker() {
   int scheduler;
   int p_offset = 0;
 
-  InitTAS(DEFAULT_CPU, &cpu_speed, 0);
+  InitTAS(DEFAULT_CPU, &cpu_speed, priority);
 
   scheduler = sched_getscheduler(0);
 
   // Should only be a single replica
   struct replica* r_p = (struct replica *) &replica;
-  initReplicas(r_p, 1, "plumber");
+  initReplicas(r_p, 1, "plumber", 10);
   createPipes(r_p, 1, trans_pipes, 2);
   forkReplicas(r_p, 1);
   
@@ -58,15 +59,14 @@ int initBenchMarker() {
 }
 
 int parseArgs(int argc, const char **argv) {
-  int i;
-
-  if (argc < 3) {
+  priority = atoi(argv[1]);
+  if (argc < 4) {
     puts("Usage: BenchMarker <read_in_fd> <write_out_fd>");
     return -1;
   }
 
-  deserializePipe(argv[1], &trans_pipes[0]);
-  deserializePipe(argv[2], &trans_pipes[1]);
+  deserializePipe(argv[2], &trans_pipes[0]);
+  deserializePipe(argv[3], &trans_pipes[1]);
 
   return 0;
 }
@@ -82,44 +82,55 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
-  while(1) {
-    doOneUpdate();
-  }
+  enterLoop();
 
   return 0;
 }
 
-void doOneUpdate() {
-  int retval = 0;
-  int index;
-  struct comm_range_pose_data recv_msg_tran;
-  struct comm_mov_cmd recv_msg_rep;
+void enterLoop() {
+  struct timeval select_timeout;
+  fd_set select_set;
+  bool waiting_response = false;
 
-  // Message comes in from translator
-  // Message goes out from replica
-  // That is it. Except for those waypoint request / responses
+  while(1) {
+    select_timeout.tv_sec = 1;
+    select_timeout.tv_usec = 0;
 
-  // Translator driven, check first. This call blocks.
+    FD_ZERO(&select_set);
+    FD_SET(trans_pipes[0].fd_in, &select_set);
+    FD_SET(replica.vot_pipes[1].fd_in, &select_set);
 
-  // TODO: handle waypoint responses
-  retval = read(trans_pipes[0].fd_in, &recv_msg_tran, sizeof(struct comm_range_pose_data));
-  if (retval > 0) {
-    // TODO: Check for erros
-    memcpy(&range_pose_data_msg, &recv_msg_tran, sizeof(struct comm_range_pose_data));
-    processRanger();      
-  } else {
-    perror("Bench: read should have worked, failed."); // EINTR?
-  }
+    // Message comes in from translator
+    // Message goes out from replica
+    int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
+    if (retval > 0) {
+      if (FD_ISSET(trans_pipes[0].fd_in, &select_set)) {
+        retval = read(trans_pipes[0].fd_in, &range_pose_data_msg, sizeof(struct comm_range_pose_data));
+        if (retval > 0) {
+          // TODO: Check for erros
+          if (waiting_response) {
+            printf("ERROR, sending data but still waiting on previous response.\n");
+          }
+          waiting_response = true;
 
-  // Second part of the cycle: response from replica
-  // TODO: Handle waypoint requests
-  retval = read(replica.vot_pipes[1].fd_in, &recv_msg_rep, sizeof(struct comm_mov_cmd));
-  if (retval > 0) {
-    mov_cmd_msg.vel_cmd[0] = recv_msg_rep.vel_cmd[0];
-    mov_cmd_msg.vel_cmd[1] = recv_msg_rep.vel_cmd[1];
-    processCommand();
-  } else {
-    perror("Bench: read should have worked, failed."); // EINTR?
+          processRanger();      
+        } else {
+          perror("Bench: read should have worked, failed."); // EINTR?
+        }
+      }
+
+      if (FD_ISSET(replica.vot_pipes[1].fd_in, &select_set)) {
+        // Second part of the cycle: response from replica
+        retval = read(replica.vot_pipes[1].fd_in, &mov_cmd_msg, sizeof(struct comm_mov_cmd));
+        if (retval > 0) {
+          waiting_response = false;
+
+          processCommand();
+        } else {
+          perror("Bench: read should have worked, failed."); // EINTR?
+        }
+      }
+    }
   }
 }
 
@@ -140,12 +151,8 @@ void processRanger() {
 // Send commands to underlying position device
 void processCommand() {
 #ifdef _STATS_BENCH_ROUND_TRIP_
-  timestamp_t current;
-  long new_interrupts;
-
-  current = generate_timestamp();
-  // check against previous interrupt count
-
+  timestamp_t current = generate_timestamp();
+  
   printf("%lld\n", current - last);
 #endif
 

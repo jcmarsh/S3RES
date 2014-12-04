@@ -26,7 +26,7 @@ struct typed_pipe cmd_out;
 %token DELIM
 %token <str> VAR_NAME
 %token <str> NAMED_OB
-%token <str> TIMEOUT_VAL
+%token <str> NUMBER_VAL
 %token EOL
 %type <str> arrow
 %type <str> rep_comp
@@ -41,14 +41,11 @@ line
   ;
 
 declaration
-  : VAR_NAME ASSIGN NAMED_OB { 
-      add_node(&all_nodes, $1, $3, NONE, NULL, 0); }
+  : VAR_NAME ASSIGN NAMED_OB NUMBER_VAL { 
+      add_node(&all_nodes, $1, $3, NONE, NULL, 0, $4); }
 
-  | VAR_NAME ASSIGN rep_comp NAMED_OB { 
-      add_node(&all_nodes, $1, $3, TMR, $4, "0"); }
-
-  | VAR_NAME ASSIGN rep_comp NAMED_OB DELIM TIMEOUT_VAL {
-      add_node(&all_nodes, $1, $3, TMR, $4, $6); }
+  | VAR_NAME ASSIGN rep_comp NAMED_OB DELIM NUMBER_VAL NUMBER_VAL {
+      add_node(&all_nodes, $1, $3, TMR, $4, $6, $7); }
   ;
 
 rep_comp
@@ -127,11 +124,11 @@ int main(int argc, char **argv) {
   }
 
   // fds are passed in as arguments
-  if (argc >= 3) {
-    deserializePipe(argv[1], &data_in);
-    deserializePipe(argv[2], &cmd_out);   
+  if (argc >= 4) {
+    deserializePipe(argv[2], &data_in);
+    deserializePipe(argv[3], &cmd_out);   
   } else {
-    printf("Usage: plumber <RANGE_POSE_DATA:fd_in:0> <MSG_CMD:0:fd_out>\n");
+    printf("Usage: plumber <priority> <RANGE_POSE_DATA:fd_in:0> <MSG_CMD:0:fd_out>\n");
     printf("\tConfiguration file is: config_plumber.cfg\n");
     return(1);
   }

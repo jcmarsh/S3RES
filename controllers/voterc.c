@@ -44,7 +44,7 @@ struct replica replicas[REP_COUNT];
 
 // TAS Stuff
 cpu_speed_t cpu_speed;
-int voter_priority = 3;
+int voter_priority;
 
 // FD server
 struct server_data sd;
@@ -128,7 +128,7 @@ void restartReplica(int restarter, int restartee) {
   }
         
   // re-init failed rep, create pipes
-  initReplicas(&(replicas[restartee]), 1, controller_name);
+  initReplicas(&(replicas[restartee]), 1, controller_name, voter_priority + 5);
   createPipes(&(replicas[restartee]), 1, ext_pipes, pipe_count);
   // send new pipe through fd server (should have a request)
   acceptSendFDS(&sd, &(replicas[restartee].pid), replicas[restartee].rep_pipes, replicas[restartee].pipe_count);
@@ -176,7 +176,7 @@ int initVoterC() {
   createFDS(&sd, controller_name);
 
   // Let's try to launch the replicas
-  initReplicas(replicas, REP_COUNT, controller_name);
+  initReplicas(replicas, REP_COUNT, controller_name, voter_priority + 5);
   createPipes(replicas, REP_COUNT, ext_pipes, pipe_count);
   forkReplicas(replicas, REP_COUNT);
   
@@ -186,20 +186,14 @@ int initVoterC() {
 }
 
 int parseArgs(int argc, const char **argv) {
-
   controller_name = const_cast<char*>(argv[1]);
   voting_timeout = atoi(argv[2]);
+  voter_priority = atoi(argv[3]);
   if (voting_timeout == 0) {
     voting_timeout = PERIOD_NSEC;
   }
-  // TODO: THIS IS AN UGLY HACK
-  // if the timeout is long, then assume NOT a reactive controller and thus should
-  // have a lower priority
-  if (voting_timeout > PERIOD_NSEC) {
-    voter_priority = 5;
-  }
 
-  if (argc < 4) { // In testing mode
+  if (argc < 5) { // In testing mode
     pid_t currentPID = getpid();
     //pipe_count = 4;  // 4 is the only controller specific bit here... and ArtPotTest
     //connectRecvFDS(currentPID, ext_pipes, pipe_count, "ArtPotTest");
@@ -210,11 +204,10 @@ int parseArgs(int argc, const char **argv) {
         // puts("Usage: VoterC <controller_name> <timeout> <message_type:fd_in:fd_out> <...>");
     // return -1;
   } else {
-    for (int i = 0; (i < argc - 3 && i < PIPE_LIMIT); i++) {
-      deserializePipe(argv[i + 3], &ext_pipes[pipe_count]);
+    for (int i = 0; (i < argc - 4 && i < PIPE_LIMIT); i++) {
+      deserializePipe(argv[i + 4], &ext_pipes[pipe_count]);
       pipe_count++;
     }
-
     if (pipe_count >= PIPE_LIMIT) {
       printf("VoterC: Raise pipe limit.\n");
     }

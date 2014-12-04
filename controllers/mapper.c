@@ -26,6 +26,7 @@ int data_index, update_index, ack_index; // Data from range pose, updates to pla
 
 // TAS related
 cpu_speed_t cpu_speed;
+int priority;
 
 struct point_i* current_pose;
 // Count to 3 method worked great before
@@ -93,13 +94,14 @@ void testSDCHandler(int signo) {
 
 int parseArgs(int argc, const char **argv) {
   // TODO: error checking
-  if (argc < 4) { // Must request fds
+  priority = atoi(argv[1]);
+  if (argc < 5) { // Must request fds
     pid_t currentPID = getpid();
     connectRecvFDS(currentPID, pipes, PIPE_COUNT, "MapperTest");
     setPipeIndexes();
   } else {
-    for (int i = 0; (i < argc - 1) && (i < PIPE_COUNT); i++) {
-      deserializePipe(argv[i + 1], &pipes[i]);
+    for (int i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {
+      deserializePipe(argv[i + 2], &pipes[i]);
     }
     setPipeIndexes();
   }
@@ -111,7 +113,7 @@ int parseArgs(int argc, const char **argv) {
 // Basically the init function
 int initReplica() {
   //optOutRT();
-  InitTAS(DEFAULT_CPU, &cpu_speed, 15);
+  InitTAS(DEFAULT_CPU, &cpu_speed, priority);
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     perror("Failed to register the restart handler");

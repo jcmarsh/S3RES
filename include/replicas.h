@@ -39,7 +39,7 @@ struct replica {
 /*
  *
  */
-void initReplicas(struct replica reps[], int num, char* name);
+void initReplicas(struct replica reps[], int num, char* name, int priority);
 
 /*
  *
