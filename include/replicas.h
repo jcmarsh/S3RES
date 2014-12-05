@@ -45,10 +45,11 @@ void initReplicas(struct replica reps[], int num, char* name, int priority);
  *
  */
 void createPipes(struct replica reps[], int rep_num, struct typed_pipe ext_pipes[], int pipe_count);
-
+void createPipesSpecial(struct replica reps[], int rep_num, struct typed_pipe ext_pipes[], int pipe_count);
 /*
  *
  */
 void forkReplicas(struct replica replicas[], int rep_num);
+void forkReplicasSpecial(struct replica replicas[], int rep_num);
 
 #endif // __REP_GUARD

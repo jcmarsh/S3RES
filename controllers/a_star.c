@@ -132,7 +132,7 @@ int parseArgs(int argc, const char **argv) {
   priority = atoi(argv[1]);
   if (argc < 6) {
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "AStarTest");
+    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "AStar");
     setPipeIndexes();
   } else {
     for (int i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {

@@ -59,8 +59,9 @@ int InitTAS(cpu_id_t cpu, cpu_speed_t *cpu_speed, int prio_offset) {
   if( cpu_c::get_speed( *cpu_speed, cpu ) != cpu_c::ERROR_NONE ) {
     printf("(voter_b_driver) InitTAS() failed calling cpu_c::get_frequency(cpu_speed,cpu)\n" );
   }
-  //  printf("CPU Speed: %lld\n", *cpu_speed);
+}
 
+int EveryTAS() {  
   // lock current and future memory
   if (lockItUp() != 0) {
     printf("(voter_b_driver) InitTAS() failed calling lockItUp()\n" );

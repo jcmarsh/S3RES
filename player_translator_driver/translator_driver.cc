@@ -165,9 +165,9 @@ int TranslatorDriver::MainSetup() {
   pipes[1].type = MOV_CMD;
   pipes[1].fd_in = 0; 
   pipes[1].fd_out = 1; // Not used, but indicates that MOV_CMD comes from the benchmarker
-  createPipes(r_p, 1, pipes, 2);
+  createPipesSpecial(r_p, 1, pipes, 2);
   // fork
-  forkReplicas(r_p, 1);
+  forkReplicasSpecial(r_p, 1);
 
   // Need this pipe not to block so that player and the outside world play nice
   flags = fcntl(rep.vot_pipes[1].fd_in, F_GETFL, 0);

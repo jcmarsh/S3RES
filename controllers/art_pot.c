@@ -118,7 +118,7 @@ int parseArgs(int argc, const char **argv) {
   priority = atoi(argv[1]);
   if (argc < 4) { // Must request fds
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "ArtPotTest");
+    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "ArtPot");
     setPipeIndexes();
   } else {
     for (int i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {

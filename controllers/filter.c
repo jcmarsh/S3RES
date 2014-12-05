@@ -40,6 +40,12 @@ void enterLoop();
 void command();
 int initReplica();
 
+bool insertSDC;
+// Need a way to simulate SDC (rare)
+void testSDCHandler(int signo) {
+  insertSDC = true;
+}
+
 void restartHandler(int signo) {
   // fork
   pid_t currentPID = fork();
@@ -47,12 +53,20 @@ void restartHandler(int signo) {
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
       // child sets new id, recreates connects, loops
-
       for (int i = 0; i < pipe_count; i++) {
         resetPipe(&(pipes[i]));
       }
 
-      initReplica();
+      if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
+        perror("Failed to register the restart handler");
+      }
+
+      if (signal(SIGUSR2, testSDCHandler) == SIG_ERR) {
+        perror("Failed to register the SDC handler");
+      }
+      
+      EveryTAS();
+      
       // Get own pid, send to voter
       currentPID = getpid();
       connectRecvFDS(currentPID, pipes, pipe_count, "Filter");
@@ -78,22 +92,17 @@ void restartHandler(int signo) {
   }
 }
 
-bool insertSDC;
-// Need a way to simulate SDC (rare)
-void testSDCHandler(int signo) {
-  insertSDC = true;
-}
-
 int parseArgs(int argc, const char **argv) {
   // TODO: error checking
   priority = atoi(argv[1]);
   if (argc < 4) { // Must request fds
     // printf("Usage: Filter <pipe_in> <pipe_out_0> <pipe_out_1>\n");
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, 2, "Filter"); // TODO: how to test now?
+    connectRecvFDS(currentPID, pipes, 4, "Filter"); // TODO: how to test now?
     data_index = 0;
     average_index = 1;
-    pipe_count = PIPE_COUNT - 1;
+    regular_index = 2;
+    pipe_count = PIPE_COUNT; // - 1;
   } else {
     data_index = 0;
     deserializePipe(argv[2], &pipes[data_index]);
@@ -114,7 +123,7 @@ int parseArgs(int argc, const char **argv) {
 // Should probably separate this out correctly
 // Basically the init function
 int initReplica() {
-  InitTAS(DEFAULT_CPU, &cpu_speed, priority);
+  InitTAS(DEFAULT_CPU, &cpu_speed, priority); // time
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     perror("Failed to register the restart handler");
