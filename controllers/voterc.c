@@ -124,12 +124,15 @@ void restartReplica(int restarter, int restartee) {
   if (retval < 0) {
     perror("VoterC Signal Problem");
   }
-  
+
   // re-init failed rep, create pipes
   initReplicas(&(replicas[restartee]), 1, controller_name, voter_priority + 5);
   createPipes(&(replicas[restartee]), 1, ext_pipes, pipe_count);
   // send new pipe through fd server (should have a request)
+  timestamp_t last = generate_timestamp();
   acceptSendFDS(&sd, &(replicas[restartee].pid), replicas[restartee].rep_pipes, replicas[restartee].pipe_count);
+  timestamp_t current = generate_timestamp();
+  printf("%lld\n", current - last);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -177,6 +180,9 @@ int initVoterC() {
   initReplicas(replicas, REP_COUNT, controller_name, voter_priority + 5);
   createPipes(replicas, REP_COUNT, ext_pipes, pipe_count);
   forkReplicas(replicas, REP_COUNT);
+  for (int i = 0; i < REP_COUNT; i++) {
+    acceptSendFDS(&sd, &(replicas[i].pid), replicas[i].rep_pipes, replicas[i].pipe_count); 
+  }
   
   resetVotingState();
 

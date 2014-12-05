@@ -114,9 +114,12 @@ int forceMaps( ){
     parseLine(line, read);
   }
 
-  if (line) {
+  if (line) { // TODO: necessary?
     free(line);
   }
+
+  fclose(mapsfile);
+
   return 0;
 }
 

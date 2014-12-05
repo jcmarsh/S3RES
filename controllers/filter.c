@@ -47,6 +47,11 @@ void restartHandler(int signo) {
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
       // child sets new id, recreates connects, loops
+
+      for (int i = 0; i < pipe_count; i++) {
+        resetPipe(&(pipes[i]));
+      }
+
       initReplica();
       // Get own pid, send to voter
       currentPID = getpid();
@@ -85,7 +90,7 @@ int parseArgs(int argc, const char **argv) {
   if (argc < 4) { // Must request fds
     // printf("Usage: Filter <pipe_in> <pipe_out_0> <pipe_out_1>\n");
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, 2, "FilterTest");
+    connectRecvFDS(currentPID, pipes, 2, "Filter"); // TODO: how to test now?
     data_index = 0;
     average_index = 1;
     pipe_count = PIPE_COUNT - 1;
