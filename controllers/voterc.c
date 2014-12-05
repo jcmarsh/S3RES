@@ -79,9 +79,6 @@ void restartHandler() {
   // Timer went off, so the timer_stop_index is the pipe which is awaiting a rep
   for (int r_index = 0; r_index < REP_COUNT; r_index++) {
     if (replicas[r_index].voted[timer_stop_index] == false) {
-      // Send along the response from the other two replicas.
-      replicas[r_index].voted[timer_stop_index] = true;
-      checkSend(timer_stop_index, false); // DO NOT check for SDC (one has failed)
 
       // This is the failed replica, restart it
       // Send a signal to the rep's friend
@@ -89,12 +86,13 @@ void restartHandler() {
       int restartee = r_index;
       restartReplica(restarter, restartee);
 
+      // Send along the response from the other two replicas.
       // also copy over the previous vote state and pipe buffers
       for (int i = 0; i < replicas[restarter].pipe_count; i++) {
         replicas[restartee].voted[i] = replicas[restarter].voted[i];
         memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
         replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
-        checkSend(i, false);
+        checkSend(i, false); // DO NOT check for SDC (one has failed)
       }
       return;
     }
@@ -105,7 +103,7 @@ void restartReplica(int restarter, int restartee) {
   // Kill old replica
   kill(replicas[restartee].pid, SIGKILL); // Make sure it is dead.
   waitpid(replicas[restartee].pid, NULL, WNOHANG); // cleans up the zombie
-
+  
   // cleanup replica data structure
   for (int i = 0; i < replicas[restartee].pipe_count; i++) {
     if (replicas[restartee].vot_pipes[i].fd_in > 0) {
@@ -126,7 +124,7 @@ void restartReplica(int restarter, int restartee) {
   if (retval < 0) {
     perror("VoterC Signal Problem");
   }
-        
+  
   // re-init failed rep, create pipes
   initReplicas(&(replicas[restartee]), 1, controller_name, voter_priority + 5);
   createPipes(&(replicas[restartee]), 1, ext_pipes, pipe_count);
@@ -402,10 +400,6 @@ void checkSend(int pipe_num, bool checkSDC) {
                    replicas[(r_index + 2) % REP_COUNT].vot_pipes[pipe_num].buffer,
                    replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
           //printf("Voting disagreement: caught SDC\n");
-
-          if (kill(replicas[(r_index + 2) % REP_COUNT].pid, SIGKILL) < 0) {
-            perror("VoterC failed to kill minority report");
-          }
 
           restartReplica(r_index, (r_index + 2) % REP_COUNT);
         }

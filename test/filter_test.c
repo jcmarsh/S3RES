@@ -30,13 +30,12 @@ int main(int argc, const char** argv) {
   pipes[1].fd_in = 0;
   pipes[1].fd_out = 42;
 
-  initReplicas(&rep, 1, controller_name);
+  initReplicas(&rep, 1, controller_name, 10);
   createPipes(&rep, 1, pipes, 2);
   // send new pipe through fd server (should have a request)
   acceptSendFDS(&sd, &(rep.pid), rep.rep_pipes, rep.pipe_count);
 
   // Should be connected now.
-
   double pose_add = 0.0;
   int loops = 10000000;
   while (loops--) {

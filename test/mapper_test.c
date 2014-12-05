@@ -32,7 +32,7 @@ int main(int argc, const char** argv) {
   pipes[2].fd_in = 42;
   pipes[2].fd_out = 0;
 
-  initReplicas(&rep, 1, controller_name);
+  initReplicas(&rep, 1, controller_name, 10);
   createPipes(&rep, 1, pipes, 3);
   // send new pipe through fd server (should have a request)
   acceptSendFDS(&sd, &(rep.pid), rep.rep_pipes, rep.pipe_count);

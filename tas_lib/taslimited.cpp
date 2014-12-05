@@ -35,7 +35,7 @@ void optOutRT() {
 
 int InitTAS(cpu_id_t cpu, cpu_speed_t *cpu_speed, int prio_offset) {
   pid_t pid;
-  int priority;
+  int priority; // TODO: This is only passed to scheduler call?
 
   pid = getpid();
 

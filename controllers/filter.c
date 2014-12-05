@@ -86,6 +86,9 @@ int parseArgs(int argc, const char **argv) {
     // printf("Usage: Filter <pipe_in> <pipe_out_0> <pipe_out_1>\n");
     pid_t currentPID = getpid();
     connectRecvFDS(currentPID, pipes, 2, "FilterTest");
+    data_index = 0;
+    average_index = 1;
+    pipe_count = PIPE_COUNT - 1;
   } else {
     data_index = 0;
     deserializePipe(argv[2], &pipes[data_index]);
