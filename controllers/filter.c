@@ -101,12 +101,12 @@ int parseArgs(int argc, const char **argv) {
   if (argc < 4) { // Must request fds
     // printf("Usage: Filter <pipe_in> <pipe_out_0> <pipe_out_1>\n");
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, 2, "Filter"); // TODO: how to test now?
+    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "Filter"); // TODO: how to test now?
     data_index = 0;
     average_index = 1;
     // TODO: Change these back.
-    regular_index = -1; // 2;
-    pipe_count = PIPE_COUNT - 1;
+    regular_index = 2;
+    pipe_count = PIPE_COUNT;
   } else {
     data_index = 0;
     deserializePipe(argv[2], &pipes[data_index]);

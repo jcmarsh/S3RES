@@ -66,7 +66,9 @@ int createFDS(struct server_data * sd, const char* name) {
   const char* post_name = "_fd_server";
   char* actual_name;
   
-  asprintf(&actual_name, "%s%s%s", pre_name, name, post_name);
+  if (asprintf(&actual_name, "%s%s%s", pre_name, name, post_name) < 0) {
+    perror("fd_server failed to allocate fd_name");
+  }
 
   sd->sock_fd = socket(PF_UNIX, SOCK_STREAM, 0);
   if (sd->sock_fd < 0) {
@@ -81,7 +83,12 @@ int createFDS(struct server_data * sd, const char* name) {
   memset(&(sd->address), 0, sizeof(struct sockaddr_un));
 
   sd->address.sun_family = AF_UNIX;
-  snprintf(sd->address.sun_path, UNIX_PATH_MAX, actual_name);
+  if (strlen(actual_name) < UNIX_PATH_MAX) {
+    memcpy(&(sd->address.sun_path), actual_name, strlen(actual_name));
+  } else {
+    printf("Server Address length longer than max.\n");
+    return -1;
+  }
   free(actual_name);
 
   if(bind(sd->sock_fd, (struct sockaddr *) &(sd->address), sizeof(struct sockaddr_un)) != 0) {

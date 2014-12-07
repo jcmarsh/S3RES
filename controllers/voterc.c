@@ -148,9 +148,9 @@ int initVoterC() {
 
   // What is up with PR_SET_CHILD_SUBREAPER?
   // TODO: Likely remove this.
-  if (prctl(36, 1, 0, 0, 0) < 0) {
-    perror("Voter not set as subreaper");
-  }
+  //if (prctl(36, 1, 0, 0, 0) < 0) {
+  //  perror("Voter not set as subreaper");
+  //}
 
   // timeout_fd
   if (pipe(timeout_fd) == -1) {

@@ -24,9 +24,13 @@ comm_message_t commToEnum(char* name) {
 char* serializePipe(struct typed_pipe pipe) {
   char* serial;
   if (pipe.fd_in == 0) {
-    asprintf(&serial, "%s:%d:%d:%d", MESSAGE_T[pipe.type], 0, pipe.fd_out, pipe.timed);
+    if (asprintf(&serial, "%s:%d:%d:%d", MESSAGE_T[pipe.type], 0, pipe.fd_out, pipe.timed) < 0) {
+      perror("serializePipe failed");
+    }
   } else {
-    asprintf(&serial, "%s:%d:%d:%d", MESSAGE_T[pipe.type], pipe.fd_in, 0, pipe.timed);
+    if (asprintf(&serial, "%s:%d:%d:%d", MESSAGE_T[pipe.type], pipe.fd_in, 0, pipe.timed) < 0) {
+      perror("serializePipe failed");
+    }
   }
   return serial;  
 }

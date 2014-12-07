@@ -4,11 +4,15 @@
 
 #define ARGV_REQ 2 // Every controller has it's own name, followed by priority, then all the pipes
 
-void initReplicas(struct replica reps[], int rep_num, char* name, int priority) {  
+void initReplicas(struct replica reps[], int rep_num, const char* name, int priority) {  
   // Init three replicas
   for (int index = 0; index < rep_num; index++) {
     struct replica* new_rep = &reps[index];
-    new_rep->name = name;
+    if (new_rep->name != NULL) {
+      free(new_rep->name);
+    }
+    new_rep->name = (char*) malloc(sizeof(char) * strlen(name));
+    memcpy(new_rep->name, name, sizeof(new_rep->name));
     new_rep->pid = -1;
     new_rep->priority = priority;
     new_rep->status = RUNNING;
@@ -121,7 +125,9 @@ void forkReplicasSpecial(struct replica replicas[], int rep_num) {
     char** rep_argv = (char**)malloc(sizeof(char *) * rep_argc);
 
     rep_argv[0] = curr->name;
-    asprintf(&(rep_argv[1]), "%d", curr->priority);
+    if (asprintf(&(rep_argv[1]), "%d", curr->priority) < 0) {
+      perror("Fork Replica failed arg write");
+    }
     for (int a_index = ARGV_REQ; a_index < curr->pipe_count + ARGV_REQ; a_index++) {
       rep_argv[a_index] = serializePipe(curr->rep_pipes[a_index - ARGV_REQ]);
     }
@@ -143,7 +149,9 @@ void forkReplicas(struct replica replicas[], int rep_num) {
     char** rep_argv = (char**)malloc(sizeof(char *) * rep_argc);
 
     rep_argv[0] = curr->name;
-    asprintf(&(rep_argv[1]), "%d", curr->priority);
+    if (asprintf(&(rep_argv[1]), "%d", curr->priority) < 0) {
+      perror("Fork Replica failed arg write");
+    }
     rep_argv[rep_argc - 1] = NULL;
     curr->pid = forkSingle(rep_argv);
     for (int a_index = 1; a_index < rep_argc; a_index++) {

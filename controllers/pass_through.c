@@ -120,7 +120,9 @@ void enterLoop() {
       if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
         read_ret = read(pipes[data_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
         if (read_ret > 0) {
-          write(pipes[average_index].fd_out, &recv_msg, sizeof(struct comm_range_pose_data));          
+          if (write(pipes[average_index].fd_out, &recv_msg, sizeof(struct comm_range_pose_data)) < sizeof(struct  comm_range_pose_data)) {
+            perror("PassThough failed to write range data");
+          }
         } else if (read_ret < 0) {
           perror("PassThough - read problems");
         } else {

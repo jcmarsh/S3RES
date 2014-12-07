@@ -144,7 +144,9 @@ void processRanger() {
   last = generate_timestamp();
 #endif // _STATS_BENCH_ROUND_TRIP_
 
-  write(replica.vot_pipes[0].fd_out, &range_pose_data_msg, sizeof(struct comm_range_pose_data));
+  if (write(replica.vot_pipes[0].fd_out, &range_pose_data_msg, sizeof(struct comm_range_pose_data)) != sizeof(struct comm_range_pose_data)) {
+    perror("BenchMarker failed range data write");
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -157,5 +159,7 @@ void processCommand() {
 #endif
 
   // data was set by read
-  write(trans_pipes[1].fd_out, &mov_cmd_msg, sizeof(struct comm_mov_cmd));
+  if (write(trans_pipes[1].fd_out, &mov_cmd_msg, sizeof(struct comm_mov_cmd)) != sizeof(struct comm_mov_cmd)) {
+    perror("Bencmarker failed mov_cmd write");
+  }
 }
