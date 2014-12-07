@@ -34,10 +34,14 @@ int initReplica();
 
 void restartHandler(int signo) {
   // fork
+  timestamp_t last = generate_timestamp();
   pid_t currentPID = fork();
+
 
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
+      timestamp_t current = generate_timestamp();
+      printf("%lld\n", current - last);
       // child sets new id, recreates connects, loops
       for (int i = 0; i < PIPE_COUNT; i++) {
         resetPipe(&(pipes[i]));
@@ -47,11 +51,11 @@ void restartHandler(int signo) {
         perror("Failed to register the restart handler");
       }
 
-      EveryTAS();
+      //EveryTAS();
       
       // Get own pid, send to voter
       currentPID = getpid();
-      connectRecvFDS(currentPID, pipes, PIPE_COUNT, "PassThrough");
+      //connectRecvFDS(currentPID, pipes, PIPE_COUNT, "PassThrough");
 
       // unblock the signal
       sigset_t signal_set;
@@ -75,7 +79,7 @@ int parseArgs(int argc, const char **argv) {
   priority = atoi(argv[1]);
   if (argc < 4) { // Must request fds
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, 2, "PassThrough");
+    //connectRecvFDS(currentPID, pipes, 2, "PassThrough");
     data_index = 0;
     average_index = 1;
   } else {
@@ -91,7 +95,7 @@ int parseArgs(int argc, const char **argv) {
 // Should probably separate this out correctly
 // Basically the init function
 int initReplica() {
-  InitTAS(DEFAULT_CPU, &cpu_speed, priority); // time
+  // InitTAS(DEFAULT_CPU, &cpu_speed, priority); // time
 
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     perror("Failed to register the restart handler");
@@ -109,6 +113,8 @@ void enterLoop() {
   fd_set select_set;
 
   while(1) {
+    sleep(1);
+    /*
     select_timeout.tv_sec = 1;
     select_timeout.tv_usec = 0;
 
@@ -129,7 +135,7 @@ void enterLoop() {
           perror("PassThough read_ret == 0?");
         }
       }
-    }
+    } */
   }
 }
 

@@ -25,21 +25,28 @@ if len(sys.argv) < 1:
 cmd_start = sys.argv[1]
 
 while True:
-	time.sleep(1)
+	time.sleep(1/5.0)
 	victim_pids = []
 	victim_names = []
 
-	getPIDs(victim_pids, victim_names, 'ps -a | grep "AStar" | grep -v "Test"')
-	getPIDs(victim_pids, victim_names, 'ps -a | grep "Filter" | grep -v "Test"')
-	getPIDs(victim_pids, victim_names, 'ps -a | grep "ArtPot" | grep -v "Test"')
-	getPIDs(victim_pids, victim_names, 'ps -a | grep "Mapper" | grep -v "Test"')
+	#getPIDs(victim_pids, victim_names, 'ps -a | grep "AStar" | grep -v "Test"')
+	#getPIDs(victim_pids, victim_names, 'ps -a | grep "Filter" | grep -v "Test"')
+	getPIDs(victim_pids, victim_names, 'ps -a | grep "PassThrough" | grep -v "Test"')
+	#getPIDs(victim_pids, victim_names, 'ps -a | grep "ArtPot" | grep -v "Test"')
+	#getPIDs(victim_pids, victim_names, 'ps -a | grep "Mapper" | grep -v "Test"')
 
-	if (len(victim_pids) < (4 * 3)):
+	if (len(victim_pids) < (1 * 3)):
 		print "Error: One of the controllers did not successfully restart"
 		sys.exit()
 
+	# Useful for something.
+	#kill_num = max(victim_pids)
+	#print "Executing ", cmd_start, " on", kill_num
+	#Popen(cmd_start + " " + str(kill_num), shell=True)
+
 	kill_index = random.randint(0, len(victim_pids)-1)
-
 	print "Executing ", cmd_start, " on a ", victim_names[kill_index], ": ", victim_pids[kill_index]
-
 	Popen(cmd_start + " " + str(victim_pids[kill_index]), shell=True)
+	rep_index = (kill_index + 2) % 3
+	print "Restarting through ", victim_names[rep_index], " ", victim_pids[rep_index]
+	Popen("kill -s USR1 " + str(victim_pids[rep_index]), shell=True)
