@@ -26,6 +26,16 @@ copy: regular
 	cp Mapper ../../stage/experiments/
 	cp VoterC ../../stage/experiments/
 
+test: regular
+	cp ArtPot ../test/
+	cp AStar ../test/
+	cp BenchMarker ../test/
+	cp Empty ../test/
+	cp Filter ../test/
+	cp PassThrough ../test/
+	cp Mapper ../test/
+	cp VoterC ../test/
+
 clean:
 	rm -f ArtPot
 	rm -f AStar
@@ -35,3 +45,11 @@ clean:
 	rm -f PassThrough
 	rm -f Mapper
 	rm -f VoterC
+	rm -f ../testArtPot
+	rm -f ../test/AStar
+	rm -f ../test/BenchMarker
+	rm -f ../test/Empty
+	rm -f ../test/Filter
+	rm -f ../test/PassThrough
+	rm -f ../test/Mapper
+	rm -f ../test/VoterC

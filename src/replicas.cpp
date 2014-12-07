@@ -11,8 +11,8 @@ void initReplicas(struct replica reps[], int rep_num, const char* name, int prio
     if (new_rep->name != NULL) {
       free(new_rep->name);
     }
-    new_rep->name = (char*) malloc(sizeof(char) * strlen(name));
-    memcpy(new_rep->name, name, sizeof(new_rep->name));
+    new_rep->name = (char*) malloc(strlen(name) + 1);
+    memcpy(new_rep->name, name, strlen(name) + 1);
     new_rep->pid = -1;
     new_rep->priority = priority;
     new_rep->status = RUNNING;
