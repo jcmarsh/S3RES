@@ -10,6 +10,8 @@
 #include <math.h>
 #include <signal.h>
 #include <string.h>
+#include <linux/prctl.h>
+#include <sys/prctl.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -102,7 +104,8 @@ void restartHandler() {
 void restartReplica(int restarter, int restartee) {
   // Kill old replica
   kill(replicas[restartee].pid, SIGKILL); // Make sure it is dead.
-  waitpid(replicas[restartee].pid, NULL, WNOHANG); // cleans up the zombie
+  waitpid(-1, NULL, WNOHANG); // cleans up the zombie // Actually doesn't // Well, now it does.
+
   
   // cleanup replica data structure
   for (int i = 0; i < replicas[restartee].pipe_count; i++) {
@@ -142,6 +145,12 @@ int initVoterC() {
   sigset_t mask;
 
   InitTAS(DEFAULT_CPU, &cpu_speed, voter_priority);
+
+  // What is up with PR_SET_CHILD_SUBREAPER?
+  // TODO: Likely remove this.
+  if (prctl(36, 1, 0, 0, 0) < 0) {
+    perror("Voter not set as subreaper");
+  }
 
   // timeout_fd
   if (pipe(timeout_fd) == -1) {
