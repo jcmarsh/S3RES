@@ -15,6 +15,7 @@ regular:
 	g++ $(FLAGS) -o PassThrough pass_through.c $(SRC) $(LIB) 
 	g++ $(FLAGS) -o Mapper mapper.c $(SRC) ../src/mapping.cpp $(LIB) 
 	g++ $(FLAGS) -o VoterC voterc.c ../src/commtypes.cpp ../src/replicas.cpp ../src/fd_server.cpp ../src/fd_client.cpp $(LIB)
+	g++ $(FLAGS) -o Min min.c ../src/commtypes.cpp ../src/replicas.cpp
 
 copy: regular
 	cp ArtPot ../../stage/experiments/
@@ -35,6 +36,7 @@ test: regular
 	cp PassThrough ../test/
 	cp Mapper ../test/
 	cp VoterC ../test/
+	cp Min ../test/
 
 clean:
 	rm -f ArtPot
@@ -45,7 +47,8 @@ clean:
 	rm -f PassThrough
 	rm -f Mapper
 	rm -f VoterC
-	rm -f ../testArtPot
+	rm -f Min
+	rm -f ../test/ArtPot
 	rm -f ../test/AStar
 	rm -f ../test/BenchMarker
 	rm -f ../test/Empty
@@ -53,3 +56,4 @@ clean:
 	rm -f ../test/PassThrough
 	rm -f ../test/Mapper
 	rm -f ../test/VoterC
+	rm -f ../test/Min
