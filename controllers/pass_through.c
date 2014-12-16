@@ -31,10 +31,6 @@ void restartHandler(int signo) {
       timestamp_t current = generate_timestamp();
       printf("%lld\n", current - last);
 
-      if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
-        perror("Failed to register the restart handler");
-      }
-
       // unblock the signal
       sigset_t signal_set;
       sigemptyset(&signal_set);
