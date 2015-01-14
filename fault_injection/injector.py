@@ -28,6 +28,7 @@ while True:
 	time.sleep(1/5.0)
 	victim_pids = []
 	victim_names = []
+	victim_count = 2
 
 	#getPIDs(victim_pids, victim_names, 'ps -a | grep "AStar" | grep -v "Test"')
 	#getPIDs(victim_pids, victim_names, 'ps -a | grep "Filter" | grep -v "Test"')
@@ -35,7 +36,7 @@ while True:
 	#getPIDs(victim_pids, victim_names, 'ps -a | grep "ArtPot" | grep -v "Test"')
 	#getPIDs(victim_pids, victim_names, 'ps -a | grep "Mapper" | grep -v "Test"')
 
-	if (len(victim_pids) < (1 * 3)):
+	if (len(victim_pids) < (1 * victim_count)):
 		print "Error: One of the controllers did not successfully restart"
 		sys.exit()
 
@@ -47,6 +48,6 @@ while True:
 	kill_index = random.randint(0, len(victim_pids)-1)
 	print "Executing ", cmd_start, " on a ", victim_names[kill_index], ": ", victim_pids[kill_index]
 	Popen(cmd_start + " " + str(victim_pids[kill_index]), shell=True)
-	rep_index = (kill_index + 2) % 3
+	rep_index = (kill_index + (victim_count - 1)) % victim_count
 	print "Restarting through ", victim_names[rep_index], " ", victim_pids[rep_index]
 	Popen("kill -s USR1 " + str(victim_pids[rep_index]), shell=True)
