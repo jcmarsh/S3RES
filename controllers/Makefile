@@ -12,7 +12,7 @@ regular:
 	g++ $(FLAGS) -o BenchMarker benchmarker.c ../src/commtypes.cpp ../src/replicas.cpp $(LIB)
 	g++ $(FLAGS) -o Empty empty.c $(SRC) $(LIB) 
 	g++ $(FLAGS) -o Filter filter.c $(SRC) $(LIB) 
-	g++ $(FLAGS) -o PassThrough pass_through.c $(SRC) $(LIB) 
+	g++ $(FLAGS) -o PassThrough pass_through.c $(LIB) 
 	g++ $(FLAGS) -o Mapper mapper.c $(SRC) ../src/mapping.cpp $(LIB) 
 	g++ $(FLAGS) -o VoterC voterc.c ../src/commtypes.cpp ../src/replicas.cpp ../src/fd_server.cpp ../src/fd_client.cpp $(LIB)
 	g++ $(FLAGS) -o Min min.c ../src/commtypes.cpp ../src/replicas.cpp
