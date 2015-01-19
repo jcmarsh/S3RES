@@ -17,69 +17,44 @@
 #include "../include/statstime.h"
 #include "../include/fd_client.h"
 
-struct typed_pipe pipes[2];
+#define PIPE_COUNT 2
+
+struct typed_pipe pipes[PIPE_COUNT];
+int pipe_count = PIPE_COUNT;
+int read_in_index, write_out_index;
 
 // TAS related
 cpu_speed_t cpu_speed;
 int priority;
 
+const char* name = "Empty";
+
 void enterLoop();
 int initReplica();
 
-void restartHandler(int signo) {
-  pid_t currentPID = 0;
-  // fork
-  currentPID = fork();
+void testSDCHandler(int signo) {
+  // ignore
+}
 
-  if (currentPID >= 0) { // Successful fork
-    if (currentPID == 0) { // Child process
-      // child sets new id, recreates connects, loops
-      initReplica();
-      // Get own pid, send to voter
-      currentPID = getpid();
-      connectRecvFDS(currentPID, pipes, 2, "Empty");
-      
-      // unblock the signal
-      sigset_t signal_set;
-      sigemptyset(&signal_set);
-      sigaddset(&signal_set, SIGUSR1);
-      sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
-
-      enterLoop(); // return to normal
-    } else {   // Parent just returns
-      return;
-    }
-  } else {
-    printf("Fork error!\n");
-    return;
-  }
+void setPipeIndexes() {
+  read_in_index = 0;
+  write_out_index = 1;
 }
 
 int parseArgs(int argc, const char **argv) {
   pid_t pid;
 
+  setPipeIndexes();
   // TODO: error checking
   priority = atoi(argv[1]);
   if (argc < 3) { // Must request fds
     pid = getpid();
     //connectRecvFDS(pid, &read_in_fd, &write_out_fd, "Empty");
   } else {
-    deserializePipe(argv[2], &pipes[0]);
-    deserializePipe(argv[3], &pipes[1]);
+    deserializePipe(argv[2], &pipes[read_in_index]);
+    deserializePipe(argv[3], &pipes[write_out_index]);
   }
 
-  return 0;
-}
-
-// TODO: Should probably separate this out correctly
-// Basically the init function
-int initReplica() {
-  InitTAS(DEFAULT_CPU, &cpu_speed, priority);
-
-  if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
-    puts("Failed to register the restart handler");
-    return -1;
-  }
   return 0;
 }
 
@@ -89,9 +64,9 @@ void enterLoop() {
  
   while(1) {
     // Blocking, but that's okay with me
-    read_ret = read(pipes[0].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
+    read_ret = read(pipes[read_in_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
     if (read_ret > 0) {
-      commSendMoveCommand(pipes[1], 0.1, 0.0);
+      commSendMoveCommand(pipes[write_out_index], 0.1, 0.0);
     } else if (read_ret == -1) {
       perror("Empty - read blocking");
     } else {

@@ -22,6 +22,7 @@
 #define OBS_THRES 3
 
 struct typed_pipe pipes[PIPE_COUNT];
+int pipe_count = PIPE_COUNT;
 int data_index, update_index, ack_index; // Data from range pose, updates to planner, planner acks.
 
 // TAS related
@@ -34,10 +35,12 @@ int obstacle_map[GRID_NUM][GRID_NUM];
 
 struct comm_map_update send_msg;
 
-void enterLoop();
-int initReplica();
+const char* name = "Mapper";
 
-void setPipeIndexes() {
+void enterLoop(void);
+int initReplica(void);
+
+void setPipeIndexes(void) {
   for (int i = 0; i < PIPE_COUNT; i++) {
     switch (pipes[i].type) {
       case RANGE_POSE_DATA:
@@ -50,39 +53,6 @@ void setPipeIndexes() {
         ack_index = i;
         break;
     }
-  }
-}
-void restartHandler(int signo) {
-  pid_t currentPID = 0;
-  // fork
-  currentPID = fork();
-
-  if (currentPID >= 0) { // Successful fork
-    if (currentPID == 0) { // Child process
-      // child sets new id, recreates connects, loops
-      initReplica();
-      // Get own pid, send to voter
-      currentPID = getpid();
-      connectRecvFDS(currentPID, pipes, PIPE_COUNT, "Mapper");
-      
-      // unblock the signal
-      sigset_t signal_set;
-      sigemptyset(&signal_set);
-      sigaddset(&signal_set, SIGUSR1);
-      sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
-
-      // unblock the signal (test SDC)
-      sigemptyset(&signal_set);
-      sigaddset(&signal_set, SIGUSR2);
-      sigprocmask(SIG_UNBLOCK, &signal_set, NULL);      
-
-      enterLoop(); // return to normal
-    } else {   // Parent just returns
-      return;
-    }
-  } else {
-    printf("Fork error!\n");
-    return;
   }
 }
 
@@ -104,25 +74,6 @@ int parseArgs(int argc, const char **argv) {
       deserializePipe(argv[i + 2], &pipes[i]);
     }
     setPipeIndexes();
-  }
-
-  return 0;
-}
-
-// TODO: Should probably separate this out correctly
-// Basically the init function
-int initReplica() {
-  //optOutRT();
-  InitTAS(DEFAULT_CPU, &cpu_speed, priority);
-
-  if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
-    perror("Failed to register the restart handler");
-    return -1;
-  }
-
-  if (signal(SIGUSR2, testSDCHandler) == SIG_ERR) {
-    perror("Failed to register the SDC handler");
-    return -1;
   }
 
   return 0;
@@ -192,7 +143,7 @@ void updateMap(struct comm_range_pose_data * data) {
   commSendMapUpdate(pipes[update_index], &send_msg);
 }
 
-void enterLoop() {
+void enterLoop(void) {
   int read_ret;
   struct comm_range_pose_data recv_msg;
   struct comm_ack ack_msg;

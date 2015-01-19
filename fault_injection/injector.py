@@ -25,26 +25,23 @@ if len(sys.argv) < 2:
 # This should be checked before running, but hey we are kill processes here
 cmd_start = sys.argv[1]
 
+# This will need to change if mixing TMR and DMR
+victim_types = 4 # different controllers
+victim_count = 3 # replicated 3 times
 while True:
-	time.sleep(1/5.0)
+	time.sleep(1)
 	victim_pids = []
 	victim_names = []
-	victim_count = 2
 
-	#getPIDs(victim_pids, victim_names, 'ps -a | grep "AStar" | grep -v "Test"')
-	#getPIDs(victim_pids, victim_names, 'ps -a | grep "Filter" | grep -v "Test"')
-	getPIDs(victim_pids, victim_names, 'ps -a | grep "PassThrough" | grep -v "Test"')
-	#getPIDs(victim_pids, victim_names, 'ps -a | grep "ArtPot" | grep -v "Test"')
-	#getPIDs(victim_pids, victim_names, 'ps -a | grep "Mapper" | grep -v "Test"')
+	#getPIDs(victim_pids, victim_names, 'ps -a | grep "PassThrough" | grep -v "Test"')
+	getPIDs(victim_pids, victim_names, 'ps -a | grep "AStar" | grep -v "Test"')
+	getPIDs(victim_pids, victim_names, 'ps -a | grep "Filter" | grep -v "Test"')
+	getPIDs(victim_pids, victim_names, 'ps -a | grep "ArtPot" | grep -v "Test"')
+	getPIDs(victim_pids, victim_names, 'ps -a | grep "Mapper" | grep -v "Test"')
 
-	if (len(victim_pids) < (1 * victim_count)):
+	if (len(victim_pids) < (victim_types * victim_count)):
 		print "Error: One of the controllers did not successfully restart"
 		sys.exit()
-
-	# Useful for something.
-	#kill_num = max(victim_pids)
-	#print "Executing ", cmd_start, " on", kill_num
-	#Popen(cmd_start + " " + str(kill_num), shell=True)
 
 	kill_index = random.randint(0, len(victim_pids)-1)
 	print "Executing ", cmd_start, " on a ", victim_names[kill_index], ": ", victim_pids[kill_index]

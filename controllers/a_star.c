@@ -29,11 +29,14 @@ struct point_i* pose;
 
 struct typed_pipe pipes[PIPE_COUNT]; // Map updates in 0, waypoint request in 1, waypoints out 2
 int updates_index, ack_index, way_req_index, way_res_index;
+int pipe_count = PIPE_COUNT;
 
 l_list_t* goal_path;
 
 cpu_speed_t cpu_speed;
 int priority;
+
+const char* name = "AStar";
 
 void enterLoop();
 void command();
@@ -85,41 +88,6 @@ l_list_t* genNeighbors(node_t* node) {
   return list;
 }
 
-// TODO: move to library
-void restartHandler(int signo) {
-  pid_t currentPID = 0;
-  // fork
-  currentPID = fork();
-
-  if (currentPID >= 0) { // Successful fork
-    if (currentPID == 0) { // Child process
-      // child sets new id, recreates connects, loops
-      initReplica();
-      // Get own pid, send to voter
-      currentPID = getpid();
-      connectRecvFDS(currentPID, pipes, PIPE_COUNT, "AStar");
-
-      // unblock the signal
-      sigset_t signal_set;
-      sigemptyset(&signal_set);
-      sigaddset(&signal_set, SIGUSR1);
-      sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
-
-      // unblock the signal (test SDC)
-      sigemptyset(&signal_set);
-      sigaddset(&signal_set, SIGUSR2);
-      sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
-
-      enterLoop(); // return to normal
-    } else {   // Parent just returns
-      return;
-    }
-  } else {
-    printf("Fork error!\n");
-    return;
-  }
-}
-
 bool insertSDC;
 // Need a way to simulate SDC (rare)
 void testSDCHandler(int signo) {
@@ -139,25 +107,6 @@ int parseArgs(int argc, const char **argv) {
       deserializePipe(argv[i + 2], &pipes[i]);
     }
     setPipeIndexes();
-  }
-
-  return 0;
-}
-
-// Should probably separate this out correctly
-// Basically the init function
-int initReplica() {
-  // optOutRT();
-  InitTAS(DEFAULT_CPU, &cpu_speed, priority);
-
-  if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
-    perror("Failed to register the restart handler");
-    return -1;
-  }
-
-  if (signal(SIGUSR2, testSDCHandler) == SIG_ERR) {
-    perror("Failed to register the SDC handler");
-    return -1;
   }
 
   return 0;

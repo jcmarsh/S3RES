@@ -37,6 +37,8 @@ int data_index, average_index, regular_index;
 cpu_speed_t cpu_speed;
 int priority;
 
+const char* name = "Filter";
+
 void enterLoop();
 void command();
 int initReplica();
@@ -47,6 +49,7 @@ void testSDCHandler(int signo) {
   insertSDC = true;
 }
 
+/* TODO: delete, and figure out the EveryTAS and resetPipe bits.
 void restartHandler(int signo) {
   // fork
   pid_t currentPID = fork();
@@ -55,94 +58,48 @@ void restartHandler(int signo) {
     if (currentPID == 0) { // Child process
       // child sets new id, recreates connects, loops
 
+      // Not sure what this bit was here for.
       for (int i = 0; i < pipe_count; i++) {
         resetPipe(&(pipes[i]));
       }
-
-      if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
-        perror("Failed to register the restart handler");
-      }
-
-      if (signal(SIGUSR2, testSDCHandler) == SIG_ERR) {
-        perror("Failed to register the SDC handler");
-      }
       
       EveryTAS();
-      
-      // Get own pid, send to voter
-      currentPID = getpid();
-      connectRecvFDS(currentPID, pipes, pipe_count, "Filter");
-
-      // unblock the signal
-      sigset_t signal_set;
-      sigemptyset(&signal_set);
-      sigaddset(&signal_set, SIGUSR1);
-      sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
-
-      // unblock the signal (test SDC)
-      sigemptyset(&signal_set);
-      sigaddset(&signal_set, SIGUSR2);
-      sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
-
-      enterLoop(); // return to normal
-    } else {   // Parent just returns
-      waitpid(-1, NULL, WNOHANG);
-      return;
     }
   } else {
     printf("Fork error!\n");
     return;
   }
+} */
+
+void setPipeIndexes(void) {
+  data_index = 0;
+  average_index = 1;
+  regular_index = 2;
 }
 
 int parseArgs(int argc, const char **argv) {
   // TODO: error checking
+  setPipeIndexes();
   priority = atoi(argv[1]);
   if (argc < 4) { // Must request fds
     // printf("Usage: Filter <pipe_in> <pipe_out_0> <pipe_out_1>\n");
     pid_t currentPID = getpid();
     connectRecvFDS(currentPID, pipes, PIPE_COUNT, "Filter"); // TODO: how to test now?
-    data_index = 0;
-    average_index = 1;
-    // TODO: Change these back.
-    regular_index = 2;
     pipe_count = PIPE_COUNT;
   } else {
-    data_index = 0;
     deserializePipe(argv[2], &pipes[data_index]);
-    average_index = 1;
     deserializePipe(argv[3], &pipes[average_index]);
     if (5 == argc) {
-      regular_index = 2;
       deserializePipe(argv[4], &pipes[regular_index]);
     } else {
       pipe_count = PIPE_COUNT - 1;
-      regular_index = -1;
     }
   }
 
   return 0;
 }
 
-// Should probably separate this out correctly
-// Basically the init function
-int initReplica() {
-  InitTAS(DEFAULT_CPU, &cpu_speed, priority); // time
-
-  if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
-    perror("Failed to register the restart handler");
-    return -1;
-  }
-
-  if (signal(SIGUSR2, testSDCHandler) == SIG_ERR) {
-    perror("Failed to register the SDC handler");
-    return -1;
-  }
-
-  return 0;
-}
-
-void command() {
+void command(void) {
   double range_average[RANGER_COUNT] = {0};
 
   if (insertSDC) {
@@ -164,7 +121,7 @@ void command() {
   }
 }
 
-void enterLoop() {
+void enterLoop(void) {
   int read_ret;
   struct comm_range_pose_data recv_msg;
 

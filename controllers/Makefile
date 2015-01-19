@@ -1,5 +1,5 @@
 RESEARCH=/home/jcmarsh/research
-SRC=../src/commtypes.cpp ../src/fd_client.cpp
+SRC=../src/commtypes.cpp ../src/fd_client.cpp ../src/controller.c
 LIB=-lrt -lTASLimited
 FLAGS=-O3
 #FLAGS=-g -O0
@@ -7,7 +7,7 @@ FLAGS=-O3
 all: regular
 
 regular:
-	g++ $(FLAGS) -o ArtPot art_pot.c $(SRC) $(LIB)
+	g++ $(FLAGS) -o ArtPot art_pot.c  $(SRC) $(LIB)
 	g++ $(FLAGS) -o AStar a_star.c $(SRC) ../src/mapping.cpp $(LIB)
 	g++ $(FLAGS) -o BenchMarker benchmarker.c ../src/commtypes.cpp ../src/replicas.cpp $(LIB)
 	g++ $(FLAGS) -o Empty empty.c $(SRC) $(LIB) 

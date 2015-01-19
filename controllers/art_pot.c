@@ -7,16 +7,13 @@
 
 #include <assert.h>
 #include <math.h>
-#include <signal.h>
+//#include <signal.h>
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
 #include <errno.h> // TODO: remove
 
-#include "../include/taslimited.h"
-#include "../include/commtypes.h"
-#include "../include/statstime.h"
-#include "../include/fd_client.h"
+#include "../include/controller.h"
 
 // Configuration parameters
 #define VEL_SCALE 1
@@ -47,12 +44,14 @@ int data_index, out_index, way_req_index, way_res_index;
 cpu_speed_t cpu_speed;
 int priority;
 
-void enterLoop();
-void command();
-int initReplica();
+const char* name = "ArtPot";
+
+void enterLoop(void);
+void command(void);
+int initReplica(void);
 
 // Set indexes based on pipe types
-void setPipeIndexes() {
+void setPipeIndexes(void) {
   way_req_index = -1;
   way_res_index = -1;
   for (int i = 0; i < PIPE_COUNT; i++) {
@@ -70,40 +69,6 @@ void setPipeIndexes() {
         way_req_index = i;
         break;
     }
-  }
-}
-
-void restartHandler(int signo) {
-  // fork
-  pid_t currentPID = fork();
-  
-  if (currentPID >= 0) { // Successful fork
-    if (currentPID == 0) { // Child process
-      // child sets new id, recreates connects, loops
-      initReplica();
-      // Get own pid, send to voter
-      currentPID = getpid();
-      connectRecvFDS(currentPID, pipes, pipe_count, "ArtPot");
-      setPipeIndexes();
-
-      // unblock the signal (restart handler)
-      sigset_t signal_set;
-      sigemptyset(&signal_set);
-      sigaddset(&signal_set, SIGUSR1);
-      sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
-
-      // unblock the signal (test SDC)
-      sigemptyset(&signal_set);
-      sigaddset(&signal_set, SIGUSR2);
-      sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
-
-      enterLoop(); // return to normal
-    } else {   // Parent just returns
-      return;
-    }
-  } else {
-    perror("ArtPot Fork error\n");
-    return;
   }
 }
 
@@ -135,25 +100,7 @@ int parseArgs(int argc, const char **argv) {
   return 0;
 }
 
-// Should probably separate this out correctly
-// Basically the init function
-int initReplica() {
-  InitTAS(DEFAULT_CPU, &cpu_speed, priority);
-
-  if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
-    perror("Failed to register the restart handler");
-    return -1;
-  }
-
-  if (signal(SIGUSR2, testSDCHandler) == SIG_ERR) {
-    perror("Failed to register the SDC handler");
-    return -1;
-  }
-
-  return 0;
-}
-
-void command() {
+void command(void) {
   double dist, theta, delta_x, delta_y, v, tao, obs_x, obs_y;
   double vel_cmd[2];
   int total_factors, i;
@@ -226,7 +173,7 @@ void command() {
   commSendMoveCommand(pipes[out_index], vel_cmd[0], vel_cmd[1]);
 }
 
-void enterLoop() {
+void enterLoop(void) {
   int read_ret;
   struct comm_range_pose_data recv_msg_data;
   struct comm_way_res recv_msg_way;
