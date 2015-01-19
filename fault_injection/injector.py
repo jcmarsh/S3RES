@@ -18,8 +18,9 @@ def getPIDs(pids, names, cmd):
 			except ValueError:
 				pass
 
-if len(sys.argv) < 1:
+if len(sys.argv) < 2:
 	print "please supply command to execute on unspecting processes (for example, 'kill -9' or 'kill -s USR2'"
+        sys.exit()
 
 # This should be checked before running, but hey we are kill processes here
 cmd_start = sys.argv[1]
