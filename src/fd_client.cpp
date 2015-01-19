@@ -61,7 +61,7 @@ int requestFDS(int sock_fd, struct typed_pipe* pipes, int pipe_count) {
 
 int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const char* name) {
   int sock_fd;
-  int retval;
+  int retval = 0;
   struct sockaddr_un address;
   const char* pre_name = "./";
   const char* post_name = "_fd_server";
@@ -69,12 +69,15 @@ int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const ch
 
   if (asprintf(&actual_name, "%s%s%s", pre_name, name, post_name) < 0) {
     perror("fd_client failed to allocate fd name");
+    retval = -1;
+    goto connect_recv_FDS_out;
   }
 
   sock_fd = socket(PF_UNIX, SOCK_STREAM, 0);
   if(sock_fd < 0) {
     perror("Replica socket() failed");
-    return -1;
+    retval = -1;
+    goto connect_recv_FDS_out;
   }
 
   /* start with a clean address structure */
@@ -85,19 +88,20 @@ int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const ch
     memcpy(&(address.sun_path), actual_name, strlen(actual_name));
   } else {
     printf("Client Address length longer than max.\n");
-    return -1;
+    retval = -1;
+    goto connect_recv_FDS_sock_out;
   }
   //snprintf(address.sun_path, UNIX_PATH_MAX, actual_name);
-  free(actual_name);
   
   if(connect(sock_fd, (struct sockaddr *) &address, sizeof(struct sockaddr_un)) != 0) {
     perror("Replica connect() failed");
-    return -1;
+    retval = -1;
+    goto connect_recv_FDS_sock_out;
   }
 
   if (requestFDS(sock_fd, pipes, pipe_count) < 0) {
-    close(sock_fd);
-    return -1;
+    retval = -1;
+    goto connect_recv_FDS_sock_out;
   }
 
   // Send pid
@@ -105,6 +109,9 @@ int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const ch
     perror("FD_client write for pid failed");
   }
 
+connect_recv_FDS_sock_out:
   close(sock_fd);
-  return 0;
+connect_recv_FDS_out:
+  free(actual_name);
+  return retval;
 }
