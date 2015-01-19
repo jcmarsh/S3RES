@@ -145,7 +145,7 @@ int initReplica() {
     return -1;
   }
 
-  if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
+  if (signal(SIGUSR2, testSDCHandler) == SIG_ERR) {
     perror("Failed to register the SDC handler");
     return -1;
   }
