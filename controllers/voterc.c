@@ -132,10 +132,7 @@ void restartReplica(int restarter, int restartee) {
   initReplicas(&(replicas[restartee]), 1, controller_name, voter_priority + 5);
   createPipes(&(replicas[restartee]), 1, ext_pipes, pipe_count);
   // send new pipe through fd server (should have a request)
-  timestamp_t last = generate_timestamp();
   acceptSendFDS(&sd, &(replicas[restartee].pid), replicas[restartee].rep_pipes, replicas[restartee].pipe_count);
-  timestamp_t current = generate_timestamp();
-  printf("%lld\n", current - last);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -145,12 +142,6 @@ int initVoterC() {
   sigset_t mask;
 
   InitTAS(DEFAULT_CPU, &cpu_speed, voter_priority);
-
-  // What is up with PR_SET_CHILD_SUBREAPER?
-  // TODO: Likely remove this.
-  //if (prctl(36, 1, 0, 0, 0) < 0) {
-  //  perror("Voter not set as subreaper");
-  //}
 
   // timeout_fd
   if (pipe(timeout_fd) == -1) {
@@ -190,7 +181,10 @@ int initVoterC() {
   createPipes(replicas, REP_COUNT, ext_pipes, pipe_count);
   forkReplicas(replicas, REP_COUNT);
   for (int i = 0; i < REP_COUNT; i++) {
-    acceptSendFDS(&sd, &(replicas[i].pid), replicas[i].rep_pipes, replicas[i].pipe_count); 
+    if (acceptSendFDS(&sd, &(replicas[i].pid), replicas[i].rep_pipes, replicas[i].pipe_count) < 0) {
+      printf("VoterC acceptSendFDS call failed\n");
+      exit(-1);
+    }
   }
   
   resetVotingState();

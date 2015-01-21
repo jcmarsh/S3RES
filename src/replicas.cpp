@@ -29,6 +29,9 @@ void initReplicas(struct replica reps[], int rep_num, const char* name, int prio
   }
 }
 
+/*
+ * See forkReplicasSpecial below. Plumber is a special case.
+ */
 void createPipesSpecial(struct replica reps[], int rep_num, struct typed_pipe ext_pipes[], int pipe_count) {
   // external pipes are the pipes for the voter (normally the reps pipes)
   for (int index = 0; index < rep_num; index++) {
@@ -65,7 +68,7 @@ void createPipes(struct replica reps[], int rep_num, struct typed_pipe ext_pipes
   for (int index = 0; index < rep_num; index++) {
     for (int p_index = 0; p_index < pipe_count; p_index++) {
       int pipe_fds[2];
-      if (pipe2(pipe_fds, O_CLOEXEC) == -1) {
+      if (pipe2(pipe_fds, O_CLOEXEC) == -1) { // Need to check on the number of open file descriptors if this line is removed.
         printf("Replica pipe error\n");
       } else {
         struct replica* rep = &reps[index];
@@ -117,6 +120,12 @@ int forkSingle(char** argv) {
   }
 }
 
+/*
+ * Used only for launching the plumber, which needs to have the pipes sent as arguments.
+ * Could have BenchMarker run an fd server for Plumber to remove this special case.
+ * OR have a fork_with_args type function. Hmm.
+ * TODO: fork_with_args?
+ */
 void forkReplicasSpecial(struct replica replicas[], int rep_num) {
   for (int index = 0; index < rep_num; index++) {
     // Each replica needs to build up it's argvs

@@ -104,14 +104,18 @@ int createFDS(struct server_data * sd, const char* name) {
   }
 }
 
-// Blocks on accept: You better know a client is about to connect!
+/*
+ * 
+ * Blocks on accept: You better know a client is about to connect!
+ * Returns 0 upon success, <0 otherwise.
+ */
 int acceptSendFDS(struct server_data * sd, pid_t *pid, struct typed_pipe* pipes, int pipe_count) {
   int connection_fd;
   int retval = 0;
 
   if ((connection_fd = accept(sd->sock_fd, (struct sockaddr *) &(sd->address), &(sd->address_length))) > -1) {
     // send read end to client
-    if (!(sendFDS(connection_fd, pipes, pipe_count) < 0)) {
+    if (sendFDS(connection_fd, pipes, pipe_count) < 0) {
       retval = -1;
       goto accept_send_FDS_out;
     }
@@ -125,6 +129,7 @@ int acceptSendFDS(struct server_data * sd, pid_t *pid, struct typed_pipe* pipes,
   retval = read(connection_fd, pid, sizeof(pid_t));
   if (retval != sizeof(pid_t)) {
     perror("FD_Server failed to read pid");
+    retval = -1;
   }
 
 accept_send_FDS_out:

@@ -17,6 +17,8 @@
 #include "../include/replicas.h"
 #include "../include/commtypes.h"
 
+#define SIG SIGRTMIN
+
 // Replica related data
 struct replica replica;
 
@@ -32,6 +34,16 @@ struct typed_pipe trans_pipes[2];
 
 timestamp_t last;
 
+long voting_timeout;
+int timer_start_index;
+int timer_stop_index;
+bool timer_started;
+// restart timer fd
+char watchdog_byte[1] = {'*'};
+int watchdog_fd[2];
+timer_t watchdogid;
+struct itimerspec watchdog_its;
+
 // FUNCTIONS!
 int initBenchMarker();
 int parseArgs(int argc, const char **argv);
@@ -41,11 +53,50 @@ void processOdom();
 void processRanger();
 void processCommand();
 
+void watchdog_sighandler(int signum) {
+  assert(write(watchdog_fd[1], watchdog_byte, 1) == 1);
+}
+
 int initBenchMarker() {
   int scheduler;
-  int p_offset = 0;
+  struct sigevent sev;
+  sigset_t mask;
 
   InitTAS(DEFAULT_CPU, &cpu_speed, priority);
+
+  // watchdog_fd
+  if (pipe(watchdog_fd) == -1) {
+    perror("BenchMarker watchdog pipe fail");
+    return -1;
+  }
+  /* Establish handler for watchdog signal */
+  if (signal(SIG, watchdog_sighandler) == SIG_ERR) {
+    perror("BenchMarker sigaction failed");
+    return -1;
+  }
+  sigemptyset(&mask);
+  sigaddset(&mask, SIG);
+  if (sigprocmask(SIG_UNBLOCK, &mask, NULL) == -1) {
+    perror("BenchMarker sigprockmask failed");
+    return -1;
+  }
+  // Create the timer
+  memset(&sev, 0, sizeof(sev));
+  sev.sigev_notify = SIGEV_SIGNAL;
+  sev.sigev_signo = SIG;
+  sev.sigev_value.sival_ptr = &watchdogid;
+  if (timer_create(CLOCK_REALTIME, &sev, &watchdogid) == -1) {
+    perror("BenchMarker timer_create failed");
+    return -1;
+  }
+  // Arm timer
+  watchdog_its.it_interval.tv_sec = 0;
+  watchdog_its.it_interval.tv_nsec = 0;
+  watchdog_its.it_value.tv_sec = 5;
+  watchdog_its.it_value.tv_nsec = 0;
+  if (timer_settime(watchdogid, 0, &watchdog_its, NULL) == -1) {
+    perror("BenchMarker timer_settime failed");
+  }
 
   scheduler = sched_getscheduler(0);
 
@@ -97,6 +148,7 @@ void enterLoop() {
     select_timeout.tv_usec = 0;
 
     FD_ZERO(&select_set);
+    FD_SET(watchdog_fd[0], &select_set);
     FD_SET(trans_pipes[0].fd_in, &select_set);
     FD_SET(replica.vot_pipes[1].fd_in, &select_set);
 
@@ -129,6 +181,21 @@ void enterLoop() {
         } else {
           perror("Bench: read should have worked, failed."); // EINTR?
         }
+        // Reset Watchdog
+        watchdog_its.it_interval.tv_sec = 0;
+        watchdog_its.it_interval.tv_nsec = 0;
+        watchdog_its.it_value.tv_sec = 5;
+        watchdog_its.it_value.tv_nsec = 0;
+
+        if (timer_settime(watchdogid, 0, &watchdog_its, NULL) == -1) {
+          perror("BenchMarker timer_settime failed");
+        }
+      }
+
+      if (FD_ISSET(watchdog_fd[0], &select_set)) {
+        // Watchdog timer has expired, need to reset the entire system
+        printf("********** Watchdog Expired. **********\n");
+        return;
       }
     }
   }

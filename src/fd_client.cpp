@@ -59,6 +59,10 @@ int requestFDS(int sock_fd, struct typed_pipe* pipes, int pipe_count) {
   return retval;
 }
 
+/*
+ * Connects to the named file descriptor server, receives new fds for each pipe, and sends back its PID.
+ * Returns 0 on success, <0 otherwise.
+ */
 int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const char* name) {
   int sock_fd;
   int retval = 0;
@@ -107,6 +111,7 @@ int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const ch
   // Send pid
   if (write(sock_fd, &pid, sizeof(pid_t)) < 0) {
     perror("FD_client write for pid failed");
+    retval = -1;
   }
 
 connect_recv_FDS_sock_out:

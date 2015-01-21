@@ -83,9 +83,14 @@ int parseArgs(int argc, const char **argv) {
   priority = atoi(argv[1]);
   if (argc < 4) { // Must request fds
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "ArtPot");
+    if (connectRecvFDS(currentPID, pipes, PIPE_COUNT, name) < 0) {
+      printf("Error in %s: failed on connectRecvFDS call. Exiting.\n", name);
+      exit(-1);
+    }
     setPipeIndexes();
   } else {
+    // TODO: This code needs to be checked.
+    // printf("IS THIS CODE EVER USED? ArtPot parseArgs.\n");
     for (int i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {
       deserializePipe(argv[i + 2], &pipes[i]);
     }

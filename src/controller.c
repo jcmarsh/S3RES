@@ -36,7 +36,10 @@ void restartHandler(int signo) {
       initReplica();
       // Get own pid, send to voter
       currentPID = getpid();
-      connectRecvFDS(currentPID, pipes, pipe_count, "ArtPot");
+      if (connectRecvFDS(currentPID, pipes, pipe_count, name) < 0) {
+        printf("Error in %s: failed connectRecvFDS call.\n", name);
+        return;
+      }
       setPipeIndexes();
 
       // unblock the signal (restart handler)
