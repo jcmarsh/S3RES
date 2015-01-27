@@ -40,6 +40,8 @@ void restartHandler(int signo) {
       sigaddset(&signal_set, SIGUSR2); // syscall
       sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
 
+      EveryTAS();
+
       return;
     } else {   // Parent just returns
       waitpid(-1, NULL, WNOHANG);

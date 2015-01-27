@@ -15,8 +15,8 @@ int parseLine(char* line, ssize_t length) {
   char start_s[17]; // I don't think that the address can be longer than 16 (64 bits in hex). One for \0
   char end_s[17];
   char permissions[5]; // read, write, execute, private (copy on write!)
-  long start = 0;
-  long end = 0;
+  unsigned long start = 0;
+  unsigned long end = 0;
   int index = 0;
   int e_index = 0;
   char current;
@@ -35,7 +35,7 @@ int parseLine(char* line, ssize_t length) {
     current = line[index];
   }
   start_s[index] = '\0';
-  start = strtol(start_s, NULL, 16);
+  start = strtoul(start_s, NULL, 16);
 
   // Read end / convert to number
   index++; // skip the '-'
@@ -47,7 +47,7 @@ int parseLine(char* line, ssize_t length) {
     current = line[index];
   }
   end_s[e_index] = '\0';
-  end = strtol(end_s, NULL, 16);
+  end = strtoul(end_s, NULL, 16);
 
   //  printf("Start-End: %s - %s\n", start_s, end_s);
   //  printf("Start-End: %ld - %ld\n", start, end);

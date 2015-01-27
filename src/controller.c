@@ -49,12 +49,15 @@ void restartHandler(int signo) {
       sigaddset(&signal_set, SIGUSR2);
       sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
 
+      EveryTAS();
+
       enterLoop(); // return to normal
     } else {   // Parent just returns
       return;
     }
   } else {
-    perror("ArtPot Fork error\n");
+    printf("%s ", name); 
+    perror("Fork error\n");
     return;
   }
 }
