@@ -133,6 +133,31 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
+  // For debugging help
+  char** rep_argv = (char**)malloc(sizeof(char *) * 2);
+  rep_argv[0] = (char*) malloc(strlen("/usr/bin/gnome-terminal") + 1);
+  memcpy(rep_argv[0], "/usr/bin/gnome-terminal", strlen("/usr/bin/gnome-terminal") + 1);
+  rep_argv[1] = NULL;
+  pid_t currentPID = 0;
+
+  // Fork child
+  currentPID = fork();
+
+  if (currentPID >= 0) { // Successful fork
+    if (currentPID == 0) { // Child process
+      if (-1 == execv(rep_argv[0], rep_argv)) {
+        printf("rep_argv[0]: %s\n", rep_argv[0]);
+        perror("BenchMarker: EXEC ERROR!");
+        return -1;
+      }
+    } else { // Parent Process
+      printf("Hopefully that worked.\n");
+    }
+  } else {
+    printf("Fork error!\n");
+    return -1;
+  }
+
   enterLoop();
 
   return 0;
