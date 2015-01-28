@@ -46,6 +46,7 @@ while True:
 	kill_index = random.randint(0, len(victim_pids)-1)
 	print "Executing ", cmd_start, " on a ", victim_names[kill_index], ": ", victim_pids[kill_index]
 	Popen(cmd_start + " " + str(victim_pids[kill_index]), shell=True)
-	rep_index = (kill_index + (victim_count - 1)) % victim_count
-	print "Restarting through ", victim_names[rep_index], " ", victim_pids[rep_index]
-	Popen("kill -s USR1 " + str(victim_pids[rep_index]), shell=True)
+	# These lines are only needed if there is no voter (testing)
+	#rep_index = (kill_index + (victim_count - 1)) % victim_count
+	#print "Restarting through ", victim_names[rep_index], " ", victim_pids[rep_index]
+	#Popen("kill -s USR1 " + str(victim_pids[rep_index]), shell=True)
