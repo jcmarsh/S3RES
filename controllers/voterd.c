@@ -198,9 +198,9 @@ int parseArgs(int argc, const char **argv) {
   controller_name = const_cast<char*>(argv[1]);
   rep_type = reptypeToEnum(const_cast<char*>(argv[2]));
   rep_count = rep_type;
+  printf("Rep count is %d for %s\n", rep_count, controller_name);
   voting_timeout = atoi(argv[3]);
   voter_priority = atoi(argv[4]);
-  printf("VoterD Priority: %d\n", voter_priority);
   if (voting_timeout == 0) {
     voting_timeout = PERIOD_NSEC;
   }
@@ -396,35 +396,72 @@ void checkSend(int pipe_num, bool checkSDC) {
     timer_started = false;
   }
 
-  // Send the solution that at least two agree on
-  // TODO: What if buff_count is off?
-  for (int r_index = 0; r_index < rep_count; r_index++) {
-    if (memcmp(replicas[r_index].vot_pipes[pipe_num].buffer,
-               replicas[(r_index+1) % rep_count].vot_pipes[pipe_num].buffer,
-               replicas[r_index].vot_pipes[pipe_num].buff_count) == 0) {
-      int retval = write(ext_pipes[pipe_num].fd_out, replicas[r_index].vot_pipes[pipe_num].buffer,
-            replicas[r_index].vot_pipes[pipe_num].buff_count);
+  int retval;
+  switch (rep_type) {
+    case SMR: 
+      // TODO: handling failure?
+      // Only one rep, so pretty much have to trust it
+      retval = write(ext_pipes[pipe_num].fd_out, replicas[0].vot_pipes[pipe_num].buffer,
+                        replicas[0].vot_pipes[pipe_num].buff_count);
+      if (retval == 0) {
+        perror("Seriously Voter?");
+      }
+      
+      resetVotingState(pipe_num);
+      return;
+    case DMR:
+      // Can detect, and check what to do
+      // TODO: What happens when checkSend is called and DMR had one fail? Should have had a result copied.
+      retval = write(ext_pipes[pipe_num].fd_out, replicas[0].vot_pipes[pipe_num].buffer,
+                        replicas[0].vot_pipes[pipe_num].buff_count);
       if (retval == 0) {
         perror("Seriously Voter?");
       }
 
       if (checkSDC) {
-        // If the third doesn't agree, it should be restarted.
-        if (memcmp(replicas[r_index].vot_pipes[pipe_num].buffer,
-                   replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num].buffer,
-                   replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
-          //printf("Voting disagreement: caught SDC\n");
+        if (memcmp(replicas[0].vot_pipes[pipe_num].buffer,
+                   replicas[1].vot_pipes[pipe_num].buffer,
+                   replicas[0].vot_pipes[pipe_num].buff_count) != 0) {
+          printf("Voting disagreement: caught SDC in DMR but can't do anything about it.\n");
 
-          restartReplica(r_index, (r_index + 2) % rep_count);
+          // Can't restart so don't know which is wrong.
+          // restartReplica(r_index, (r_index + 2) % rep_count);
         }
       }
+      
       resetVotingState(pipe_num);
-
       return;
-    } 
-  }
+    case TMR:
+      // Send the solution that at least two agree on
+      // TODO: What if buff_count is off?
+      for (int r_index = 0; r_index < rep_count; r_index++) {
+        if (memcmp(replicas[r_index].vot_pipes[pipe_num].buffer,
+                   replicas[(r_index+1) % rep_count].vot_pipes[pipe_num].buffer,
+                   replicas[r_index].vot_pipes[pipe_num].buff_count) == 0) {
+          retval = write(ext_pipes[pipe_num].fd_out, replicas[r_index].vot_pipes[pipe_num].buffer,
+                replicas[r_index].vot_pipes[pipe_num].buff_count);
+          if (retval == 0) {
+            perror("Seriously Voter?");
+          }
 
-  printf("VoterD: No two replicas agreed.\n");
+          if (checkSDC) {
+            // If the third doesn't agree, it should be restarted.
+            if (memcmp(replicas[r_index].vot_pipes[pipe_num].buffer,
+                       replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num].buffer,
+                       replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
+              //printf("Voting disagreement: caught SDC\n");
+
+              restartReplica(r_index, (r_index + 2) % rep_count);
+            }
+          }
+          resetVotingState(pipe_num);
+
+          return;
+        } 
+      }
+
+      printf("VoterD: TMR no two replicas agreed.\n");
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
