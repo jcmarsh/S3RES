@@ -73,56 +73,98 @@ void resetVotingState();
 void checkSend(int pipe_num, bool checkSDC);
 void processFromRep(int replica_num, int pipe_num);
 void restartReplica(int restarter, int restartee);
+void cleanupReplica(int rep_index);
 
 void timeout_sighandler(int signum) {
   assert(write(timeout_fd[1], timeout_byte, 1) == 1);
 }
 
-void restartHandler() {
-  // Timer went off, so the timer_stop_index is the pipe which is awaiting a rep
-  for (int r_index = 0; r_index < rep_count; r_index++) {
-    if (replicas[r_index].voted[timer_stop_index] == false) {
-
-      // This is the failed replica, restart it
-      // Send a signal to the rep's friend
-      int restarter = (r_index + (rep_count - 1)) % rep_count;
-      int restartee = r_index;
-      restartReplica(restarter, restartee);
-
-      // Send along the response from the other two replicas.
-      // also copy over the previous vote state and pipe buffers
-      for (int i = 0; i < replicas[restarter].pipe_count; i++) {
-        replicas[restartee].voted[i] = replicas[restarter].voted[i];
-        memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
-        replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
-        checkSend(i, false); // DO NOT check for SDC (one has failed)
-      }
-      return;
+void startReplicas(void) {
+  initReplicas(replicas, rep_count, controller_name, voter_priority + 5);
+  createPipes(replicas, rep_count, ext_pipes, pipe_count);
+  forkReplicas(replicas, rep_count);
+  for (int i = 0; i < rep_count; i++) {
+    if (acceptSendFDS(&sd, &(replicas[i].pid), replicas[i].rep_pipes, replicas[i].pipe_count) < 0) {
+      printf("VoterD acceptSendFDS call failed\n");
+      exit(-1);
     }
   }
 }
 
-void restartReplica(int restarter, int restartee) {
+void restartHandler() {
+  // Timer went off, so the timer_stop_index is the pipe which is awaiting a rep
+
+  switch (rep_type) {
+    case SMR:
+      // Need to cold restart the replica
+      cleanupReplica(0);
+
+      // TODO: make function
+      startReplicas();
+      
+      // Resend last data
+      for (int p_index = 0; p_index < pipe_count; p_index++) {
+        int read_fd = ext_pipes[p_index].fd_in;
+        if (read_fd != 0) {
+          //ext_pipes[p_index].buff_count = read(read_fd, ext_pipes[p_index].buffer, 1024); // TODO remove magic number
+          processData(ext_pipes[p_index], p_index);    
+        }
+      }
+
+      return;
+    case DMR:
+      // Same as TMR
+    case TMR:
+      for (int r_index = 0; r_index < rep_count; r_index++) {
+        if (replicas[r_index].voted[timer_stop_index] == false) {
+
+          // This is the failed replica, restart it
+          // Send a signal to the rep's friend
+          int restarter = (r_index + (rep_count - 1)) % rep_count;
+          int restartee = r_index;
+          restartReplica(restarter, restartee);
+
+          // Send along the response from the other two replicas.
+          // also copy over the previous vote state and pipe buffers
+          for (int i = 0; i < replicas[restarter].pipe_count; i++) {
+            replicas[restartee].voted[i] = replicas[restarter].voted[i];
+            memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
+            replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
+            checkSend(i, false); // DO NOT check for SDC (one has failed)
+          }
+          return;
+        }
+      }
+  }
+}
+
+void cleanupReplica(int rep_index) {
   // Kill old replica
-  kill(replicas[restartee].pid, SIGKILL); // Make sure it is dead.
+  kill(replicas[rep_index].pid, SIGKILL); // Make sure it is dead.
   waitpid(-1, NULL, WNOHANG); // cleans up the zombie // Actually doesn't // Well, now it does.
 
   
   // cleanup replica data structure
-  for (int i = 0; i < replicas[restartee].pipe_count; i++) {
-    if (replicas[restartee].vot_pipes[i].fd_in > 0) {
-      close(replicas[restartee].vot_pipes[i].fd_in);
+  for (int i = 0; i < replicas[rep_index].pipe_count; i++) {
+    if (replicas[rep_index].vot_pipes[i].fd_in > 0) {
+      close(replicas[rep_index].vot_pipes[i].fd_in);
     }
-    if (replicas[restartee].vot_pipes[i].fd_out > 0) {
-      close(replicas[restartee].vot_pipes[i].fd_out);
+    if (replicas[rep_index].vot_pipes[i].fd_out > 0) {
+      close(replicas[rep_index].vot_pipes[i].fd_out);
     }
-    if (replicas[restartee].rep_pipes[i].fd_in > 0) {
-      close(replicas[restartee].rep_pipes[i].fd_in);
+    if (replicas[rep_index].rep_pipes[i].fd_in > 0) {
+      close(replicas[rep_index].rep_pipes[i].fd_in);
     }
-    if (replicas[restartee].rep_pipes[i].fd_out > 0) {
-      close(replicas[restartee].rep_pipes[i].fd_out);
+    if (replicas[rep_index].rep_pipes[i].fd_out > 0) {
+      close(replicas[rep_index].rep_pipes[i].fd_out);
     }
   }
+
+  return;
+}
+
+void restartReplica(int restarter, int restartee) {
+  cleanupReplica(restartee);
 
   int retval = kill(replicas[restarter].pid, SIGUSR1);
   if (retval < 0) {
@@ -178,15 +220,7 @@ int initVoterD() {
   createFDS(&sd, controller_name);
 
   // Let's try to launch the replicas
-  initReplicas(replicas, rep_count, controller_name, voter_priority + 5);
-  createPipes(replicas, rep_count, ext_pipes, pipe_count);
-  forkReplicas(replicas, rep_count);
-  for (int i = 0; i < rep_count; i++) {
-    if (acceptSendFDS(&sd, &(replicas[i].pid), replicas[i].rep_pipes, replicas[i].pipe_count) < 0) {
-      printf("VoterD acceptSendFDS call failed\n");
-      exit(-1);
-    }
-  }
+  startReplicas();
   
   resetVotingState();
 
