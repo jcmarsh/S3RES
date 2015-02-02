@@ -7,8 +7,6 @@
 #include <stdbool.h>
 #include "../include/commtypes.h"
 
-typedef enum {NONE, SMR, DMR, TMR} replication_t;
-
 // Data structure for components that need to be initialized by the plumber
 struct node {
 	// Name... name / value pair in the config file

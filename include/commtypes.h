@@ -24,6 +24,10 @@ typedef enum {
 // TODO: consider generating with macros: http://stackoverflow.com/questions/9907160/how-to-convert-enum-names-to-string-in-c
 static const char* MESSAGE_T[] = {"COMM_ERROR", "WAY_REQ", "WAY_RES", "MOV_CMD", "RANGE_POSE_DATA", "MAP_UPDATE", "COMM_ACK"};
 
+// Here more for convenience
+typedef enum {NONE, SMR, DMR, TMR, REP_TYPE_ERROR} replication_t;
+static const char* REP_TYPE_T[] = {"NONE", "SMR", "DMR", "TMR", "REP_TYPE_ERROR"};
+
 #define INDEX_X 0
 #define INDEX_Y 1
 #define INDEX_A 2
@@ -73,6 +77,7 @@ struct comm_ack {
 // Hack to check when parsing
 // Also need for deserialization
 comm_message_t commToEnum(char* name);
+replication_t reptypeToEnum(char* type);
 
 // Typed pipes
 char* serializePipe(struct typed_pipe pipe);

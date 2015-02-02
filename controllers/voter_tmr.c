@@ -25,7 +25,6 @@
 
 #define SIG SIGRTMIN + 7
 #define REP_COUNT 3
-#define INIT_ROUNDS 4
 #define PERIOD_NSEC 120000 // Max time for voting in nanoseconds (120 micro seconds)
 
 // Either waiting for replicas to vote or waiting for the next round (next ranger input).

@@ -102,6 +102,16 @@ void print_nodes(struct nodelist* nodes)
 	}
 }
 
+char* serializeRep(replication_t rep_type) {
+	char* serial;
+
+	if (asprintf(&serial, "%s", REP_TYPE_T[rep_type]) < 0) {
+		perror("serializeRep failed");
+	}
+
+	return serial;
+}
+
 // TODO: compare to "forkSingleReplica" in replicas.cpp
 int launch_node(struct nodelist* nodes) {
 	pid_t currentPID = 0;
@@ -122,19 +132,16 @@ int launch_node(struct nodelist* nodes) {
 			rep_argv[1] = curr->priority;
 			other_arg = 2;
 			rep_argv[rep_count - 1] = NULL;
-		} else if (curr->rep_strat == SMR) {
-			printf("pb.y: No support for SMR\n");
-		} else if (curr->rep_strat == DMR) {
-			printf("pb.y: No support for DMR\n");
-		} else if (curr->rep_strat == TMR) {
+		} else {
 			// launch with voter
-			int rep_count = 5 + curr->pipe_count;
+			int rep_count = 6 + curr->pipe_count;
 			rep_argv = malloc(sizeof(char *) * rep_count);
 			rep_argv[0] = curr->voter_name;
 			rep_argv[1] = curr->value;
-			rep_argv[2] = curr->voter_timer;
-			rep_argv[3] = curr->priority;
-			other_arg = 4;
+			rep_argv[2] = serializeRep(curr->rep_strat);
+			rep_argv[3] = curr->voter_timer;
+			rep_argv[4] = curr->priority;
+			other_arg = 5;
 			rep_argv[rep_count - 1] = NULL;
 		}
 

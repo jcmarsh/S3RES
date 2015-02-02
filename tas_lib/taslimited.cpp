@@ -36,6 +36,7 @@ void optOutRT() {
 int InitTAS(cpu_id_t cpu, cpu_speed_t *cpu_speed, int prio_offset) {
   pid_t pid;
   int priority; // TODO: This is only passed to scheduler call?
+  int result;
 
   pid = getpid();
 
@@ -51,24 +52,25 @@ int InitTAS(cpu_id_t cpu, cpu_speed_t *cpu_speed, int prio_offset) {
   // Set Realtime Scheduling
   // set the process to be scheduled with realtime policy and max priority              
   //  priority = priority - 5; // running max priority is bad? testing. AHHH DOING THIS WRONG
-  if( scheduler_c::set_realtime_policy( pid, priority, prio_offset + 5) != scheduler_c::ERROR_NONE ) {
-    perror("(voter_b_driver) InitTAS() failed calling schedule_set_realtime_max(pid,priority)." );
+  result = scheduler_c::set_realtime_policy( pid, priority, prio_offset + 5);
+  if( result != scheduler_c::ERROR_NONE ) {
+    printf("(voter_d_driver) InitTAS() failed calling schedule_set_realtime_max(pid,priority): %d\n", result);
   }
 
   // * get the cpu speed *
   if( cpu_c::get_speed( *cpu_speed, cpu ) != cpu_c::ERROR_NONE ) {
-    printf("(voter_b_driver) InitTAS() failed calling cpu_c::get_frequency(cpu_speed,cpu)\n" );
+    printf("(voter_d_driver) InitTAS() failed calling cpu_c::get_frequency(cpu_speed,cpu)\n" );
   }
 }
 
 int EveryTAS() {  
   // lock current and future memory
   if (lockItUp() != 0) {
-    printf("(voter_b_driver) InitTAS() failed calling lockItUp()\n" );
+    printf("(voter_d_driver) InitTAS() failed calling lockItUp()\n" );
   }
 
   // Walk current memory to get it paged in
   if (forceMaps() != 0) {
-    printf("(voter_b_driver) InitTAS() failed calling forceMaps()\n" );
+    printf("(voter_d_driver) InitTAS() failed calling forceMaps()\n" );
   }
 }

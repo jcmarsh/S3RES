@@ -50,7 +50,7 @@ declaration
       add_node(&all_nodes, $1, $3, NONE, NULL, 0, $4); }
 
   | VAR_NAME ASSIGN rep_comp rep_strat DELIM NUMBER_VAL NUMBER_VAL {
-      add_node(&all_nodes, $1, $3, $4, "VoterC", $6, $7); }
+      add_node(&all_nodes, $1, $3, $4, "VoterD", $6, $7); }
   ;
 
 rep_comp

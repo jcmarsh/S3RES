@@ -21,6 +21,20 @@ comm_message_t commToEnum(char* name) {
   }
 }
 
+replication_t reptypeToEnum(char* type) {
+  if (strcmp(type, "NONE") == 0) {
+    return NONE;
+  } else if (strcmp(type, "SMR") == 0) {
+    return SMR;
+  } else if (strcmp(type, "DMR") == 0) {
+    return DMR;
+  } else if (strcmp(type, "TMR") == 0) {
+    return TMR;
+  } else {
+    return REP_TYPE_ERROR;
+  }
+}
+
 char* serializePipe(struct typed_pipe pipe) {
   char* serial;
   if (pipe.fd_in == 0) {
