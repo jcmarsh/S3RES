@@ -122,6 +122,8 @@ int launch_node(struct nodelist* nodes) {
 			rep_argv[1] = curr->priority;
 			other_arg = 2;
 			rep_argv[rep_count - 1] = NULL;
+		} else if (curr->rep_strat == SMR) {
+			printf("pb.y: No support for SMR\n");
 		} else if (curr->rep_strat == DMR) {
 			printf("pb.y: No support for DMR\n");
 		} else if (curr->rep_strat == TMR) {

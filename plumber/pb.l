@@ -1,11 +1,15 @@
 /* read the startup script */
 %{
+#include "plumbing.h"
 #include "pb.tab.h"
 %}
 
 %%
 [ \t\r]
 "Bench"			{ yylval.str = "Bench"; return BENCH; }
+"SMR"			{ yylval.rep_type = SMR; return P_SMR; }
+"DMR"			{ yylval.rep_type = DMR; return P_DMR; }
+"TMR"			{ yylval.rep_type = TMR; return P_TMR; }
 "--"			{ return START_PIPE; }
 "->"			{ return END_PIPE; }
 "("				{ return START_VOTE; }

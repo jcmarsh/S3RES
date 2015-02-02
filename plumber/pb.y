@@ -15,9 +15,13 @@ struct typed_pipe cmd_out;
 
 %union {
   char* str;
+  replication_t rep_type;
 }
 
 %token <str> BENCH
+%token <rep_type> P_SMR
+%token <rep_type> P_DMR
+%token <rep_type> P_TMR
 %token START_PIPE
 %token END_PIPE
 %token START_VOTE
@@ -31,6 +35,7 @@ struct typed_pipe cmd_out;
 %type <str> arrow
 %type <str> rep_comp
 %type <str> rep_name
+%type <rep_type> rep_strat
 
 %%
 line
@@ -44,12 +49,18 @@ declaration
   : VAR_NAME ASSIGN NAMED_OB NUMBER_VAL { 
       add_node(&all_nodes, $1, $3, NONE, NULL, 0, $4); }
 
-  | VAR_NAME ASSIGN rep_comp NAMED_OB DELIM NUMBER_VAL NUMBER_VAL {
-      add_node(&all_nodes, $1, $3, TMR, $4, $6, $7); }
+  | VAR_NAME ASSIGN rep_comp rep_strat DELIM NUMBER_VAL NUMBER_VAL {
+      add_node(&all_nodes, $1, $3, $4, "VoterC", $6, $7); }
   ;
 
 rep_comp
   : START_VOTE NAMED_OB END_VOTE { $$ = $2; }
+  ;
+
+rep_strat
+  : P_SMR { $$ = $1; }
+  | P_DMR { $$ = $1; }
+  | P_TMR { $$ = $1; }
   ;
 
 relationship
