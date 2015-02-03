@@ -9,7 +9,6 @@
 #include "plumbing.h"
 
 // True if succeeds, false otherwise.
-// TODO: DMR vs TMR are not used here (yet).
 // TODO: should eventually allow an arbitrary number of arguments to be passed in. For now, just one for ease
 bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep_type, char* voter_name, char* voter_timer, char* priority) {
 	// if current is null, add new node

@@ -232,7 +232,6 @@ int parseArgs(int argc, const char **argv) {
   controller_name = const_cast<char*>(argv[1]);
   rep_type = reptypeToEnum(const_cast<char*>(argv[2]));
   rep_count = rep_type;
-  printf("Rep count is %d for %s\n", rep_count, controller_name);
   voting_timeout = atoi(argv[3]);
   voter_priority = atoi(argv[4]);
   if (voting_timeout == 0) {
@@ -445,7 +444,6 @@ void checkSend(int pipe_num, bool checkSDC) {
       return;
     case DMR:
       // Can detect, and check what to do
-      // TODO: What happens when checkSend is called and DMR had one fail? Should have had a result copied.
       retval = write(ext_pipes[pipe_num].fd_out, replicas[0].vot_pipes[pipe_num].buffer,
                         replicas[0].vot_pipes[pipe_num].buff_count);
       if (retval == 0) {

@@ -21,7 +21,8 @@ typedef enum {
   COMM_ACK
 } comm_message_t;
 
-// TODO: consider generating with macros: http://stackoverflow.com/questions/9907160/how-to-convert-enum-names-to-string-in-c
+// Not happy with this, but clean. Order needs to be the same as above.
+// Used to serialize / deserialize the pipe type
 static const char* MESSAGE_T[] = {"COMM_ERROR", "WAY_REQ", "WAY_RES", "MOV_CMD", "RANGE_POSE_DATA", "MAP_UPDATE", "COMM_ACK"};
 
 // Here more for convenience

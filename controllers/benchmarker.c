@@ -106,7 +106,6 @@ void enterLoop() {
       if (FD_ISSET(trans_pipes[0].fd_in, &select_set)) {
         retval = read(trans_pipes[0].fd_in, &range_pose_data_msg, sizeof(struct comm_range_pose_data));
         if (retval > 0) {
-          // TODO: Check for erros
           if (waiting_response) {
             printf("ERROR, sending data but still waiting on previous response.\n");
           }
@@ -114,7 +113,7 @@ void enterLoop() {
 
           processRanger();      
         } else {
-          perror("Bench: read should have worked, failed."); // EINTR?
+          perror("Bench: read (from translator) should have worked"); // EINTR?
         }
       }
 
@@ -126,7 +125,7 @@ void enterLoop() {
 
           processCommand();
         } else {
-          perror("Bench: read should have worked, failed."); // EINTR?
+          perror("Bench: read (from replica) should have worked"); // EINTR?
         }
       }
     }
@@ -137,8 +136,7 @@ void enterLoop() {
 ////////////////////////////////////////////////////////////////////////////////
 // Process ranger data
 void processRanger() {
-  // msg data set by read in (TODO: Change?)
-
+  // msg data set by read in enterLoop
 #ifdef _STATS_BENCH_ROUND_TRIP_
   last = generate_timestamp();
 #endif // _STATS_BENCH_ROUND_TRIP_
@@ -157,7 +155,7 @@ void processCommand() {
   printf("%lld\n", current - last);
 #endif
 
-  // data was set by read
+  // data was set by read in enterLoop
   if (write(trans_pipes[1].fd_out, &mov_cmd_msg, sizeof(struct comm_mov_cmd)) != sizeof(struct comm_mov_cmd)) {
     perror("Bencmarker failed mov_cmd write");
   }

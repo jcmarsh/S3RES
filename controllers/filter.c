@@ -49,28 +49,6 @@ void testSDCHandler(int signo) {
   insertSDC = true;
 }
 
-/* TODO: delete, and figure out the EveryTAS and resetPipe bits.
-void restartHandler(int signo) {
-  // fork
-  pid_t currentPID = fork();
-
-  if (currentPID >= 0) { // Successful fork
-    if (currentPID == 0) { // Child process
-      // child sets new id, recreates connects, loops
-
-      // Not sure what this bit was here for.
-      for (int i = 0; i < pipe_count; i++) {
-        resetPipe(&(pipes[i]));
-      }
-      
-      EveryTAS();
-    }
-  } else {
-    printf("Fork error!\n");
-    return;
-  }
-} */
-
 void setPipeIndexes(void) {
   data_index = 0;
   average_index = 1;
