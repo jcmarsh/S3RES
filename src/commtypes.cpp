@@ -50,19 +50,20 @@ char* serializePipe(struct typed_pipe pipe) {
 }
 
 void deserializePipe(const char* serial, struct typed_pipe *pipe) {
-  char* type = (char*)malloc(sizeof(char) * 100);
+  char* type;
   int in = 0;
   int out = 0;
   int timed = 0;
 
-  sscanf(serial, "%[^:]:%d:%d:%d", type, &in, &out, &timed);
+  // TODO: check allocation and scan for errors
+  sscanf(serial, "%m[^:]:%d:%d:%d", &type, &in, &out, &timed);
   pipe->fd_in = in;
   pipe->fd_out = out;
   pipe->timed = timed;
 
   pipe->type = commToEnum(type);
 
-  memset(pipe->buffer, 0, 1024);
+  memset(pipe->buffer, 0, MAX_PIPE_BUFF);
   pipe->buff_count = 0;
 
   free(type);
@@ -139,7 +140,7 @@ int commSendMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg) {
   }
 
   int index = 0;
-  int buffer[1024] = {0}; // TODO Max size should be set somewhere
+  int buffer[MAX_PIPE_BUFF / sizeof(int)] = {0};
   int buff_count = 0;
 
   buffer[buff_count++] = msg->pose_x;
@@ -149,6 +150,11 @@ int commSendMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg) {
   for (index = 0; index < msg->obs_count; index++) {
     buffer[buff_count++] = msg->obs_x[index];
     buffer[buff_count++] = msg->obs_y[index];
+    
+    if (buff_count * sizeof(int) > MAX_PIPE_BUFF) {
+      printf("ERROR: Commtypes:commSendMapUpdate attempting to surpase MAX_PIPE_BUFF\n");
+      break;
+    }
   }
   
   return write(pipe.fd_out, buffer, sizeof(int) * buff_count);

@@ -10,6 +10,8 @@
 
 // Why 10? No reason.
 #define PIPE_LIMIT 10
+// Max number of bytes
+#define MAX_PIPE_BUFF 1024
 
 typedef enum {
   COMM_ERROR,
@@ -43,7 +45,7 @@ struct typed_pipe {
   int fd_out;
 
   int buff_count;
-  char* buffer[1024];
+  char* buffer[MAX_PIPE_BUFF];
 };
 
 struct comm_way_req {

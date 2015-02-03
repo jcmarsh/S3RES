@@ -4,10 +4,7 @@
  * James Marshall
  */
 
-#include <math.h> // TODO: REVIEW
-#include <signal.h>
 #include <string.h>
-#include <time.h>
 #include <unistd.h>
 
 #include <libplayercore/playercore.h>
@@ -108,7 +105,7 @@ TranslatorDriver::TranslatorDriver(ConfigFile* cf, int section)
 
   // Check for position2d (we require)
   this->odom = NULL;
-  // TODO: No memset for the odom? -jcm
+  memset(&(this->odom_addr), 0, sizeof(player_devaddr_t));
   if (cf->ReadDeviceAddr(&(this->odom_addr), section, "requires",
 			 PLAYER_POSITION2D_CODE, -1, "original") != 0) {
     PLAYER_ERROR("Could not find required position2d device!");

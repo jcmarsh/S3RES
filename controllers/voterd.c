@@ -24,7 +24,7 @@
 #include "../include/fd_client.h" // Used for testing
 
 #define SIG SIGRTMIN + 7
-#define REP_MAX 3 // TODO: consider removing
+#define REP_MAX 3
 #define PERIOD_NSEC 120000 // Max time for voting in nanoseconds (120 micro seconds)
 
 // Either waiting for replicas to vote or waiting for the next round (next ranger input).
@@ -99,14 +99,12 @@ void restartHandler() {
       // Need to cold restart the replica
       cleanupReplica(0);
 
-      // TODO: make function
       startReplicas();
       
       // Resend last data
       for (int p_index = 0; p_index < pipe_count; p_index++) {
         int read_fd = ext_pipes[p_index].fd_in;
         if (read_fd != 0) {
-          //ext_pipes[p_index].buff_count = read(read_fd, ext_pipes[p_index].buffer, 1024); // TODO remove magic number
           processData(ext_pipes[p_index], p_index);    
         }
       }
@@ -219,7 +217,6 @@ int initVoterD() {
   // Setup fd server
   createFDS(&sd, controller_name);
 
-  // Let's try to launch the replicas
   startReplicas();
   
   resetVotingState();
@@ -339,7 +336,7 @@ void doOneUpdate() {
       int read_fd = ext_pipes[p_index].fd_in;
       if (read_fd != 0) {
         if (FD_ISSET(read_fd, &select_set)) {
-          ext_pipes[p_index].buff_count = read(read_fd, ext_pipes[p_index].buffer, 1024); // TODO remove magic number
+          ext_pipes[p_index].buff_count = read(read_fd, ext_pipes[p_index].buffer, MAX_PIPE_BUFF);
           processData(ext_pipes[p_index], p_index);
         }
       }
@@ -351,7 +348,7 @@ void doOneUpdate() {
         struct typed_pipe* curr_pipe = &(replicas[r_index].vot_pipes[p_index]);
         if (curr_pipe->fd_in !=0) {
           if (FD_ISSET(curr_pipe->fd_in, &select_set)) {
-            curr_pipe->buff_count = read(curr_pipe->fd_in, curr_pipe->buffer, 1024);
+            curr_pipe->buff_count = read(curr_pipe->fd_in, curr_pipe->buffer, MAX_PIPE_BUFF);
             if (curr_pipe->buff_count > 0) {
               processFromRep(r_index, p_index);  
             }
@@ -432,7 +429,6 @@ void checkSend(int pipe_num, bool checkSDC) {
   int retval;
   switch (rep_type) {
     case SMR: 
-      // TODO: handling failure?
       // Only one rep, so pretty much have to trust it
       retval = write(ext_pipes[pipe_num].fd_out, replicas[0].vot_pipes[pipe_num].buffer,
                         replicas[0].vot_pipes[pipe_num].buff_count);

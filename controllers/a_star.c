@@ -94,7 +94,6 @@ void testSDCHandler(int signo) {
   insertSDC = true;
 }
 
-// TODO: move to library?
 int parseArgs(int argc, const char **argv) {
   // TODO: error checking
   priority = atoi(argv[1]);
@@ -141,7 +140,7 @@ void command() {
   node_t* goal_node = newNode(goal->x, goal->y, 0);
   bool solution = false;
 
-  while(open_set != NULL) { // set empty // TODO: check remove functions
+  while(open_set != NULL) { // set empty
     node_t* current = pop(&open_set);
     if ((current != NULL) && nodeEqauls(current, goal_node)) {
       free(goal_node);
@@ -199,7 +198,7 @@ void command() {
 
 void enterLoop() {
   int read_ret;
-  int recv_msg_buffer[1024] = {0};
+  int recv_msg_buffer[MAX_PIPE_BUFF / sizeof(int)] = {0};
   struct comm_way_req recv_msg_req;
 
   struct timeval select_timeout;

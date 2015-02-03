@@ -7,11 +7,9 @@
 
 #include <assert.h>
 #include <math.h>
-//#include <signal.h>
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
-#include <errno.h> // TODO: remove
 
 #include "../include/controller.h"
 
@@ -89,8 +87,6 @@ int parseArgs(int argc, const char **argv) {
     }
     setPipeIndexes();
   } else {
-    // TODO: This code needs to be checked.
-    // printf("IS THIS CODE EVER USED? ArtPot parseArgs.\n");
     for (int i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {
       deserializePipe(argv[i + 2], &pipes[i]);
     }

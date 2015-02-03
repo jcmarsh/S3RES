@@ -56,13 +56,13 @@ void setPipeIndexes(void) {
 }
 
 int parseArgs(int argc, const char **argv) {
-  // TODO: error checking
   setPipeIndexes();
+  // TODO: Check for errors
   priority = atoi(argv[1]);
   if (argc < 4) { // Must request fds
     // printf("Usage: Filter <pipe_in> <pipe_out_0> <pipe_out_1>\n");
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "Filter"); // TODO: how to test now?
+    connectRecvFDS(currentPID, pipes, PIPE_COUNT, name);
     pipe_count = PIPE_COUNT;
   } else {
     deserializePipe(argv[2], &pipes[data_index]);
