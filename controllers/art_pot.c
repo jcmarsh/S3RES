@@ -15,11 +15,11 @@
 
 // Configuration parameters
 #define VEL_SCALE 1
-#define DIST_EPSILON .3
+#define DIST_EPSILON .4
 #define GOAL_RADIUS 0
 #define GOAL_EXTENT .5
 #define GOAL_SCALE 1
-#define OBST_RADIUS 0
+#define OBST_RADIUS .1
 #define OBST_EXTENT .5
 #define OBST_SCALE 1.5
 
@@ -27,7 +27,7 @@
 
 // Controller state
 double goal[] = {0.0, 0.0, 0.0};
-bool waiting_on_way = false;
+double next_goal[] = {0.0, 0.0, 0.0};
 
 // Position
 double pos[3];
@@ -110,6 +110,20 @@ void command(void) {
   dist = sqrt(pow(goal[INDEX_X] - pos[INDEX_X], 2)  + pow(goal[INDEX_Y] - pos[INDEX_Y], 2));
   theta = atan2(goal[INDEX_Y] - pos[INDEX_Y], goal[INDEX_X] - pos[INDEX_X]) - pos[INDEX_A];
 
+  printf("Current Goal: %f, %f - %f\n", goal[0], goal[1], goal[2]);
+  printf("Next Goal   : %f, %f - %f\n", next_goal[0], next_goal[1], next_goal[2]);
+
+  if (dist <= DIST_EPSILON) { // Try next goal
+    goal[INDEX_X] = next_goal[INDEX_X];
+    goal[INDEX_Y] = next_goal[INDEX_Y];
+    goal[INDEX_A] = next_goal[INDEX_A];
+
+    commSendWaypointRequest(pipes[way_req_index]);
+
+    dist = sqrt(pow(goal[INDEX_X] - pos[INDEX_X], 2)  + pow(goal[INDEX_Y] - pos[INDEX_Y], 2));
+    theta = atan2(goal[INDEX_Y] - pos[INDEX_Y], goal[INDEX_X] - pos[INDEX_X]) - pos[INDEX_A];
+  }
+
   total_factors = 0;
   if (dist < GOAL_RADIUS) {
     v = 0;
@@ -127,8 +141,6 @@ void command(void) {
     total_factors += 1;
   }
   
-  // TODO: Could I use goal_radius for the dist_epsilon
-  // TODO: Now will not react to obstacles while at a waypoint. Even moving ones.
   if (dist > DIST_EPSILON) {
     // Makes the assumption that scans are evenly spaced around the robot.
     for (i = 0; i < ranger_count; i++) {
@@ -154,13 +166,7 @@ void command(void) {
     vel_cmd[1] = atan2(delta_y, delta_x);
     vel_cmd[0] = VEL_SCALE * vel_cmd[0] * (abs(M_PI - vel_cmd[1]) / M_PI);
     vel_cmd[1] = VEL_SCALE * vel_cmd[1];
-  } else { // within distance epsilon. Give it up, man.
-    if (!waiting_on_way) {
-      if (PIPE_COUNT == pipe_count) {
-        commSendWaypointRequest(pipes[way_req_index]);
-        waiting_on_way = true;
-      }
-    }
+  } else { // within distance epsilon. And already tried next goal.
     vel_cmd[0] = 0.0;
     vel_cmd[1] = 0.0;
   }
@@ -212,9 +218,7 @@ void enterLoop(void) {
           read_ret = read(pipes[way_res_index].fd_in, &recv_msg_way, sizeof(struct comm_way_res));
           if (read_ret > 0) {
             // TODO check for erros
-            waiting_on_way = false;
-            commCopyWaypoints(&recv_msg_way, goal);
-            // Calculates and sends the new command
+            commCopyWaypoints(&recv_msg_way, goal, next_goal);
           } else if (read_ret < 0) {
             perror("ArtPot - read problems");
           } else {
@@ -240,7 +244,6 @@ int main(int argc, const char **argv) {
   insertSDC = false;
   if (PIPE_COUNT == pipe_count) {
     commSendWaypointRequest(pipes[way_req_index]);
-    waiting_on_way = true;
   } else {
     goal[0] = 7.0;
     goal[1] = 7.0;

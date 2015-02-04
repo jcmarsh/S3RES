@@ -1,8 +1,8 @@
 RESEARCH=/home/jcmarsh/research
 SRC=../src/commtypes.cpp ../src/fd_client.cpp ../src/controller.c
 LIB=-lrt -lTASLimited
-FLAGS=-O3
-#FLAGS=-g -O0
+#FLAGS=-O3
+FLAGS=-g -O0
 
 all: regular
 
@@ -27,17 +27,6 @@ copy: regular
 	cp Mapper ../../stage/experiments/
 	cp VoterD ../../stage/experiments/
 
-test: regular
-	cp ArtPot ../test/
-	cp AStar ../test/
-	cp BenchMarker ../test/
-	cp Empty ../test/
-	cp Filter ../test/
-	cp PassThrough ../test/
-	cp Mapper ../test/
-	cp VoterD ../test/
-	cp Min ../test/
-
 clean:
 	rm -f ArtPot
 	rm -f AStar
@@ -48,12 +37,3 @@ clean:
 	rm -f Mapper
 	rm -f VoterD
 	rm -f Min
-	rm -f ../test/ArtPot
-	rm -f ../test/AStar
-	rm -f ../test/BenchMarker
-	rm -f ../test/Empty
-	rm -f ../test/Filter
-	rm -f ../test/PassThrough
-	rm -f ../test/Mapper
-	rm -f ../test/VoterD
-	rm -f ../test/Min

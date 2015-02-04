@@ -81,7 +81,9 @@ void resetPipe(struct typed_pipe* pipe) {
   }
 }
 
-int commSendWaypoints(struct typed_pipe pipe, double way_x, double way_y, double way_a) {
+int commSendWaypoints(struct typed_pipe pipe, 
+                      double way_x, double way_y, double way_a,
+                      double n_way_x, double n_way_y, double n_way_a) {
   if (pipe.fd_out == 0 || pipe.type != WAY_RES) {
     printf("commSendWaypoints Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe.type], pipe.fd_out);
     return 0;
@@ -94,13 +96,20 @@ int commSendWaypoints(struct typed_pipe pipe, double way_x, double way_y, double
   msg.point[INDEX_Y] = way_y;
   msg.point[INDEX_A] = way_a;
 
+  msg.n_point[INDEX_X] = n_way_x;
+  msg.n_point[INDEX_Y] = n_way_y;
+  msg.n_point[INDEX_A] = n_way_a;
+
   return write(pipe.fd_out, &msg, sizeof(struct comm_way_res));
 }
 
-void commCopyWaypoints(struct comm_way_res * recv_msg, double * waypoints) {
+void commCopyWaypoints(struct comm_way_res * recv_msg, double * waypoints, double * n_waypoints) {
   int index = 0;
   for (index = 0; index < 3; index++) {
     waypoints[index] = recv_msg->point[index];
+  }
+  for (index = 0; index < 3; index++) {
+    n_waypoints[index] = recv_msg->n_point[index];
   }
   return;
 }

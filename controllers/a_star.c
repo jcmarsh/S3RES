@@ -99,7 +99,7 @@ int parseArgs(int argc, const char **argv) {
   priority = atoi(argv[1]);
   if (argc < 6) {
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "AStar");
+    connectRecvFDS(currentPID, pipes, PIPE_COUNT, name);
     setPipeIndexes();
   } else {
     for (int i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {
@@ -155,7 +155,6 @@ void command() {
       }
 
       // clean up memory
-      //eraseAllButList(&open_set, goal_path);
       eraseList(&open_set);
       free(open_set);
       eraseAllButList(&closed_set, goal_path);      
@@ -239,19 +238,22 @@ void enterLoop() {
         read_ret = read(pipes[way_req_index].fd_in, &recv_msg_req, sizeof(struct comm_way_req));
         if (read_ret > 0) {
           if (goal_path->head == NULL) {
-            commSendWaypoints(pipes[way_res_index], -7.0, -7.0, 0.0);
-            // none yet
+            commSendWaypoints(pipes[way_res_index], -7.0, -7.0, 0.0, -7.0, -7.0, 0.0);
           } else {
             free(pop(&goal_path)); // Toss closest result
-            node_t* new_goal = pop(&goal_path);
+            node_t *new_goal = pop(&goal_path);
             point_d *goal_p = degridify(new_goal->x, new_goal->y);
             free(new_goal);
+            node_t *n_new_goal = pop(&goal_path);
+            point_d *n_goal_p = degridify(n_new_goal->x, n_new_goal->y);
+            free(n_new_goal);
             if (insertSDC) {
               insertSDC = false;
               goal_p->x++;
             }
-            commSendWaypoints(pipes[way_res_index], goal_p->x, goal_p->y, 0.0);
+            commSendWaypoints(pipes[way_res_index], goal_p->x, goal_p->y, 0.0, n_goal_p->x, n_goal_p->y, 0.0);
             free(goal_p);
+            free(n_goal_p);
           }
         } else if (read_ret == -1) {
           perror("AStar - read blocking");

@@ -54,6 +54,7 @@ struct comm_way_req {
 
 struct comm_way_res {
   double point[3];
+  double n_point[3];
 };
 
 struct comm_mov_cmd {
@@ -87,8 +88,10 @@ char* serializePipe(struct typed_pipe pipe);
 void deserializePipe(const char* serial, struct typed_pipe* pipe);
 void resetPipe(struct typed_pipe* pipe);
 
-int commSendWaypoints(struct typed_pipe pipe, double way_x, double way_y, double way_a);
-void commCopyWaypoints(struct comm_way_res * recv_msg, double * waypoints);
+int commSendWaypoints(struct typed_pipe pipe,
+                      double way_x, double way_y, double way_a,
+                      double n_way_x, double n_way_y, double n_way_a);
+void commCopyWaypoints(struct comm_way_res * recv_msg, double * waypoints, double * n_waypoints);
 
 int commSendWaypointRequest(struct typed_pipe pipe);
 
