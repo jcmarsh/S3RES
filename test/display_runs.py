@@ -21,13 +21,16 @@ for data_file in datas:
 	x.append([])
 	y.append([])
 	for line in data_file:
-		try:
-			value = int(line)
-			x[file_num].append(value / 3092.0)
-			y[file_num].append(n)
-			n = n + 1
-		except ValueError:
-			pass
+		if line[0] == '(' and line[-2] == ')':
+			try:
+				value = int(line[1:-2])
+				x[file_num].append(value / 3092.0)
+				y[file_num].append(n)
+				n = n + 1
+			except ValueError:
+				print "Failed to interpret line: ", line
+		else:
+			print "Poorly formatted line: ", line
 	file_num = file_num + 1
 	data_file.close()
 

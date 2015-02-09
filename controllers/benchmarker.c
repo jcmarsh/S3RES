@@ -152,7 +152,7 @@ void processCommand() {
 #ifdef _STATS_BENCH_ROUND_TRIP_
   timestamp_t current = generate_timestamp();
   
-  printf("%lld\n", current - last);
+  printf("(%lld)\n", current - last);
 #endif
 
   // data was set by read in enterLoop
