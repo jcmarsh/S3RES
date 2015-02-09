@@ -1,8 +1,8 @@
 RESEARCH=/home/jcmarsh/research
 SRC=../src/commtypes.cpp ../src/fd_client.cpp ../src/controller.c
 LIB=-lrt -lTASLimited
-#FLAGS=-O3
-FLAGS=-g -O0
+FLAGS=-O3
+#FLAGS=-g -O0
 
 all: regular
 

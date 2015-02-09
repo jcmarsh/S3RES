@@ -54,7 +54,7 @@ int main(int argc, const char** argv) {
   	write(rep.vot_pipes[0].fd_out, &sim_range_data, sizeof(struct comm_range_pose_data));
 
     // read the map update, should at least have the pose
-    char buffer[1024];
+    char buffer[MAX_PIPE_BUFF];
     read(rep.vot_pipes[1].fd_in, buffer, sizeof(buffer));
     printf("Pose returned %d, %d\n", ((int *)buffer)[0], ((int *)buffer)[1]);
 
