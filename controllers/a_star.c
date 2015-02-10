@@ -32,18 +32,21 @@ int updates_index, ack_index, way_req_index, way_res_index;
 int pipe_count = PIPE_COUNT;
 
 l_list_t* goal_path;
+node_t *current_goal;
+node_t *n_current_goal;
 
 cpu_speed_t cpu_speed;
 int priority;
 
 const char* name = "AStar";
 
-void enterLoop();
-void command();
-int initReplica();
+void enterLoop(void);
+void command(void);
+int initReplica(void);
+void sendWaypoints(void);
 
 // Set indexes based on pipe types
-void setPipeIndexes() {
+void setPipeIndexes(void) {
   for (int i = 0; i < PIPE_COUNT; i++) {
     switch (pipes[i].type) {
       case MAP_UPDATE:
@@ -99,7 +102,7 @@ int parseArgs(int argc, const char **argv) {
   priority = atoi(argv[1]);
   if (argc < 6) {
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, PIPE_COUNT, name);
+    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "AStarTest");
     setPipeIndexes();
   } else {
     for (int i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {
@@ -132,7 +135,7 @@ void eraseAllButList(l_list_t** kill_list, l_list_t* save_list) {
   free(*kill_list);
 }
 
-void command() {
+void command(void) {
   l_list_t* closed_set = newList();
   l_list_t* open_set = newList();
 
@@ -192,10 +195,35 @@ void command() {
   if (!solution) {
     printf("You have failed, as expected.\n");
     // Not sure what to do in this case
+  } else {
+    // check if new path is different then old
+    node_t *node_a = peek(goal_path, 0);
+    node_t *node_b = peek(goal_path, 1);
+    if (nodeEqauls(node_a, current_goal) && nodeEqauls(node_b, n_current_goal)) {
+      // don't send
+    } else {  
+      sendWaypoints();
+    }
   }
 }
 
-void enterLoop() {
+void sendWaypoints(void) {
+  free(current_goal);
+  free(n_current_goal);
+  current_goal = pop(&goal_path);
+  point_d *goal_p = degridify(current_goal->x, current_goal->y);
+  n_current_goal = pop(&goal_path);
+  point_d *n_goal_p = degridify(n_current_goal->x, n_current_goal->y);
+  if (insertSDC) {
+    insertSDC = false;
+    goal_p->x++;
+  }
+  commSendWaypoints(pipes[way_res_index], goal_p->x, goal_p->y, 0.0, n_goal_p->x, n_goal_p->y, 0.0);
+  free(goal_p);
+  free(n_goal_p);
+}
+
+void enterLoop(void) {
   int read_ret;
   int recv_msg_buffer[MAX_PIPE_BUFF / sizeof(int)] = {0};
   struct comm_way_req recv_msg_req;
@@ -240,20 +268,7 @@ void enterLoop() {
           if (goal_path->head == NULL) {
             commSendWaypoints(pipes[way_res_index], -7.0, -7.0, 0.0, -7.0, -7.0, 0.0);
           } else {
-            free(pop(&goal_path)); // Toss closest result
-            node_t *new_goal = pop(&goal_path);
-            point_d *goal_p = degridify(new_goal->x, new_goal->y);
-            free(new_goal);
-            node_t *n_new_goal = pop(&goal_path);
-            point_d *n_goal_p = degridify(n_new_goal->x, n_new_goal->y);
-            free(n_new_goal);
-            if (insertSDC) {
-              insertSDC = false;
-              goal_p->x++;
-            }
-            commSendWaypoints(pipes[way_res_index], goal_p->x, goal_p->y, 0.0, n_goal_p->x, n_goal_p->y, 0.0);
-            free(goal_p);
-            free(n_goal_p);
+            sendWaypoints();
           }
         } else if (read_ret == -1) {
           perror("AStar - read blocking");

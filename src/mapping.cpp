@@ -73,7 +73,11 @@ void printList(l_list_t* list) {
 }
 
 bool nodeEqauls(node_t* a, node_t* b) {
-  return ((a->x == b->x) && (a->y == b->y));
+  if (a == NULL || b == NULL) {
+    return false;
+  } else {
+    return ((a->x == b->x) && (a->y == b->y));
+  }
 }
 
 // Frees the removed node
@@ -93,7 +97,7 @@ void removeNode(l_list_t** list, node_t* node) {
   }
 }
 
-// node here has already been alloced
+// node here has already been allocated
 void addNode(l_list_t** list, node_t* node, double sort_val) {
   if ((*list)->head == NULL) {
     // Empty list: add node to head
@@ -148,6 +152,17 @@ node_t* pop(l_list_t** list) {
   }
   
   return ret_val;
+}
+
+// returns the num (from the top) without modifying anything
+node_t* peek(l_list_t* list, int num) {
+  if (list == NULL || list->head == NULL) {
+    return NULL; // not found
+  } else if (num == 0) {
+    return list->head;
+  } else {
+    return peek(list->tail, num - 1);
+  }
 }
 
 void eraseList(l_list_t** list) {

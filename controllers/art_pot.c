@@ -110,9 +110,6 @@ void command(void) {
   dist = sqrt(pow(goal[INDEX_X] - pos[INDEX_X], 2)  + pow(goal[INDEX_Y] - pos[INDEX_Y], 2));
   theta = atan2(goal[INDEX_Y] - pos[INDEX_Y], goal[INDEX_X] - pos[INDEX_X]) - pos[INDEX_A];
 
-  printf("Current Goal: %f, %f - %f\n", goal[0], goal[1], goal[2]);
-  printf("Next Goal   : %f, %f - %f\n", next_goal[0], next_goal[1], next_goal[2]);
-
   if (dist <= DIST_EPSILON) { // Try next goal
     goal[INDEX_X] = next_goal[INDEX_X];
     goal[INDEX_Y] = next_goal[INDEX_Y];
