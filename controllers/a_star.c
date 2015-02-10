@@ -42,7 +42,6 @@ const char* name = "AStar";
 
 void enterLoop(void);
 void command(void);
-int initReplica(void);
 void sendWaypoints(void);
 
 // Set indexes based on pipe types
@@ -102,7 +101,8 @@ int parseArgs(int argc, const char **argv) {
   priority = atoi(argv[1]);
   if (argc < 6) {
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "AStarTest");
+    //connectRecvFDS(currentPID, pipes, PIPE_COUNT, "AStarTest"); // For test purposes
+    connectRecvFDS(currentPID, pipes, PIPE_COUNT, name);
     setPipeIndexes();
   } else {
     for (int i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {

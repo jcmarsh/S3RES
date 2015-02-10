@@ -30,7 +30,6 @@ int priority;
 const char* name = "Empty";
 
 void enterLoop();
-int initReplica();
 
 void testSDCHandler(int signo) {
   // ignore
@@ -42,14 +41,12 @@ void setPipeIndexes() {
 }
 
 int parseArgs(int argc, const char **argv) {
-  pid_t pid;
-
   setPipeIndexes();
   // TODO: error checking
   priority = atoi(argv[1]);
   if (argc < 3) { // Must request fds
-    pid = getpid();
-    //connectRecvFDS(pid, &read_in_fd, &write_out_fd, "Empty");
+    pid_t pid = getpid();
+    connectRecvFDS(pid, pipes, 2, "Empty");
   } else {
     deserializePipe(argv[2], &pipes[read_in_index]);
     deserializePipe(argv[3], &pipes[write_out_index]);
@@ -71,6 +68,7 @@ void enterLoop() {
       perror("Empty - read blocking");
     } else {
       puts("Empty read_ret == 0?");
+      exit(0);
     }
   }
 }

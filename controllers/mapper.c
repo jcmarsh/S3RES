@@ -38,7 +38,6 @@ struct comm_map_update send_msg;
 const char* name = "Mapper";
 
 void enterLoop(void);
-int initReplica(void);
 
 void setPipeIndexes(void) {
   for (int i = 0; i < PIPE_COUNT; i++) {

@@ -46,7 +46,6 @@ const char* name = "ArtPot";
 
 void enterLoop(void);
 void command(void);
-int initReplica(void);
 
 // Set indexes based on pipe types
 void setPipeIndexes(void) {

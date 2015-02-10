@@ -41,7 +41,6 @@ const char* name = "Filter";
 
 void enterLoop();
 void command();
-int initReplica();
 
 bool insertSDC;
 // Need a way to simulate SDC (rare)

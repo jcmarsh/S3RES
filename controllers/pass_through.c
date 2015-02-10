@@ -21,7 +21,6 @@
 
 void enterLoop();
 void command();
-int initReplica();
 
 void restartHandler(int signo) {
   // fork

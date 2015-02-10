@@ -240,10 +240,10 @@ int parseArgs(int argc, const char **argv) {
     //pipe_count = 4;  // 4 is the only controller specific bit here... and ArtPotTest
     //connectRecvFDS(currentPID, ext_pipes, pipe_count, "ArtPotTest");
     pipe_count = 2;  // 4 is the only controller specific bit here... and ArtPotTest
-    connectRecvFDS(currentPID, ext_pipes, pipe_count, "FilterTest");
+    connectRecvFDS(currentPID, ext_pipes, pipe_count, "EmptyTest");
     timer_start_index = 0;
     timer_stop_index = 1;
-        // puts("Usage: VoterD <controller_name> <timeout> <message_type:fd_in:fd_out> <...>");
+        // puts("Usage: VoterD <controller_name> <rep_type> <timeout> <priority> <message_type:fd_in:fd_out> <...>");
     // return -1;
   } else {
     for (int i = 0; (i < argc - required_args && i < PIPE_LIMIT); i++) {
@@ -253,14 +253,14 @@ int parseArgs(int argc, const char **argv) {
     if (pipe_count >= PIPE_LIMIT) {
       printf("VoterD: Raise pipe limit.\n");
     }
-  }
-
-  for (int i = 0; i < pipe_count; i++) {
-    if (ext_pipes[i].timed) {
-      if (ext_pipes[i].fd_in != 0) {
-        timer_start_index = i;
-      } else {
-        timer_stop_index = i;
+  
+    for (int i = 0; i < pipe_count; i++) {
+      if (ext_pipes[i].timed) {
+        if (ext_pipes[i].fd_in != 0) {
+          timer_start_index = i;
+        } else {
+          timer_stop_index = i;
+        }
       }
     }
   }
