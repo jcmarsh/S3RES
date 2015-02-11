@@ -6,16 +6,12 @@
 
 #include <assert.h>
 #include <math.h>
-#include <signal.h>
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
 
-#include "../include/taslimited.h"
-#include "../include/commtypes.h"
-#include "../include/fd_client.h"
+#include "../include/controller.h"
 #include "../include/mapping.h"
-#include "../include/statstime.h"
 
 #define PIPE_COUNT 4
 

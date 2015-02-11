@@ -17,7 +17,6 @@
 #include <unistd.h>
 
 #include "../include/taslimited.h"
-#include "../include/statstime.h"
 #include "../include/replicas.h"
 #include "../include/commtypes.h"
 #include "../include/fd_server.h"
@@ -26,14 +25,6 @@
 #define SIG SIGRTMIN + 7
 #define REP_MAX 3
 #define PERIOD_NSEC 120000 // Max time for voting in nanoseconds (120 micro seconds)
-
-// Either waiting for replicas to vote or waiting for the next round (next ranger input).
-// Or a replica has failed and recovery is needed
-typedef enum {
-  VOTING,
-  RECOVERY,
-  WAITING
-} voting_status;
 
 long voting_timeout;
 int timer_start_index;

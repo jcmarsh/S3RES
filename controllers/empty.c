@@ -7,15 +7,11 @@
 
 #include <assert.h>
 #include <math.h>
-#include <signal.h>
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
 
-#include "../include/taslimited.h"
-#include "../include/commtypes.h"
-#include "../include/statstime.h"
-#include "../include/fd_client.h"
+#include "../include/controller.h"
 
 #define PIPE_COUNT 2
 
@@ -66,9 +62,10 @@ void enterLoop() {
       commSendMoveCommand(pipes[write_out_index], 0.1, 0.0);
     } else if (read_ret == -1) {
       perror("Empty - read blocking");
+      exit(-1);
     } else {
       puts("Empty read_ret == 0?");
-      exit(0);
+      exit(-1);
     }
   }
 }

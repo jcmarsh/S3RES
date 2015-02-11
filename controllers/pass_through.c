@@ -1,7 +1,5 @@
 /*
- * Simple filter that averages the three values previous values for
- * Ranger readings.
- *
+ * 
  * James Marshall
  */
 

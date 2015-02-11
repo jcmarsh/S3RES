@@ -59,10 +59,7 @@ int main(int argc, const char** argv) {
     read(rep.vot_pipes[1].fd_in, &sim_range_data, sizeof(sim_range_data));
     
     timestamp_t current = generate_timestamp();
-    // check against previous interrupt count
 
     printf("(%lld)\n", current - last);
-
-    //    usleep(10000);
   }
 }

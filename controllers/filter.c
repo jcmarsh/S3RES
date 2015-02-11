@@ -7,16 +7,12 @@
 
 #include <assert.h>
 #include <math.h>
-#include <signal.h>
 #include <stdbool.h>
 #include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "../include/taslimited.h"
-#include "../include/commtypes.h"
-#include "../include/statstime.h"
-#include "../include/fd_client.h"
+#include "../include/controller.h"
 
 // Configuration parameters
 #define WINDOW_SIZE 3

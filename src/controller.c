@@ -11,8 +11,6 @@ extern struct typed_pipe pipes[];
 extern const char* name;
 
 int initReplica(void) {
-  InitTAS(DEFAULT_CPU, &cpu_speed, priority);
-
   if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
     perror("Failed to register the restart handler");
     return -1;
@@ -22,7 +20,8 @@ int initReplica(void) {
     perror("Failed to register the SDC handler");
     return -1;
   }
-
+  InitTAS(DEFAULT_CPU, &cpu_speed, priority);
+  
   return 0;
 }
 
