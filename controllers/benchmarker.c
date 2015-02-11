@@ -110,7 +110,11 @@ void enterLoop() {
           }
           waiting_response = true;
 
-          processRanger();      
+          last = generate_timestamp();
+
+          if (write(replica.vot_pipes[0].fd_out, &range_pose_data_msg, sizeof(struct comm_range_pose_data)) != sizeof(struct comm_range_pose_data)) {
+            perror("BenchMarker failed range data write");
+          }
         } else {
           perror("Bench: read (from translator) should have worked"); // EINTR?
         }
@@ -122,40 +126,17 @@ void enterLoop() {
         if (retval > 0) {
           waiting_response = false;
 
-          processCommand();
+          timestamp_t current = generate_timestamp();
+          printf("(%lld)\n", current - last);
+
+          // data was set by read in enterLoop
+          if (write(trans_pipes[1].fd_out, &mov_cmd_msg, sizeof(struct comm_mov_cmd)) != sizeof(struct comm_mov_cmd)) {
+            perror("Bencmarker failed mov_cmd write");
+          }
         } else {
           perror("Bench: read (from replica) should have worked"); // EINTR?
         }
       }
     }
-  }
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-// Process ranger data
-void processRanger() {
-  // msg data set by read in enterLoop
-#ifdef _STATS_BENCH_ROUND_TRIP_
-  last = generate_timestamp();
-#endif // _STATS_BENCH_ROUND_TRIP_
-
-  if (write(replica.vot_pipes[0].fd_out, &range_pose_data_msg, sizeof(struct comm_range_pose_data)) != sizeof(struct comm_range_pose_data)) {
-    perror("BenchMarker failed range data write");
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Send commands to underlying position device
-void processCommand() {
-#ifdef _STATS_BENCH_ROUND_TRIP_
-  timestamp_t current = generate_timestamp();
-  
-  printf("(%lld)\n", current - last);
-#endif
-
-  // data was set by read in enterLoop
-  if (write(trans_pipes[1].fd_out, &mov_cmd_msg, sizeof(struct comm_mov_cmd)) != sizeof(struct comm_mov_cmd)) {
-    perror("Bencmarker failed mov_cmd write");
   }
 }
