@@ -81,10 +81,11 @@ int main(int argc, const char **argv) {
   createFDS(&sd, controller_name);
   startReplicas();
 
-  int loops = 11;
+  int loops = 1001;
   while(loops--) {
     // pick one at random
-    int restartee = 0;
+    int restartee = rand() % 2;
+
     // kill it
     kill(replicas[restartee].pid, SIGKILL);
 
@@ -97,6 +98,8 @@ int main(int argc, const char **argv) {
     timestamp_t current = generate_timestamp();
     printf("(%lld)\n", current - last);
     // show time
+
+    usleep(100000);
   }
 
   return 0;

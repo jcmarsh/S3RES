@@ -27,8 +27,9 @@ const char* name = "Empty";
 
 void enterLoop();
 
+bool insertSDC;
 void testSDCHandler(int signo) {
-  // ignore
+  insertSDC = true;
 }
 
 void setPipeIndexes() {
@@ -59,7 +60,11 @@ void enterLoop() {
     // Blocking, but that's okay with me
     read_ret = read(pipes[read_in_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
     if (read_ret > 0) {
-      commSendMoveCommand(pipes[write_out_index], 0.1, 0.0);
+      if (insertSDC) {
+        commSendMoveCommand(pipes[write_out_index], 0.1, 1.0);
+      } else {
+        commSendMoveCommand(pipes[write_out_index], 0.1, 0.0);
+      }
     } else if (read_ret == -1) {
       perror("Empty - read blocking");
       exit(-1);
