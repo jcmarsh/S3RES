@@ -27,7 +27,7 @@ const char* name = "Empty";
 
 void enterLoop();
 
-bool insertSDC;
+bool insertSDC = false;
 void testSDCHandler(int signo) {
   insertSDC = true;
 }
@@ -61,6 +61,7 @@ void enterLoop() {
     read_ret = read(pipes[read_in_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
     if (read_ret > 0) {
       if (insertSDC) {
+        insertSDC = false;
         commSendMoveCommand(pipes[write_out_index], 0.1, 1.0);
       } else {
         commSendMoveCommand(pipes[write_out_index], 0.1, 0.0);

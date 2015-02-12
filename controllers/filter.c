@@ -38,7 +38,7 @@ const char* name = "Filter";
 void enterLoop();
 void command();
 
-bool insertSDC;
+bool insertSDC = false;
 // Need a way to simulate SDC (rare)
 void testSDCHandler(int signo) {
   insertSDC = true;

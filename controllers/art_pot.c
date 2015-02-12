@@ -69,7 +69,7 @@ void setPipeIndexes(void) {
   }
 }
 
-bool insertSDC;
+bool insertSDC = false;
 // Need a way to simulate SDC (rare)
 void testSDCHandler(int signo) {
   insertSDC = true;
@@ -168,8 +168,8 @@ void command(void) {
   }
 
   if (insertSDC) {
-    vel_cmd[0] += 1;
     insertSDC = false;
+    vel_cmd[0] += 1;
   }
 
   // Write move command
