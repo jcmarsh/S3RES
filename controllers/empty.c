@@ -67,8 +67,8 @@ void enterLoop() {
         commSendMoveCommand(pipes[write_out_index], 0.1, 0.0);
       }
     } else if (read_ret == -1) {
-      perror("Empty - read blocking");
-      exit(-1);
+      //perror("Empty - read blocking");
+      //exit(-1);
     } else {
       puts("Empty read_ret == 0?");
       exit(-1);

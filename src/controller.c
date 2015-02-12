@@ -11,21 +11,32 @@ extern struct typed_pipe pipes[];
 extern const char* name;
 
 int initReplica(void) {
-  if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
+  struct sigaction sa;
+
+  sa.sa_flags = SA_SIGINFO;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_sigaction = restartHandler;
+  if (sigaction(SIGUSR1, &sa, NULL) == -1) {
     perror("Failed to register the restart handler");
     return -1;
   }
 
-  if (signal(SIGUSR2, testSDCHandler) == SIG_ERR) {
-    perror("Failed to register the SDC handler");
-    return -1;
-  }
+  //if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
+  //  perror("Failed to register the SDC handler");
+  //  return -1;
+  //}
+
+  //if (signal(SIGUSR2, testSDCHandler) == SIG_ERR) {
+  //  perror("Failed to register the SDC handler");
+  //  return -1;
+  //}
   InitTAS(DEFAULT_CPU, &cpu_speed, priority);
   
   return 0;
 }
 
-void restartHandler(int signo) {
+static void restartHandler(int signo, siginfo_t *si, void *unused) {
+//void restartHandler(int signo) {
   // fork
   pid_t currentPID = fork();
   
@@ -51,8 +62,10 @@ void restartHandler(int signo) {
       sigset_t signal_set;
       sigemptyset(&signal_set);
       sigaddset(&signal_set, SIGUSR1);
-      sigaddset(&signal_set, SIGUSR2);
-      sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
+      //sigaddset(&signal_set, SIGUSR2);
+      if (sigprocmask(SIG_UNBLOCK, &signal_set, NULL) < 0) {
+        perror("Controller signal unblock error");
+      }
 
       EveryTAS();
 

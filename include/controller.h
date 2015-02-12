@@ -5,4 +5,5 @@
 #include "../include/fd_client.h"
 
 int initReplica(void);
-void restartHandler(int signo);
+static void restartHandler(int signo, siginfo_t *si, void *unused);
+//void restartHandler(int signo);
