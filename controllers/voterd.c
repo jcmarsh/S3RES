@@ -16,13 +16,10 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "../include/taslimited.h"
+#include "../include/controller.h"
 #include "../include/replicas.h"
-#include "../include/commtypes.h"
 #include "../include/fd_server.h"
-#include "../include/fd_client.h" // Used for testing
 
-#define SIG SIGRTMIN + 7
 #define REP_MAX 3
 #define PERIOD_NSEC 120000 // Max time for voting in nanoseconds (120 micro seconds)
 
@@ -66,7 +63,7 @@ void processFromRep(int replica_num, int pipe_num);
 void restartReplica(int restarter, int restartee);
 void cleanupReplica(int rep_index);
 
-void timeout_sighandler(int signum) {
+void timeout_sighandler(int signo, siginfo_t *si, void *unused) {
   assert(write(timeout_fd[1], timeout_byte, 1) == 1);
 }
 
@@ -155,7 +152,7 @@ void cleanupReplica(int rep_index) {
 void restartReplica(int restarter, int restartee) {
   cleanupReplica(restartee);
 
-  int retval = kill(replicas[restarter].pid, SIGUSR1);
+  int retval = kill(replicas[restarter].pid, RESTART_SIGNAL);
   if (retval < 0) {
     perror("VoterD Signal Problem");
   }
@@ -181,24 +178,21 @@ int initVoterD() {
     return -1;
   }
 
-  // create timer
-  /* Establish handler for timer signal */
-  if (signal(SIG, timeout_sighandler) == SIG_ERR) {
-    perror("VoterD sigaction failed");
-    return -1;
-  }
+  // create timer handler
+  struct sigaction sa;
 
-  sigemptyset(&mask);
-  sigaddset(&mask, SIG);
-  if (sigprocmask(SIG_UNBLOCK, &mask, NULL) == -1) {
-    perror("VoterD sigprockmask failed");
+  sa.sa_flags = SA_SIGINFO;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_sigaction = timeout_sighandler;
+  if (sigaction(TIMEOUT_SIGNAL, &sa, NULL) == -1) {
+    perror("Voter failed to register the watchdog handler");
     return -1;
   }
 
   /* Create the timer */
   memset(&sev, 0, sizeof(sev));
   sev.sigev_notify = SIGEV_SIGNAL;
-  sev.sigev_signo = SIG;
+  sev.sigev_signo = TIMEOUT_SIGNAL;
   sev.sigev_value.sival_ptr = &timerid;
   if (timer_create(CLOCK_REALTIME, &sev, &timerid) == -1) {
     perror("VoterD timer_create failed");
@@ -457,11 +451,6 @@ void checkSend(int pipe_num, bool checkSDC) {
         if (memcmp(replicas[r_index].vot_pipes[pipe_num].buffer,
                    replicas[(r_index+1) % rep_count].vot_pipes[pipe_num].buffer,
                    replicas[r_index].vot_pipes[pipe_num].buff_count) == 0) {
-          retval = write(ext_pipes[pipe_num].fd_out, replicas[r_index].vot_pipes[pipe_num].buffer,
-                replicas[r_index].vot_pipes[pipe_num].buff_count);
-          if (retval == 0) {
-            perror("Seriously Voter?");
-          }
 
           if (checkSDC) {
             // If the third doesn't agree, it should be restarted.
@@ -470,11 +459,19 @@ void checkSend(int pipe_num, bool checkSDC) {
                        replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
               //printf("Voting disagreement: caught SDC\n");
 
+              //timestamp_t last = generate_timestamp();
               restartReplica(r_index, (r_index + 2) % rep_count);
+              //timestamp_t current = generate_timestamp();
+              //printf("(%lld)\n", current - last);
             }
           }
           resetVotingState(pipe_num);
 
+          retval = write(ext_pipes[pipe_num].fd_out, replicas[r_index].vot_pipes[pipe_num].buffer,
+                replicas[r_index].vot_pipes[pipe_num].buff_count);
+          if (retval == 0) {
+            perror("Seriously Voter?");
+          }
           return;
         } 
       }

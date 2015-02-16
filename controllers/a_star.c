@@ -87,8 +87,7 @@ l_list_t* genNeighbors(node_t* node) {
 }
 
 bool insertSDC;
-// Need a way to simulate SDC (rare)
-void testSDCHandler(int signo) {
+void testSDCHandler(int signo, siginfo_t *si, void *unused) {
   insertSDC = true;
 }
 

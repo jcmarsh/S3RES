@@ -2,7 +2,7 @@
 
 extern void setPipeIndexes(void);
 extern void enterLoop(void);
-extern void testSDCHandler(int signo);
+extern void testSDCHandler(int signo, siginfo_t *si, void *unused);
 
 extern cpu_speed_t cpu_speed;
 extern int priority;
@@ -16,27 +16,25 @@ int initReplica(void) {
   sa.sa_flags = SA_SIGINFO;
   sigemptyset(&sa.sa_mask);
   sa.sa_sigaction = restartHandler;
-  if (sigaction(SIGUSR1, &sa, NULL) == -1) {
+  if (sigaction(RESTART_SIGNAL, &sa, NULL) == -1) {
     perror("Failed to register the restart handler");
     return -1;
   }
 
-  //if (signal(SIGUSR1, restartHandler) == SIG_ERR) {
-  //  perror("Failed to register the SDC handler");
-  //  return -1;
-  //}
+  sa.sa_flags = SA_SIGINFO;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_sigaction = testSDCHandler;
+  if (sigaction(SDC_SIM_SIGNAL, &sa, NULL) == -1) {
+    perror("Failed to register the simulate sdc handler");
+    return -1;
+  }
 
-  //if (signal(SIGUSR2, testSDCHandler) == SIG_ERR) {
-  //  perror("Failed to register the SDC handler");
-  //  return -1;
-  //}
   InitTAS(DEFAULT_CPU, &cpu_speed, priority);
   
   return 0;
 }
 
 static void restartHandler(int signo, siginfo_t *si, void *unused) {
-//void restartHandler(int signo) {
   // fork
   pid_t currentPID = fork();
   
@@ -58,11 +56,11 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
       }
       setPipeIndexes();
 
-      // unblock the signal (restart handler - USR1, inject SDC - USR2)
+      // unblock the signals (restart handler, inject SDC)
       sigset_t signal_set;
       sigemptyset(&signal_set);
-      sigaddset(&signal_set, SIGUSR1);
-      //sigaddset(&signal_set, SIGUSR2);
+      sigaddset(&signal_set, RESTART_SIGNAL);
+      sigaddset(&signal_set, SDC_SIM_SIGNAL);
       if (sigprocmask(SIG_UNBLOCK, &signal_set, NULL) < 0) {
         perror("Controller signal unblock error");
       }

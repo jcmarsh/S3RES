@@ -28,7 +28,7 @@ const char* name = "Empty";
 void enterLoop();
 
 bool insertSDC = false;
-void testSDCHandler(int signo) {
+void testSDCHandler(int signo, siginfo_t *si, void *unused) {
   insertSDC = true;
 }
 
