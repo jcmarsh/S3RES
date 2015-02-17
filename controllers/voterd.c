@@ -152,7 +152,14 @@ void cleanupReplica(int rep_index) {
 void restartReplica(int restarter, int restartee) {
   cleanupReplica(restartee);
 
-  int retval = kill(replicas[restarter].pid, RESTART_SIGNAL);
+  #ifdef TIME_RESTART_SIGNAL
+    timestamp_t curr_time = generate_timestamp();
+    union sigval time_value;
+    time_value.sival_ptr = (void *)curr_time;
+    int retval = sigqueue(replicas[restarter].pid, RESTART_SIGNAL, time_value);
+  #else
+    int retval = kill(replicas[restarter].pid, RESTART_SIGNAL);
+  #endif /* TIME_RESTART_SIGNAL */
   if (retval < 0) {
     perror("VoterD Signal Problem");
   }
@@ -161,6 +168,7 @@ void restartReplica(int restarter, int restartee) {
   initReplicas(&(replicas[restartee]), 1, controller_name, voter_priority + 5);
   createPipes(&(replicas[restartee]), 1, ext_pipes, pipe_count);
   // send new pipe through fd server (should have a request)
+
   acceptSendFDS(&sd, &(replicas[restartee].pid), replicas[restartee].rep_pipes, replicas[restartee].pipe_count);
 }
 
@@ -459,10 +467,7 @@ void checkSend(int pipe_num, bool checkSDC) {
                        replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
               //printf("Voting disagreement: caught SDC\n");
 
-              //timestamp_t last = generate_timestamp();
               restartReplica(r_index, (r_index + 2) % rep_count);
-              //timestamp_t current = generate_timestamp();
-              //printf("(%lld)\n", current - last);
             }
           }
           resetVotingState(pipe_num);

@@ -1,5 +1,9 @@
 # Should look for (via ps) process that need to die!
-# Should find all eligible pids, then send a kill -9 (or -s USR2 (or use the handy c program here)).
+# Should find all eligible pids, then execute specified command.
+# Examples - 
+#  * kill a process at random - python injector.py 'kill -9'
+#  * inject simulated SDC - python injector.py '/bin/kill -s SIGRTMIN+2'
+#  * Use the flip bit program = python injector.py './inject_error'
 # James Marshall
 
 import random

@@ -35,6 +35,12 @@ int initReplica(void) {
 }
 
 static void restartHandler(int signo, siginfo_t *si, void *unused) {
+  #ifdef TIME_RESTART_SIGNAL
+    timestamp_t curr_time = generate_timestamp();
+    timestamp_t parent_time = (timestamp_t)si->si_value.sival_ptr;
+    printf("(%ld)\n", curr_time - parent_time);
+  #endif
+    
   // fork
   pid_t currentPID = fork();
   
@@ -54,6 +60,7 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
         printf("Error in %s: failed connectRecvFDS call.\n", name);
         return;
       }
+      
       setPipeIndexes();
 
       // unblock the signals (restart handler, inject SDC)
@@ -66,7 +73,7 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
       }
 
       EveryTAS();
-
+      
       enterLoop(); // return to normal
     } else {   // Parent just returns
       return;

@@ -1,5 +1,6 @@
 #include <signal.h>
 
+#include "../include/bench_config.h"
 #include "../include/taslimited.h"
 #include "../include/commtypes.h"
 #include "../include/fd_client.h"

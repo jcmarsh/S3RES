@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <stdio.h>
 
+#include "../include/bench_config.h"
 #include "../include/taslimited.h"
 #include "../include/replicas.h"
 #include "../include/commtypes.h"
@@ -28,8 +29,6 @@ int priority;
 
  // These are to your parent (Translator)
 struct typed_pipe trans_pipes[2];
-
-timestamp_t last;
 
 // FUNCTIONS!
 int initBenchMarker();
@@ -90,6 +89,10 @@ void enterLoop() {
   fd_set select_set;
   bool waiting_response = false;
 
+  #ifdef TIME_FULL_BENCH
+    timestamp_t last;
+  #endif
+
   while(1) {
     select_timeout.tv_sec = 1;
     select_timeout.tv_usec = 0;
@@ -110,7 +113,9 @@ void enterLoop() {
           }
           waiting_response = true;
 
-          last = generate_timestamp();
+          #ifdef TIME_FULL_BENCH
+            last = generate_timestamp();
+          #endif
 
           if (write(replica.vot_pipes[0].fd_out, &range_pose_data_msg, sizeof(struct comm_range_pose_data)) != sizeof(struct comm_range_pose_data)) {
             perror("BenchMarker failed range data write");
@@ -126,8 +131,10 @@ void enterLoop() {
         if (retval > 0) {
           waiting_response = false;
 
-          timestamp_t current = generate_timestamp();
-          printf("(%lld)\n", current - last);
+          #ifdef TIME_FULL_BENCH
+            timestamp_t current = generate_timestamp();
+            printf("(%lld)\n", current - last);
+          #endif
 
           // data was set by read in enterLoop
           if (write(trans_pipes[1].fd_out, &mov_cmd_msg, sizeof(struct comm_mov_cmd)) != sizeof(struct comm_mov_cmd)) {

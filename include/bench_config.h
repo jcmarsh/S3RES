@@ -1,0 +1,2 @@
+#define TIME_FULL_BENCH
+//#define TIME_RESTART_SIGNAL

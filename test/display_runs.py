@@ -18,6 +18,7 @@ y = []
 file_num = 0
 for data_file in datas:
 	n = 0
+	total = 0;
 	x.append([])
 	y.append([])
 	for line in data_file:
@@ -26,6 +27,7 @@ for data_file in datas:
 				value = int(line[1:-2])
 				x[file_num].append(value / 3092.0)
 				y[file_num].append(n)
+				total = total + (value / 3092.0);
 				n = n + 1
 			except ValueError:
 				print "Failed to interpret line: ", line
@@ -33,7 +35,7 @@ for data_file in datas:
 			print "Poorly formatted line: ", line
 	file_num = file_num + 1
 	data_file.close()
-
+	print "Average: ", total / n
 
 
 plt.figure(figsize=(12, 12))
