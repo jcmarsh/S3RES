@@ -2,8 +2,7 @@
 
 #include <time.h>
 
-#include "../include/taslimited.h"
-#include "../include/commtypes.h"
+#include "../include/controller.h"
 #include "../include/replicas.h"
 #include "../include/fd_server.h"
 
@@ -61,19 +60,25 @@ void restartReplica(int restartee) {
   int restarter = (restartee + (rep_count - 1)) % rep_count;
   cleanupReplica(restartee);
 
-  int retval = kill(replicas[restarter].pid, SIGUSR1);
+  timestamp_t curr_time = generate_timestamp();
+  union sigval time_value;
+  time_value.sival_ptr = (void *)curr_time;
+  int retval = sigqueue(replicas[restarter].pid, RESTART_SIGNAL, time_value);
+
+  //int retval = kill(replicas[restarter].pid, RESTART_SIGNAL);
   if (retval < 0) {
     perror("EmptyRestart Signal Problem");
   }
 
-  // re-init failed rep, create pipes
+
+  // re-init failed rep, create pipes TODO: These lines seem responsible for about 1 milli-sec
   initReplicas(&(replicas[restartee]), 1, controller_name, voter_priority + 5);
   createPipes(&(replicas[restartee]), 1, ext_pipes, pipe_count);
   // send new pipe through fd server (should have a request)
+  
   acceptSendFDS(&sd, &(replicas[restartee].pid), replicas[restartee].rep_pipes, replicas[restartee].pipe_count);
 }
 
-timestamp_t last;
 int main(int argc, const char **argv) {
   InitTAS(DEFAULT_CPU, &cpu_speed, voter_priority);
 
@@ -81,24 +86,25 @@ int main(int argc, const char **argv) {
   createFDS(&sd, controller_name);
   startReplicas();
 
-  int loops = 1001;
-  while(loops--) {
+  while(1) {
     // pick one at random
     int restartee = rand() % 2;
+
+    //int restarter = (restartee + (rep_count - 1)) % rep_count;
+    //timestamp_t curr_time = generate_timestamp();
+    //union sigval time_value;
+    //time_value.sival_ptr = (void *)curr_time;
+    //int retval = sigqueue(replicas[restarter].pid, SDC_SIM_SIGNAL, time_value);
 
     // kill it
     kill(replicas[restartee].pid, SIGKILL);
 
-    // start time
-    last = generate_timestamp();
-
     // restart it
+    timestamp_t last = generate_timestamp();
     restartReplica(restartee);
-    
     timestamp_t current = generate_timestamp();
     printf("(%lld)\n", current - last);
-    // show time
-
+    
     usleep(100000);
   }
 

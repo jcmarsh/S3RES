@@ -29,6 +29,10 @@ void enterLoop();
 
 bool insertSDC = false;
 void testSDCHandler(int signo, siginfo_t *si, void *unused) {
+  timestamp_t curr_time = generate_timestamp();
+  timestamp_t parent_time = (timestamp_t)si->si_value.sival_ptr;
+  printf("(%lld)\n", curr_time - parent_time);
+  
   insertSDC = true;
 }
 
@@ -55,23 +59,35 @@ int parseArgs(int argc, const char **argv) {
 void enterLoop() {
   int read_ret;
   struct comm_range_pose_data recv_msg;
+
+  struct timeval select_timeout;
+  fd_set select_set;
  
   while(1) {
+    select_timeout.tv_sec = 1;
+    select_timeout.tv_usec = 0;
+
+    FD_ZERO(&select_set);
+    FD_SET(pipes[read_in_index].fd_in, &select_set);
+
     // Blocking, but that's okay with me
-    read_ret = read(pipes[read_in_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
-    if (read_ret > 0) {
-      if (insertSDC) {
-        insertSDC = false;
-        commSendMoveCommand(pipes[write_out_index], 0.1, 1.0);
-      } else {
-        commSendMoveCommand(pipes[write_out_index], 0.1, 0.0);
+    int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
+    if (retval > 0) {
+      if (FD_ISSET(pipes[read_in_index].fd_in, &select_set)) {
+        read_ret = read(pipes[read_in_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
+        if (read_ret > 0) {
+          if (insertSDC) {
+            insertSDC = false;
+            commSendMoveCommand(pipes[write_out_index], 0.1, 1.0);
+          } else {
+            commSendMoveCommand(pipes[write_out_index], 0.1, 0.0);
+          }
+        } else if (read_ret < 0) {
+          perror("Empty - read problems");
+        } else {
+          puts("Empty read_ret == 0?");
+        }
       }
-    } else if (read_ret == -1) {
-      //perror("Empty - read blocking");
-      //exit(-1);
-    } else {
-      puts("Empty read_ret == 0?");
-      exit(-1);
     }
   }
 }
