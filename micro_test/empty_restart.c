@@ -18,7 +18,7 @@ struct server_data sd;
 
 replication_t rep_type = DMR;
 int rep_count = rep_type;
-char* controller_name = "Empty";
+const char* controller_name = "Empty";
 
 // pipes to external components (not replicas)
 int pipe_count = 2;

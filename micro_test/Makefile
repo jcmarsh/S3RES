@@ -6,6 +6,5 @@ default:
 
 clean:
 	rm -rf EmptyBench
-	rm -rf EmptyTest_fd_server
 	rm -rf EmptyRestart
 	rm -rf Empty_fd_server

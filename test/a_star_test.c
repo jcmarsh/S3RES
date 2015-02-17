@@ -5,7 +5,7 @@
 #include "../include/fd_server.h"
 
 struct replica rep;
-char* controller_name = "AStar";
+const char* controller_name = "AStar";
 struct typed_pipe pipes[PIPE_LIMIT];
 
 // FD server

@@ -8,7 +8,7 @@
 #include "../include/fd_server.h"
 
 struct replica rep;
-char* controller_name = "Empty";
+const char* controller_name = "Empty";
 struct typed_pipe pipes[PIPE_LIMIT];
 
 // FD server
@@ -21,7 +21,7 @@ timestamp_t last;
 int main(int argc, const char** argv) {
   InitTAS(DEFAULT_CPU, &cpu_speed, 5);
   // Setup fd server
-  createFDS(&sd, "EmptyTest");
+  createFDS(&sd, "Empty");
 
   // Setup pipe type and direction
   // Ranger data in
@@ -43,6 +43,7 @@ int main(int argc, const char** argv) {
   while (loops--) {
     // Create and send some ranger data
     struct comm_range_pose_data sim_range_data;
+    struct comm_mov_cmd sim_mov_cmd;
     sim_range_data.pose[0] = -2.0;
     sim_range_data.pose[1] = -5.0;
     sim_range_data.pose[2] = 1.0;
@@ -53,10 +54,14 @@ int main(int argc, const char** argv) {
 
     last = generate_timestamp();
 
-    write(rep.vot_pipes[0].fd_out, &sim_range_data, sizeof(struct comm_range_pose_data));
+    if (write(rep.vot_pipes[0].fd_out, &sim_range_data, sizeof(struct comm_range_pose_data)) != sizeof(struct comm_range_pose_data)) {
+      perror("Write failed");
+    }
 
     // read filtered data
-    read(rep.vot_pipes[1].fd_in, &sim_range_data, sizeof(sim_range_data));
+    if (read(rep.vot_pipes[1].fd_in, &sim_mov_cmd, sizeof(sim_mov_cmd)) != sizeof(struct comm_mov_cmd)) {
+      perror("Read failed");
+    }
     
     timestamp_t current = generate_timestamp();
 
