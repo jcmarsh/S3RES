@@ -33,7 +33,7 @@ cmd_start = sys.argv[1]
 victim_types = 4 # different controllers
 victim_count = 3 # replicated 3 times
 while True:
-	time.sleep(1)
+	time.sleep(1/4.0)
 	victim_pids = []
 	victim_names = []
 

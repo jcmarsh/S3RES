@@ -54,15 +54,6 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
         resetPipe(&pipes[i]);
       }
 
-      // Get own pid, send to voter
-      currentPID = getpid();
-      if (connectRecvFDS(currentPID, pipes, pipe_count, name) < 0) {
-        printf("Error in %s: failed connectRecvFDS call.\n", name);
-        return;
-      }
-      
-      setPipeIndexes();
-
       // unblock the signals (restart handler, inject SDC)
       sigset_t signal_set;
       sigemptyset(&signal_set);
@@ -73,6 +64,15 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
       }
 
       EveryTAS();
+
+      // Get own pid, send to voter
+      currentPID = getpid();
+      if (connectRecvFDS(currentPID, pipes, pipe_count, name) < 0) {
+        printf("Error in %s: failed connectRecvFDS call.\n", name);
+        return;
+      }
+      
+      setPipeIndexes();
       
       enterLoop(); // return to normal
     } else {   // Parent just returns

@@ -16,6 +16,7 @@
 #define PIPE_COUNT 4
 
 bool obstacle_map[GRID_NUM][GRID_NUM];
+bool update_sent = false;
 
 // Controller state
 struct point_i* goal;
@@ -198,6 +199,7 @@ void command(void) {
       // don't send
     } else {  
       sendWaypoints();
+      update_sent = true;
     }
   }
 }
@@ -247,10 +249,11 @@ void enterLoop(void) {
             int obs_y = recv_msg_buffer[obs_index + (index * 2 + 1)];
             obstacle_map[obs_x][obs_y] = true;
           }
-          if (recv_msg_buffer[2] > 0) { // New obstacle arrived
-            command();
-          }
           commSendAck(pipes[ack_index]);
+          update_sent = false;
+          if (recv_msg_buffer[2] > 0) { // New obstacle arrived
+            command(); // will set update_sent to true if that is the case.            
+          }
         } else if (read_ret == -1) {
           perror("AStar - read blocking");
         } else {
@@ -259,7 +262,7 @@ void enterLoop(void) {
       }
       if (FD_ISSET(pipes[way_req_index].fd_in, &select_set)) {
         read_ret = read(pipes[way_req_index].fd_in, &recv_msg_req, sizeof(struct comm_way_req));
-        if (read_ret > 0) {
+        if (read_ret > 0 && !update_sent) {
           if (goal_path->head == NULL) {
             commSendWaypoints(pipes[way_res_index], -7.0, -7.0, 0.0, -7.0, -7.0, 0.0);
           } else {
@@ -267,9 +270,8 @@ void enterLoop(void) {
           }
         } else if (read_ret == -1) {
           perror("AStar - read blocking");
-        } else {
+        } else if (read_ret == 0) {
           perror("AStar read_ret == 0?");
-          exit(0);
         }
       }  
     }

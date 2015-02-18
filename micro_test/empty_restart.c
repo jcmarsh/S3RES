@@ -86,7 +86,8 @@ int main(int argc, const char **argv) {
   createFDS(&sd, controller_name);
   startReplicas();
 
-  while(1) {
+  int loops = 1000;
+  while(loops--) {
     // pick one at random
     int restartee = rand() % 2;
 
@@ -102,6 +103,16 @@ int main(int argc, const char **argv) {
     // restart it
     timestamp_t last = generate_timestamp();
     restartReplica(restartee);
+    timestamp_t current = generate_timestamp();
+    printf("(%lld)\n", current - last);
+    
+    usleep(100000);
+  }
+
+  while(1) {
+    // restart it
+    timestamp_t last = generate_timestamp();
+    //restartReplica(restartee);
     timestamp_t current = generate_timestamp();
     printf("(%lld)\n", current - last);
     

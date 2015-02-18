@@ -108,14 +108,22 @@ void restartHandler() {
           // Send a signal to the rep's friend
           int restarter = (r_index + (rep_count - 1)) % rep_count;
           int restartee = r_index;
+
+          #ifdef TIME_RESTART_REPLICA
+            timestamp_t last = generate_timestamp();
+          #endif
           restartReplica(restarter, restartee);
+          #ifdef TIME_RESTART_REPLICA
+            timestamp_t current = generate_timestamp();
+            printf("(%lld)\n", current - last);
+          #endif
 
           // Send along the response from the other two replicas.
           // also copy over the previous vote state and pipe buffers
           for (int i = 0; i < replicas[restarter].pipe_count; i++) {
             replicas[restartee].voted[i] = replicas[restarter].voted[i];
-            memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
-            replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
+            //memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
+            //replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
             checkSend(i, false); // DO NOT check for SDC (one has failed)
           }
           return;
@@ -210,10 +218,10 @@ int initVoterD() {
   // Setup fd server
   createFDS(&sd, controller_name);
 
+  resetVotingState();
+ 
   startReplicas();
   
-  resetVotingState();
-
   return 0;
 }
 
@@ -341,10 +349,7 @@ void doOneUpdate() {
         struct typed_pipe* curr_pipe = &(replicas[r_index].vot_pipes[p_index]);
         if (curr_pipe->fd_in !=0) {
           if (FD_ISSET(curr_pipe->fd_in, &select_set)) {
-            curr_pipe->buff_count = read(curr_pipe->fd_in, curr_pipe->buffer, MAX_PIPE_BUFF);
-            if (curr_pipe->buff_count > 0) {
-              processFromRep(r_index, p_index);  
-            }
+            processFromRep(r_index, p_index);
           }
         }
       }
@@ -488,14 +493,20 @@ void checkSend(int pipe_num, bool checkSDC) {
 ////////////////////////////////////////////////////////////////////////////////
 // Process output from replica; vote on it
 void processFromRep(int replica_num, int pipe_num) {
-  int index = 0;
+  struct typed_pipe* curr_pipe = &(replicas[replica_num].vot_pipes[pipe_num]);
+  curr_pipe->buff_count = read(curr_pipe->fd_in, curr_pipe->buffer, MAX_PIPE_BUFF);
+  if (curr_pipe->buff_count <= 0) {
+    perror("Failed to copy buffer\n");
+  }
 
   if (replicas[replica_num].voted[pipe_num] == true) {
-    printf("ERROR: Replica already voted\n");
-  } else {
-    // record vote
-    replicas[replica_num].voted[pipe_num] = true;
+    // This happens when one of the reps has failed, but the watchdog has not expired yet. Other reps are responding to the next round of data.
+    // The old data is simply dropped, since new data is arriving. A solution sending the old result could be made, but a second set of buffers would be needed.
+    // TODO: It would be BAD if a rep sent a second response by accident.... this needs to be more robust.
+    //printf("ERROR: Replica already voted. Name %s\t Rep %d\t Pipe %d\n", controller_name, replica_num, pipe_num);
+    resetVotingState(pipe_num);
   }
+  replicas[replica_num].voted[pipe_num] = true;
 
   checkSend(pipe_num, true);
 }
