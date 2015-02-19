@@ -208,19 +208,26 @@ void sendWaypoints(void) {
   free(current_goal);
   free(n_current_goal);
   point_d *n_goal_p;
+  point_d *goal_p;
+  
+  pop(&goal_path); // trash closest
   current_goal = pop(&goal_path);
-  point_d *goal_p = degridify(current_goal->x, current_goal->y);
-  n_current_goal = pop(&goal_path);
-  if (n_current_goal == NULL) {
-    // At goal! (Err... right next to it) Just hang out I suppose. By sending same goal twice.
+  if (current_goal == NULL) {
     commSendWaypoints(pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
-  } else{
-    n_goal_p = degridify(n_current_goal->x, n_current_goal->y);
-    if (insertSDC) {
-      insertSDC = false;
-      goal_p->x++;
+  } else {
+    goal_p = degridify(current_goal->x, current_goal->y);
+    n_current_goal = pop(&goal_path);
+    if (n_current_goal == NULL) {
+      // At goal! (Err... right next to it) Just hang out I suppose. By sending same goal twice.
+      commSendWaypoints(pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
+    } else{
+      n_goal_p = degridify(n_current_goal->x, n_current_goal->y);
+      if (insertSDC) {
+        insertSDC = false;
+        goal_p->x++;
+      }
+      commSendWaypoints(pipes[way_res_index], goal_p->x, goal_p->y, 0.0, n_goal_p->x, n_goal_p->y, 0.0);
     }
-    commSendWaypoints(pipes[way_res_index], goal_p->x, goal_p->y, 0.0, n_goal_p->x, n_goal_p->y, 0.0);
   }
   free(goal_p);
   free(n_goal_p);
