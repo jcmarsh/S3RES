@@ -205,11 +205,17 @@ void command(void) {
 }
 
 void sendWaypoints(void) {
-  free(current_goal);
-  free(n_current_goal);
+  if (current_goal != NULL) {
+    free(current_goal);
+    current_goal = NULL;
+  }
+  if (n_current_goal != NULL) {
+    free(n_current_goal);
+    n_current_goal = NULL;
+  }
   point_d *n_goal_p;
   point_d *goal_p;
-  
+
   pop(&goal_path); // trash closest
   current_goal = pop(&goal_path);
   if (current_goal == NULL) {
@@ -227,10 +233,10 @@ void sendWaypoints(void) {
         goal_p->x++;
       }
       commSendWaypoints(pipes[way_res_index], goal_p->x, goal_p->y, 0.0, n_goal_p->x, n_goal_p->y, 0.0);
+      free(n_goal_p);
     }
+    free(goal_p);
   }
-  free(goal_p);
-  free(n_goal_p);
 }
 
 void enterLoop(void) {
