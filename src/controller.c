@@ -74,7 +74,7 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
       
       setPipeIndexes();
       
-      enterLoop(); // return to normal
+      return;
     } else {   // Parent just returns
       return;
     }
