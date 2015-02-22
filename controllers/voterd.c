@@ -6,15 +6,10 @@
  */
 
 #include <assert.h>
-#include <errno.h>
-#include <math.h>
 #include <signal.h>
 #include <string.h>
-#include <linux/prctl.h>
-#include <sys/prctl.h>
 #include <sys/wait.h>
 #include <time.h>
-#include <unistd.h>
 
 #include "../include/controller.h"
 #include "../include/replicas.h"
@@ -354,8 +349,6 @@ void doOneUpdate() {
         }
       }
     }
-  } else if (errno == EINTR) {
-    // Timer likely expired. Will loop back so no worries.
   }
 }
 

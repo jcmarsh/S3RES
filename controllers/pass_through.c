@@ -3,9 +3,8 @@
  * James Marshall
  */
 
-#include <math.h>
 #include <signal.h>
-#include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>

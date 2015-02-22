@@ -6,12 +6,8 @@
 #include <fcntl.h>
 #include <linux/un.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/user.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const char* name);

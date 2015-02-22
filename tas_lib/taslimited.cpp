@@ -1,5 +1,11 @@
 #include "../include/taslimited.h"
 
+#include <sys/resource.h>
+#include <unistd.h>
+
+#include "../include/scheduler.h"
+#include "../include/force.h"
+
 // From Gabe's cos_loader.c
 void call_getrlimit(int id) {
   struct rlimit rl;

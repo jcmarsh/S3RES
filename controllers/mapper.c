@@ -4,11 +4,7 @@
  * James Marshall
  */
 
-#include <assert.h>
 #include <math.h>
-#include <stdbool.h>
-#include <string.h>
-#include <unistd.h>
 
 #include "../include/controller.h"
 #include "../include/mapping.h"

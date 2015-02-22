@@ -11,7 +11,9 @@
 #include <time.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
 
+#include "../include/scheduler.h"
 #include "../include/bench_config.h"
 #include "../include/taslimited.h"
 #include "../include/replicas.h"

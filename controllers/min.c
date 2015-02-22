@@ -2,13 +2,7 @@
  * Author - James Marshall
  */
 
-#include <math.h>
-#include <string.h>
-#include <time.h>
-#include <unistd.h>
-
 #include "../include/replicas.h"
-#include "../include/commtypes.h"
 
 #include <linux/kernel.h>
 #include <sys/syscall.h>
