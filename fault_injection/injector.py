@@ -23,25 +23,33 @@ def getPIDs(pids, names, cmd):
 				pass
 
 if len(sys.argv) < 2:
-	print "please supply command to execute on unspecting processes (for example, 'kill -9' or 'kill -s USR2'"
-        sys.exit()
+	print "please supply command to execute on unspecting processes (for example, 'kill -9' or '/bin/kill -s SIGRTMIN+2'"
+	print "Oh yeah, you can also specify the controller you want to attack."
+	sys.exit()
 
 # This should be checked before running, but hey we are kill processes here
 cmd_start = sys.argv[1]
 
+victim_programs = []
+if len(sys.argv) > 2: # victim name supplied
+	victim_programs.append(sys.argv[2])
+else:
+	victim_programs.append("AStar")
+	victim_programs.append("Filter")
+	victim_programs.append("Mapper")
+	victim_programs.append("ArtPot")
+
 # This will need to change if mixing TMR and DMR
-victim_types = 4 # different controllers
+victim_types = len(victim_programs) # different controllers
 victim_count = 3 # replicated 3 times
 while True:
 	time.sleep(1/4.0)
 	victim_pids = []
 	victim_names = []
 
-	#getPIDs(victim_pids, victim_names, 'ps -a | grep "PassThrough" | grep -v "Test"')
-	getPIDs(victim_pids, victim_names, 'ps -a | grep "AStar" | grep -v "Test"')
-	getPIDs(victim_pids, victim_names, 'ps -a | grep "Filter" | grep -v "Test"')
-	getPIDs(victim_pids, victim_names, 'ps -a | grep "ArtPot" | grep -v "Test"')
-	getPIDs(victim_pids, victim_names, 'ps -a | grep "Mapper" | grep -v "Test"')
+	for name in victim_programs:
+		search_str = 'ps -a | grep "' + name + '" | grep -v "Test"'
+		getPIDs(victim_pids, victim_names, search_str)
 
 	if (len(victim_pids) < (victim_types * victim_count)):
 		print "Error: One of the controllers did not successfully restart"
