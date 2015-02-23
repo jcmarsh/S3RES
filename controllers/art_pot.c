@@ -79,7 +79,6 @@ int parseArgs(int argc, const char **argv) {
       printf("Error in %s: failed on connectRecvFDS call. Exiting.\n", name);
       exit(-1);
     }
-    setPipeIndexes();
   } else {
     for (int i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {
       deserializePipe(argv[i + 2], &pipes[i]);
@@ -89,8 +88,8 @@ int parseArgs(int argc, const char **argv) {
     } else {
       pipe_count = PIPE_COUNT;
     }
-    setPipeIndexes();
   }
+  setPipeIndexes();
 
   return 0;
 }

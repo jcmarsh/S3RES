@@ -117,8 +117,8 @@ void restartHandler() {
           // also copy over the previous vote state and pipe buffers
           for (int i = 0; i < replicas[restarter].pipe_count; i++) {
             replicas[restartee].voted[i] = replicas[restarter].voted[i];
-            //memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
-            //replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
+            memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
+            replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
             checkSend(i, false); // DO NOT check for SDC (one has failed)
           }
           return;
@@ -463,9 +463,18 @@ void checkSend(int pipe_num, bool checkSDC) {
             if (memcmp(replicas[r_index].vot_pipes[pipe_num].buffer,
                        replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num].buffer,
                        replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
-              //printf("Voting disagreement: caught SDC\n");
+              //printf("Voting disagreement: caught SDC on pipe: %d\n", pipe_num);
 
-              restartReplica(r_index, (r_index + 2) % rep_count);
+              int restartee = (r_index + 2) % rep_count;
+              restartReplica(r_index, restartee);
+
+              // TODO: This is similar to code in the restart timeout handler
+              for (int i = 0; i < replicas[r_index].pipe_count; i++) {
+                replicas[restartee].voted[i] = replicas[r_index].voted[i];
+                memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[r_index].vot_pipes[i].buffer, replicas[r_index].vot_pipes[i].buff_count);
+                replicas[restartee].vot_pipes[i].buff_count = replicas[r_index].vot_pipes[i].buff_count;
+                //checkSend(i, false); // DO NOT check for SDC (one has failed)
+              }
             }
           }
           resetVotingState(pipe_num);

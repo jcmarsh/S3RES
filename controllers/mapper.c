@@ -161,7 +161,7 @@ void enterLoop(void) {
         } else if (read_ret == -1) {
           perror("Mapper - read blocking");
         } else {
-          puts("Mapper read_ret == 0?");
+          perror("Mapper read_ret == 0?");
         }
       }
       if (FD_ISSET(pipes[ack_index].fd_in, &select_set)) {
