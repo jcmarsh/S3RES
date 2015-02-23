@@ -1,8 +1,8 @@
 #!/bin/bash
 
-PLAYER_TIME=220s
-BASIC_TIME=210s
-ANOTHER_TIME=200s
+PLAYER_TIME=320s
+BASIC_TIME=310s
+ANOTHER_TIME=300s
 
 # make sure bench_config.h has TIME_FULL_BENCH defined.
 
