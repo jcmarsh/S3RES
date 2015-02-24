@@ -104,14 +104,7 @@ void restartHandler() {
           int restarter = (r_index + (rep_count - 1)) % rep_count;
           int restartee = r_index;
 
-          #ifdef TIME_RESTART_REPLICA
-            timestamp_t last = generate_timestamp();
-          #endif
           restartReplica(restarter, restartee);
-          #ifdef TIME_RESTART_REPLICA
-            timestamp_t current = generate_timestamp();
-            printf("(%lld)\n", current - last);
-          #endif
 
           // Send along the response from the other two replicas.
           // also copy over the previous vote state and pipe buffers
@@ -153,6 +146,9 @@ void cleanupReplica(int rep_index) {
 }
 
 void restartReplica(int restarter, int restartee) {
+  #ifdef TIME_RESTART_REPLICA
+    timestamp_t last = generate_timestamp();
+  #endif
   cleanupReplica(restartee);
 
   #ifdef TIME_RESTART_SIGNAL
@@ -173,6 +169,10 @@ void restartReplica(int restarter, int restartee) {
   // send new pipe through fd server (should have a request)
 
   acceptSendFDS(&sd, &(replicas[restartee].pid), replicas[restartee].rep_pipes, replicas[restartee].pipe_count);
+  #ifdef TIME_RESTART_REPLICA
+    timestamp_t current = generate_timestamp();
+    printf("(%lld)\n", current - last);
+  #endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////

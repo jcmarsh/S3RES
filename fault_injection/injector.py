@@ -32,12 +32,15 @@ cmd_start = sys.argv[1]
 
 victim_programs = []
 if len(sys.argv) > 2: # victim name supplied
+	print "Victim name is ", sys.argv[2]
 	victim_programs.append(sys.argv[2])
 else:
 	victim_programs.append("AStar")
 	victim_programs.append("Filter")
 	victim_programs.append("Mapper")
 	victim_programs.append("ArtPot")
+
+print "executing: ", cmd_start
 
 # This will need to change if mixing TMR and DMR
 victim_types = len(victim_programs) # different controllers
