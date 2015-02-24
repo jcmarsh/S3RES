@@ -32,8 +32,9 @@ cmd_start = sys.argv[1]
 
 victim_programs = []
 if len(sys.argv) > 2: # victim name supplied
-	print "Victim name is ", sys.argv[2]
-	victim_programs.append(sys.argv[2])
+	for i in range(2, len(sys.argv)):
+		print "Victim name is ", sys.argv[i]
+		victim_programs.append(sys.argv[i])
 else:
 	victim_programs.append("AStar")
 	victim_programs.append("Filter")
@@ -51,7 +52,7 @@ while True:
 	victim_names = []
 
 	for name in victim_programs:
-		search_str = 'ps -a | grep "' + name + '" | grep -v "Test"'
+		search_str = 'ps -a | grep "' + name + '" | grep -v "Test" | grep -v "defunct"'
 		getPIDs(victim_pids, victim_names, search_str)
 
 	if (len(victim_pids) < (victim_types * victim_count)):
