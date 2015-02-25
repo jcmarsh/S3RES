@@ -19,9 +19,9 @@ done
 sleep 60
 
 # Empty with SDR (just a watchdog basically)
-cp /home/jcmarsh/research/PINT/controllers/configs/ping_pong_micro/SDR_empty.cfg ./config_plumber.cfg
+cp /home/jcmarsh/research/PINT/controllers/configs/ping_pong_micro/SMR_empty.cfg ./config_plumber.cfg
 for index in `seq 0 1`; do
-	timeout $PLAYER_TIME player baseline.cfg > SDR_empty_$index.txt &
+	timeout $PLAYER_TIME player baseline.cfg > SMR_empty_$index.txt &
 	sleep 5
 	timeout $BASIC_TIME ./controllers/c_cont/basic 127.0.0.1 &
 	sleep $BASIC_TIME
