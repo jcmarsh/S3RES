@@ -10,4 +10,6 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../include/commtypes.h"
+
 int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const char* name);

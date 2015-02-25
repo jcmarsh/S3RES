@@ -10,95 +10,30 @@ author: James Taylor : jrt@gwu.edu
 
 //-----------------------------------------------------------------------------
 
-//#include <vector>
-#include <pthread.h>
-
 #include "time.h"
 #include "cpu.h"
 
 //-----------------------------------------------------------------------------
 
-#define KILL_ALLOWED false
+/// The set of scheduling operation errors.
+typedef enum {
+  SCHED_ERROR_NONE = 0,          ///< Operation completed successfully.
+  SCHED_ERROR_SIGNAL,            ///< An invalid signal was sent.
+  SCHED_ERROR_PERMISSIONS,       ///< A process does not have required permissions.
+  SCHED_ERROR_NOEXIST,           ///< The process specified does not exist.
+  SCHED_ERROR_POLICY,            ///< A failure to set realtime policy.
+  SCHED_ERROR_PRIORITY_QUERY,    ///< A failure when querying priority.
+  SCHED_ERROR_PRIORITY_VALIDATE, ///< A failure to validate priority.
+  SCHED_ERROR_PARAM_QUERY,       ///< A failure querying a scheduling parameter.
+  SCHED_ERROR_GENERAL            ///< A general error in scheduling.
+} sched_error_e;
 
-//-----------------------------------------------------------------------------
+// test
+sched_error_e sched_set_realtime_policy( const pid_t pid, int priority, const int offset ); // keep
 
-/// Worker function pointer type for use with pthreads.
-typedef void* (worker_f)( void* );
+sched_error_e sched_get_realtime_min_priority( int priority ); // kleep
 
-//-----------------------------------------------------------------------------
-
-class scheduler_c {
-public:
-
-  /// The set of scheduling operation errors.
-  enum error_e {
-    ERROR_NONE = 0,          ///< Operation completed successfully.
-    ERROR_SIGNAL,            ///< An invalid signal was sent.
-    ERROR_PERMISSIONS,       ///< A process does not have required permissions.
-    ERROR_NOEXIST,           ///< The process specified does not exist.
-    ERROR_CREATE,            ///< A failure to create the thread or process.
-    ERROR_SCHEDULE,          ///< A failure to set schedule.
-    ERROR_POLICY,            ///< A failure to set realtime policy.
-    ERROR_PRIORITY_BOUNDS,   ///< A boundary violation in requested priority.
-    ERROR_PRIORITY_QUERY,    ///< A failure when querying priority.
-    ERROR_PRIORITY_VALIDATE, ///< A failure to validate priority.
-    ERROR_PARAM_QUERY,       ///< A failure querying a scheduling parameter.
-    ERROR_PARAM_UPDATE,      ///< A failure updating a scheduling parameter.
-    ERROR_GENERAL            ///< A general error in scheduling.
-  };
-
-  // The set of API scheduling policies.
-  enum policy_e {
-    PRIORITY,
-    PROGRESS
-  };
-
-  // API level scheduling
-
-  // POSIX level scheduling
-  static error_e create( pid_t& pid, const int& priority_offset, const cpu_id_t& cpu, const char* program, const char* as ); 
-
-  // test
-  static error_e create( pid_t& pid, const int& priority_offset, const cpu_id_t& cpu, worker_f worker ); 
-
-  static error_e suspend( const pid_t& pid );
-
-  static error_e resume( const pid_t& pid );
-
-  static error_e terminate( const pid_t& pid );
-
-  static error_e set_realtime_policy( const pid_t& pid, int& priority );
-
-  static error_e set_realtime_policy( const pid_t& pid, int& priority, const int& offset );
-
-  static error_e get_realtime_min_priority( int& priority );
-
-  static error_e get_realtime_max_priority( int& priority );
-
-  static error_e get_realtime_relative_priority( int& priority, const int& offset );
-
-  static error_e validate_realtime_priority_offset( const int& offset );
-
-  static error_e get_priority( const pid_t& pid, int& priority );
-
-  static error_e set_priority( const pid_t& pid, int& priority );
-
-  static error_e decrease_realtime_priority( const pid_t& pid, int& priority, const int& offset, const int& min_priority );
-
-  static error_e increase_realtime_priority( const pid_t& pid, int& priority, const int& offset, const int& max_priority );
-
-  // POSIX pthread scheduling
-  static error_e create( pthread_t& thread, const int& priority, worker_f worker );
- 
-  static error_e get_priority( const pthread_t& thread, int& priority );
-
-  static error_e set_priority( const pthread_t& thread, int& prioirty );
-
-  static error_e decrease_realtime_priority( const pthread_t& thread, int& priority, const int& offset, const int& min_priority );
-
-  static error_e increase_realtime_priority( const pthread_t& thread, int& priority, const int& offset, const int& max_priority );
-
-};
+sched_error_e sched_get_realtime_max_priority( int priority ); // keep
 
 //-----------------------------------------------------------------------------
 

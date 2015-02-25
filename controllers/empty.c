@@ -14,7 +14,6 @@ int pipe_count = PIPE_COUNT;
 int read_in_index, write_out_index;
 
 // TAS related
-cpu_speed_t cpu_speed;
 int priority;
 
 const char* name = "Empty";

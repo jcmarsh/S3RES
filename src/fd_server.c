@@ -1,14 +1,13 @@
 /*
- * fd_server.cpp
+ * fd_server.c
  *
  * James Marshall May 3 2014
  */
 
 #include "../include/fd_server.h"
-#include "../include/commtypes.h"
-
 
 int sendFDS(int connection_fd, struct typed_pipe* pipes, int pipe_count) { // pipes are the rep side
+  int i;
   struct msghdr hdr;
   struct iovec data;
   // cmsg is the out-of-band data (fds)
@@ -16,7 +15,7 @@ int sendFDS(int connection_fd, struct typed_pipe* pipes, int pipe_count) { // pi
 
   int types_msg[pipe_count * 2];
   // Need to specify whether each pipe is meant to be an fd_in or fd_out
-  for (int i = 0; i < pipe_count * 2; i = i + 2) {
+  for (i = 0; i < pipe_count * 2; i = i + 2) {
     types_msg[i] = (int) pipes[i/2].type;
     if (pipes[i/2].fd_in != 0) {
       types_msg[i + 1] = 0; // 0 is the read side
@@ -42,7 +41,7 @@ int sendFDS(int connection_fd, struct typed_pipe* pipes, int pipe_count) { // pi
   cmsg->cmsg_level = SOL_SOCKET;
   cmsg->cmsg_type  = SCM_RIGHTS;
 
-  for (int i = 0; i < pipe_count; i++) {
+  for (i = 0; i < pipe_count; i++) {
     if (pipes[i].fd_in != 0) {
       ((int*)CMSG_DATA(cmsg))[i] = pipes[i].fd_in;
     } else {

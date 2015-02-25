@@ -4,8 +4,7 @@
 #include "../include/cpu.h"
 #include "../include/time.h"
 
-void optOutRT();
-int InitTAS(cpu_id_t cpu, cpu_speed_t *cpu_speed, int prio_offset);
+int InitTAS(cpu_id_t cpu, int prio_offset);
 int EveryTAS();
 
 #endif // _TAS_LIMITED_H_

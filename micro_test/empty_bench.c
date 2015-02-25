@@ -14,12 +14,10 @@ struct typed_pipe pipes[PIPE_LIMIT];
 // FD server
 struct server_data sd;
 
-cpu_speed_t cpu_speed;
-
 timestamp_t last;
 
 int main(int argc, const char** argv) {
-  InitTAS(DEFAULT_CPU, &cpu_speed, 5);
+  InitTAS(DEFAULT_CPU, 5);
   // Setup fd server
   createFDS(&sd, "Empty");
 

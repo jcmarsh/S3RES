@@ -5,8 +5,10 @@
 #define ARGV_REQ 2 // Every controller has it's own name, followed by priority, then all the pipes
 
 void initReplicas(struct replica reps[], int rep_num, const char* name, int priority) {  
+  int index, jndex;
+
   // Init three replicas
-  for (int index = 0; index < rep_num; index++) {
+  for (index = 0; index < rep_num; index++) {
     struct replica* new_rep = &reps[index];
     if (new_rep->name != NULL) {
       free(new_rep->name);
@@ -19,9 +21,9 @@ void initReplicas(struct replica reps[], int rep_num, const char* name, int prio
 
     // clean up pipes if this replica is not fresh
     if (new_rep->pipe_count != 0) {
-      for (int i = 0; i < new_rep->pipe_count; i++) {
-        resetPipe(&(new_rep->vot_pipes[i]));
-        resetPipe(&(new_rep->rep_pipes[i]));
+      for (jndex = 0; jndex < new_rep->pipe_count; jndex++) {
+        resetPipe(&(new_rep->vot_pipes[jndex]));
+        resetPipe(&(new_rep->rep_pipes[jndex]));
       }
     }
 
@@ -33,9 +35,11 @@ void initReplicas(struct replica reps[], int rep_num, const char* name, int prio
  * See forkReplicasSpecial below. Plumber is a special case.
  */
 void createPipesSpecial(struct replica reps[], int rep_num, struct typed_pipe ext_pipes[], int pipe_count) {
+  int index, p_index;
+
   // external pipes are the pipes for the voter (normally the reps pipes)
-  for (int index = 0; index < rep_num; index++) {
-    for (int p_index = 0; p_index < pipe_count; p_index++) {
+  for (index = 0; index < rep_num; index++) {
+    for (p_index = 0; p_index < pipe_count; p_index++) {
       int pipe_fds[2];
       if (pipe(pipe_fds) == -1) {
         printf("Replica pipe error\n");
@@ -64,9 +68,11 @@ void createPipesSpecial(struct replica reps[], int rep_num, struct typed_pipe ex
 }
 
 void createPipes(struct replica reps[], int rep_num, struct typed_pipe ext_pipes[], int pipe_count) {
+  int index, p_index;
+
   // external pipes are the pipes for the voter (normally the reps pipes)
-  for (int index = 0; index < rep_num; index++) {
-    for (int p_index = 0; p_index < pipe_count; p_index++) {
+  for (index = 0; index < rep_num; index++) {
+    for (p_index = 0; p_index < pipe_count; p_index++) {
       int pipe_fds[2];
       if (pipe2(pipe_fds, O_CLOEXEC) == -1) { // Need to check on the number of open file descriptors if this line is removed.
         printf("Replica pipe error\n");
@@ -127,7 +133,9 @@ int forkSingle(char** argv) {
  * TODO: fork_with_args?
  */
 void forkReplicasSpecial(struct replica replicas[], int rep_num) {
-  for (int index = 0; index < rep_num; index++) {
+  int index, a_index;
+
+  for (index = 0; index < rep_num; index++) {
     // Each replica needs to build up it's argvs
     struct replica* curr = &replicas[index];
     int rep_argc = ARGV_REQ + curr->pipe_count + 1; // 0 is the program name, 1 is the priority, and 1 more for a NULL at the end
@@ -137,12 +145,12 @@ void forkReplicasSpecial(struct replica replicas[], int rep_num) {
     if (asprintf(&(rep_argv[1]), "%d", curr->priority) < 0) {
       perror("Fork Replica failed arg write");
     }
-    for (int a_index = ARGV_REQ; a_index < curr->pipe_count + ARGV_REQ; a_index++) {
+    for (a_index = ARGV_REQ; a_index < curr->pipe_count + ARGV_REQ; a_index++) {
       rep_argv[a_index] = serializePipe(curr->rep_pipes[a_index - ARGV_REQ]);
     }
     rep_argv[rep_argc - 1] = NULL;
     curr->pid = forkSingle(rep_argv);
-    for (int a_index = 1; a_index < rep_argc; a_index++) {
+    for (a_index = 1; a_index < rep_argc; a_index++) {
       free(rep_argv[a_index]);
     }
     free(rep_argv);
@@ -151,7 +159,9 @@ void forkReplicasSpecial(struct replica replicas[], int rep_num) {
 
 
 void forkReplicas(struct replica replicas[], int rep_num) {
-  for (int index = 0; index < rep_num; index++) {
+  int index, a_index;
+
+  for (index = 0; index < rep_num; index++) {
     // Each replica needs to build up it's argvs
     struct replica* curr = &replicas[index];
     int rep_argc = ARGV_REQ + 1;    
@@ -163,7 +173,7 @@ void forkReplicas(struct replica replicas[], int rep_num) {
     }
     rep_argv[rep_argc - 1] = NULL;
     curr->pid = forkSingle(rep_argv);
-    for (int a_index = 1; a_index < rep_argc; a_index++) {
+    for (a_index = 1; a_index < rep_argc; a_index++) {
       free(rep_argv[a_index]);
     }
     free(rep_argv);

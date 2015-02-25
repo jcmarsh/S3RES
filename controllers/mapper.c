@@ -18,7 +18,6 @@ int pipe_count = PIPE_COUNT;
 int data_index, update_index, ack_index; // Data from range pose, updates to planner, planner acks.
 
 // TAS related
-cpu_speed_t cpu_speed;
 int priority;
 
 struct point_i* current_pose;
@@ -32,7 +31,8 @@ const char* name = "Mapper";
 void enterLoop(void);
 
 void setPipeIndexes(void) {
-  for (int i = 0; i < PIPE_COUNT; i++) {
+  int i;
+  for (i = 0; i < PIPE_COUNT; i++) {
     switch (pipes[i].type) {
       case RANGE_POSE_DATA:
         data_index = i;
@@ -53,6 +53,7 @@ void testSDCHandler(int signo, siginfo_t *si, void *unused) {
 }
 
 int parseArgs(int argc, const char **argv) {
+  int i;
   // TODO: error checking
   priority = atoi(argv[1]);
   if (argc < 5) { // Must request fds
@@ -60,7 +61,7 @@ int parseArgs(int argc, const char **argv) {
     connectRecvFDS(currentPID, pipes, PIPE_COUNT, "Mapper");
     setPipeIndexes();
   } else {
-    for (int i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {
+    for (i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {
       deserializePipe(argv[i + 2], &pipes[i]);
     }
     setPipeIndexes();
@@ -93,6 +94,7 @@ bool addObstacle(struct point_i* obs) {
 }
 
 void updateMap(struct comm_range_pose_data * data) {
+  int i;
   double theta_pose;
   // Read pose
   struct point_d pose;
@@ -105,7 +107,7 @@ void updateMap(struct comm_range_pose_data * data) {
   send_msg.obs_count = 0;
 
   // Convert ranges absolute positions
-  for (int i = 0; i < RANGE_COUNT; i++) {
+  for (i = 0; i < RANGE_COUNT; i++) {
     struct point_d obstacle_l, obstacle_g;
 
     // obstacle location relative to the robot
@@ -180,6 +182,7 @@ void enterLoop(void) {
 }
 
 int main(int argc, const char **argv) {
+  int i, j;
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");
     return -1;
@@ -197,8 +200,8 @@ int main(int argc, const char **argv) {
   send_msg.obs_y = (int*)malloc(sizeof(int) * 128);
 
   // Remember, don't initialize anything in the loop! (this used to be there... problems)
-  for (int i = 0; i < GRID_NUM; i++) {
-    for (int j = 0; j < GRID_NUM; j++) {
+  for (i = 0; i < GRID_NUM; i++) {
+    for (j = 0; j < GRID_NUM; j++) {
       obstacle_map[i][j] = 0;
     }
   }

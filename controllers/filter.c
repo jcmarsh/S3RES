@@ -23,7 +23,6 @@ struct typed_pipe pipes[PIPE_COUNT];
 int data_index, average_index, regular_index;
 
 // TAS related
-cpu_speed_t cpu_speed;
 int priority;
 
 const char* name = "Filter";
@@ -65,6 +64,7 @@ int parseArgs(int argc, const char **argv) {
 }
 
 void command(void) {
+  int i, j;
   double range_average[RANGER_COUNT] = {0};
 
   if (insertSDC) {
@@ -72,8 +72,8 @@ void command(void) {
     ranges[0][0]++;
   }
 
-  for (int j = 0; j < RANGER_COUNT; j++) {
-    for (int i = 0; i < WINDOW_SIZE; i++) {
+  for (j = 0; j < RANGER_COUNT; j++) {
+    for (i = 0; i < WINDOW_SIZE; i++) {
       range_average[j] += ranges[i][j];
     }
     range_average[j] = range_average[j] / WINDOW_SIZE;

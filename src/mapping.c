@@ -28,11 +28,12 @@ struct point_d* degridify(int x, int y) {
   return new_point;
 }
 
-void printMap(bool obs_map[][GRID_NUM], l_list_t* path) {
+void printMap(bool obs_map[][GRID_NUM], struct l_list_t* path) {
+  int i, j;
   printf("\n");
-  for (int i = GRID_NUM - 1; i >= 0; i--) {
-    for (int j = 0; j < GRID_NUM; j++) {
-      node_t* node = newNode(j, i, 0);
+  for (i = GRID_NUM - 1; i >= 0; i--) {
+    for (j = 0; j < GRID_NUM; j++) {
+      struct node_t* node = newNode(j, i, 0);
       if (findNode(path, node) != NULL) {
         if (obs_map[j][i]) {
           printf("!"); // Should not happen
@@ -53,15 +54,15 @@ void printMap(bool obs_map[][GRID_NUM], l_list_t* path) {
 }
 
 /*              */
-l_list_t* newList() {
-  l_list_t* new_list = (l_list_t*) malloc(sizeof(l_list_t));
+struct l_list_t* newList() {
+  struct l_list_t* new_list = (struct l_list_t*) malloc(sizeof(struct l_list_t));
   new_list->head = NULL;
   new_list->sort_val = 0.0;
   new_list->tail = NULL;
   return new_list;
 }
 
-void printList(l_list_t* list) {
+void printList(struct l_list_t* list) {
   if (list == NULL) {
     printf("N\n");
   } else if (list->head == NULL) {
@@ -72,7 +73,7 @@ void printList(l_list_t* list) {
   }
 }
 
-bool nodeEqauls(node_t* a, node_t* b) {
+bool nodeEqauls(struct node_t* a, struct node_t* b) {
   if (a == NULL || b == NULL) {
     return false;
   } else {
@@ -81,13 +82,13 @@ bool nodeEqauls(node_t* a, node_t* b) {
 }
 
 // Frees the removed node
-void removeNode(l_list_t** list, node_t* node) {
+void removeNode(struct l_list_t** list, struct node_t* node) {
   if ((*list) == NULL || (*list)->head == NULL) {
     return;
   } else if (nodeEqauls((*list)->head, node)) {
     // Magic happens
     free((*list)->head);
-    l_list_t* removed = (*list);
+    struct l_list_t* removed = (*list);
     (*list) = (*list)->tail;
     free(removed);
     return;
@@ -98,14 +99,14 @@ void removeNode(l_list_t** list, node_t* node) {
 }
 
 // node here has already been allocated
-void addNode(l_list_t** list, node_t* node, double sort_val) {
+void addNode(struct l_list_t** list, struct node_t* node, double sort_val) {
   if ((*list)->head == NULL) {
     // Empty list: add node to head
     (*list)->head = node;
     (*list)->sort_val = sort_val;
   } else if ((*list)->sort_val > sort_val) {
     // current is greater than new: swap
-    l_list_t* new_list = newList();
+    struct l_list_t* new_list = newList();
     new_list->head = (*list)->head;
     (*list)->head = node;
     new_list->sort_val = (*list)->sort_val;
@@ -121,7 +122,7 @@ void addNode(l_list_t** list, node_t* node, double sort_val) {
   }
 }
 
-node_t* findNode(l_list_t* list, node_t* node) {
+struct node_t* findNode(struct l_list_t* list, struct node_t* node) {
   if (list == NULL || list->head == NULL) {
     return NULL; // not found
   } else if (nodeEqauls(node, list->head)) {
@@ -132,17 +133,17 @@ node_t* findNode(l_list_t* list, node_t* node) {
 }
 
 // SHOULD NEVER BE USED IN CONJUNCTION WITH addNode
-void push(l_list_t** list, node_t* node) {
-  l_list_t* new_list = newList();
+void push(struct l_list_t** list, struct node_t* node) {
+  struct l_list_t* new_list = newList();
   new_list->head = node;
   new_list->sort_val = 0.0; // Not used. Do not use with addNode
   new_list->tail = *list;
   (*list) = new_list;
 }
 
-node_t* pop(l_list_t** list) {
-  l_list_t* popped = *list;
-  node_t* ret_val = popped->head;
+struct node_t* pop(struct l_list_t** list) {
+  struct l_list_t* popped = *list;
+  struct node_t* ret_val = popped->head;
   
   *list = popped->tail;
   free(popped);
@@ -155,7 +156,7 @@ node_t* pop(l_list_t** list) {
 }
 
 // returns the num (from the top) without modifying anything
-node_t* peek(l_list_t* list, int num) {
+struct node_t* peek(struct l_list_t* list, int num) {
   if (list == NULL || list->head == NULL) {
     return NULL; // not found
   } else if (num == 0) {
@@ -165,16 +166,16 @@ node_t* peek(l_list_t* list, int num) {
   }
 }
 
-void eraseList(l_list_t** list) {
-  node_t* curr = pop(list);
+void eraseList(struct l_list_t** list) {
+  struct node_t* curr = pop(list);
   while (curr != NULL) {
     free(curr);
     curr = pop(list);
   }
 }
 
-node_t* newNode(int x, int y, double g_score) {
-  node_t* new_node = (node_t*) malloc(sizeof(node_t));
+struct node_t* newNode(int x, int y, double g_score) {
+  struct node_t* new_node = (struct node_t*) malloc(sizeof(struct node_t));
   new_node->x = x;
   new_node->y = y;
   new_node->g_score = g_score;

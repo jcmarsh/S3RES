@@ -35,7 +35,6 @@ struct typed_pipe pipes[PIPE_COUNT]; // 0 is data_in, 1 is cmd_out
 int data_index, out_index, way_req_index, way_res_index;
 
 // TAS related
-cpu_speed_t cpu_speed;
 int priority;
 
 const char* name = "ArtPot";
@@ -45,9 +44,11 @@ void command(void);
 
 // Set indexes based on pipe types
 void setPipeIndexes(void) {
+  int i;
+
   way_req_index = -1;
   way_res_index = -1;
-  for (int i = 0; i < PIPE_COUNT; i++) {
+  for (i = 0; i < PIPE_COUNT; i++) {
     switch (pipes[i].type) {
       case RANGE_POSE_DATA:
         data_index = i;
@@ -71,6 +72,8 @@ void testSDCHandler(int signo, siginfo_t *si, void *unused) {
 }
 
 int parseArgs(int argc, const char **argv) {
+  int i;
+
   // TODO: error checking
   priority = atoi(argv[1]);
   if (argc < 4) { // Must request fds
@@ -80,7 +83,7 @@ int parseArgs(int argc, const char **argv) {
       exit(-1);
     }
   } else {
-    for (int i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {
+    for (i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {
       deserializePipe(argv[i + 2], &pipes[i]);
     }
     if (argc < 6) {

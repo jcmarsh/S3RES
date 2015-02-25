@@ -42,6 +42,7 @@ int main(int argc, const char** argv) {
 
   int loops = 100;
   int c = 0;
+  int i;
   while (loops--) {
   	// Send Map update
   	struct comm_map_update map_update;
@@ -50,7 +51,7 @@ int main(int argc, const char** argv) {
   	map_update.obs_count = 5;
   	int obs_x[5];
   	int obs_y[5];
-  	for (int i = 0; i < 5; i++) {
+  	for (i = 0; i < 5; i++) {
   		obs_x[i] = c;
   		obs_y[i] = c;
   		c++;

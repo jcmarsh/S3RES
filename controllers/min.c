@@ -34,7 +34,7 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
-  controller_name = const_cast<char*>(argv[1]);
+  controller_name = (char*)(argv[1]);
 
   initReplicas(replicas, REP_COUNT, controller_name, 10);
   createPipes(replicas, REP_COUNT, NULL, 0);

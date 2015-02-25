@@ -10,6 +10,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <sched.h> // TODO: Move to taslib?
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -26,7 +27,6 @@ struct comm_range_pose_data range_pose_data_msg;
 struct comm_mov_cmd mov_cmd_msg;
 
 // TAS Stuff
-cpu_speed_t cpu_speed;
 int priority;
 
  // These are to your parent (Translator)
@@ -44,7 +44,7 @@ void processCommand();
 int initBenchMarker() {
   int scheduler;
 
-  InitTAS(DEFAULT_CPU, &cpu_speed, priority);
+  InitTAS(DEFAULT_CPU, priority);
 
   scheduler = sched_getscheduler(0);
 

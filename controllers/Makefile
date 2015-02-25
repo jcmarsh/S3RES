@@ -1,5 +1,5 @@
 RESEARCH=/home/jcmarsh/research
-SRC=../src/commtypes.cpp ../src/fd_client.cpp ../src/controller.c
+SRC=../src/commtypes.c ../src/fd_client.c ../src/controller.c
 LIB=-lrt -lTASLimited
 FLAGS=-O3
 #FLAGS=-g -O0
@@ -7,15 +7,15 @@ FLAGS=-O3
 all: regular
 
 regular:
-	g++ $(FLAGS) -o ArtPot art_pot.c  $(SRC) $(LIB)
-	g++ $(FLAGS) -o AStar a_star.c $(SRC) ../src/mapping.cpp $(LIB)
-	g++ $(FLAGS) -o BenchMarker benchmarker.c ../src/commtypes.cpp ../src/replicas.cpp $(LIB)
-	g++ $(FLAGS) -o Empty empty.c $(SRC) $(LIB) 
-	g++ $(FLAGS) -o Filter filter.c $(SRC) $(LIB) 
-	g++ $(FLAGS) -o PassThrough pass_through.c $(LIB) 
-	g++ $(FLAGS) -o Mapper mapper.c $(SRC) ../src/mapping.cpp $(LIB) 
-	g++ $(FLAGS) -o VoterD voterd.c ../src/commtypes.cpp ../src/replicas.cpp ../src/fd_server.cpp ../src/fd_client.cpp $(LIB)
-	g++ $(FLAGS) -o Min min.c ../src/commtypes.cpp ../src/replicas.cpp
+	gcc $(FLAGS) -o ArtPot art_pot.c  $(SRC) $(LIB) -lm
+	gcc $(FLAGS) -o AStar a_star.c $(SRC) ../src/mapping.c $(LIB) -lm
+	gcc $(FLAGS) -o BenchMarker benchmarker.c ../src/commtypes.c ../src/replicas.c $(LIB)
+	gcc $(FLAGS) -o Empty empty.c $(SRC) $(LIB) 
+	gcc $(FLAGS) -o Filter filter.c $(SRC) $(LIB) 
+	gcc $(FLAGS) -o PassThrough pass_through.c $(LIB) 
+	gcc $(FLAGS) -o Mapper mapper.c $(SRC) ../src/mapping.c $(LIB) -lm
+	gcc $(FLAGS) -o VoterD voterd.c ../src/commtypes.c ../src/replicas.c ../src/fd_server.c ../src/fd_client.c $(LIB)
+	gcc $(FLAGS) -o Min min.c ../src/commtypes.c ../src/replicas.c
 
 copy: regular
 	cp ArtPot ../../stage/experiments/

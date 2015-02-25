@@ -9,8 +9,11 @@
 
 #include <libplayercore/playercore.h>
 
-#include "../include/taslimited.h"
-#include "../include/replicas.h"
+extern "C"
+{
+  #include "../include/taslimited.h"
+  #include "../include/replicas.h"
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // The class for the driver
@@ -63,9 +66,6 @@ private:
   player_devaddr_t ranger_addr; // "original:localhost:6666:ranger:0"
 
   double curr_goal[3]; // Current goal for planners
-
-  // TAS Stuff
-  cpu_speed_t cpu_speed;
 
   // Replica related data
   struct replica rep;
@@ -134,7 +134,7 @@ int TranslatorDriver::MainSetup() {
 
   puts("Translator driver initialising in MainSetup");
 
-  InitTAS(0, &cpu_speed, 10);
+  InitTAS(0, 10);
   curr_goal[INDEX_X] = curr_goal[INDEX_Y] = curr_goal[INDEX_A] = 0.0;
 
   // Initial starting position

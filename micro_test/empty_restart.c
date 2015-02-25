@@ -10,14 +10,12 @@
 struct replica replicas[2];
 
 // TAS Stuff
-cpu_speed_t cpu_speed;
 int voter_priority = 5;
 
 // FD server
 struct server_data sd;
 
-replication_t rep_type = DMR;
-int rep_count = rep_type;
+int rep_count = DMR;
 const char* controller_name = "Empty";
 
 // pipes to external components (not replicas)
@@ -25,8 +23,9 @@ int pipe_count = 2;
 struct typed_pipe ext_pipes[2];
 
 void cleanupReplica(int rep_index) {
+  int i;
   // cleanup replica data structure
-  for (int i = 0; i < replicas[rep_index].pipe_count; i++) {
+  for (i = 0; i < replicas[rep_index].pipe_count; i++) {
     if (replicas[rep_index].vot_pipes[i].fd_in > 0) {
       close(replicas[rep_index].vot_pipes[i].fd_in);
     }
@@ -45,10 +44,11 @@ void cleanupReplica(int rep_index) {
 }
 
 void startReplicas(void) {
+  int i;
   initReplicas(replicas, rep_count, controller_name, voter_priority + 5);
   createPipes(replicas, rep_count, ext_pipes, pipe_count);
   forkReplicas(replicas, rep_count);
-  for (int i = 0; i < rep_count; i++) {
+  for (i = 0; i < rep_count; i++) {
     if (acceptSendFDS(&sd, &(replicas[i].pid), replicas[i].rep_pipes, replicas[i].pipe_count) < 0) {
       printf("EmptyRestart acceptSendFDS call failed\n");
       exit(-1);
@@ -80,7 +80,7 @@ void restartReplica(int restartee) {
 }
 
 int main(int argc, const char **argv) {
-  InitTAS(DEFAULT_CPU, &cpu_speed, voter_priority);
+  InitTAS(DEFAULT_CPU, voter_priority);
 
   // Setup fd server
   createFDS(&sd, controller_name);

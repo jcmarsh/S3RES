@@ -24,11 +24,10 @@ struct typed_pipe pipes[PIPE_COUNT]; // Map updates in 0, waypoint request in 1,
 int updates_index, ack_index, way_req_index, way_res_index;
 int pipe_count = PIPE_COUNT;
 
-l_list_t* goal_path;
-node_t *current_goal;
-node_t *n_current_goal;
+struct l_list_t* goal_path;
+struct node_t *current_goal;
+struct node_t *n_current_goal;
 
-cpu_speed_t cpu_speed;
 int priority;
 
 const char* name = "AStar";
@@ -39,7 +38,8 @@ void sendWaypoints(void);
 
 // Set indexes based on pipe types
 void setPipeIndexes(void) {
-  for (int i = 0; i < PIPE_COUNT; i++) {
+  int i;
+  for (i = 0; i < PIPE_COUNT; i++) {
     switch (pipes[i].type) {
       case MAP_UPDATE:
         updates_index = i;
@@ -57,11 +57,12 @@ void setPipeIndexes(void) {
   }
 }
 
-l_list_t* genNeighbors(node_t* node) {
-  l_list_t* list = newList();
+struct l_list_t* genNeighbors(struct node_t* node) {
+  int i, j;
+  struct l_list_t* list = newList();
 
-  for (int i = -1; i <= 1; i++) {
-    for (int j = -1; j <= 1; j++) {
+  for (i = -1; i <= 1; i++) {
+    for (j = -1; j <= 1; j++) {
       int n_x = node->x + i;
       int n_y = node->y + j;
       if (j == 0 && i == 0) {
@@ -89,6 +90,7 @@ void testSDCHandler(int signo, siginfo_t *si, void *unused) {
 }
 
 int parseArgs(int argc, const char **argv) {
+  int i;
   // TODO: error checking
   priority = atoi(argv[1]);
   if (argc < 6) {
@@ -97,7 +99,7 @@ int parseArgs(int argc, const char **argv) {
     connectRecvFDS(currentPID, pipes, PIPE_COUNT, name);
     setPipeIndexes();
   } else {
-    for (int i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {
+    for (i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {
       deserializePipe(argv[i + 2], &pipes[i]);
     }
     setPipeIndexes();
@@ -114,8 +116,8 @@ double estDistanceG(int x, int y) {
   return estDistance(x, y, goal->x, goal->y);
 }
 
-void eraseAllButList(l_list_t** kill_list, l_list_t* save_list) {
-  node_t* clean_n = pop(kill_list);
+void eraseAllButList(struct l_list_t** kill_list, struct l_list_t* save_list) {
+  struct node_t* clean_n = pop(kill_list);
   while(clean_n != NULL) {
     if (findNode(save_list, clean_n) != NULL) {
       // Found node in save list, don't free
@@ -128,15 +130,15 @@ void eraseAllButList(l_list_t** kill_list, l_list_t* save_list) {
 }
 
 void command(void) {
-  l_list_t* closed_set = newList();
-  l_list_t* open_set = newList();
+  struct l_list_t* closed_set = newList();
+  struct l_list_t* open_set = newList();
 
   addNode(&open_set, newNode(pose->x, pose->y, 0), estDistanceG(pose->x, pose->y));
-  node_t* goal_node = newNode(goal->x, goal->y, 0);
+  struct node_t* goal_node = newNode(goal->x, goal->y, 0);
   bool solution = false;
 
   while(open_set != NULL) { // set empty
-    node_t* current = pop(&open_set);
+    struct node_t* current = pop(&open_set);
     if ((current != NULL) && nodeEqauls(current, goal_node)) {
       free(goal_node);
 
@@ -160,15 +162,15 @@ void command(void) {
 
     // add current to closedset
     addNode(&closed_set, current, estDistanceG(current->x, current->y));
-    l_list_t *neighbors = genNeighbors(current);
-    node_t* curr_neigh = pop(&neighbors);
+    struct l_list_t *neighbors = genNeighbors(current);
+    struct node_t* curr_neigh = pop(&neighbors);
     while(curr_neigh != NULL) {
       if (findNode(closed_set, curr_neigh) != NULL) {
         // if neighbor in closed - already explored so skip
         free(curr_neigh);
       } else {
         double tent_g_score = curr_neigh->g_score + estDistance(curr_neigh->x, curr_neigh->y, current->x, current->y);
-        node_t* neigh_from_open = findNode(open_set, curr_neigh);
+        struct node_t* neigh_from_open = findNode(open_set, curr_neigh);
         if (neigh_from_open == NULL || tent_g_score < neigh_from_open->g_score) {
           curr_neigh->back_link = current;
           curr_neigh->g_score = tent_g_score;
@@ -189,8 +191,8 @@ void command(void) {
     // Not sure what to do in this case
   } else {
     // check if new path is different then old
-    node_t *node_a = peek(goal_path, 0);
-    node_t *node_b = peek(goal_path, 1);
+    struct node_t *node_a = peek(goal_path, 0);
+    struct node_t *node_b = peek(goal_path, 1);
     if (nodeEqauls(node_a, current_goal) && nodeEqauls(node_b, n_current_goal)) {
       // don't send
     } else {  
@@ -209,8 +211,8 @@ void sendWaypoints(void) {
     free(n_current_goal);
     n_current_goal = NULL;
   }
-  point_d *n_goal_p;
-  point_d *goal_p;
+  struct point_d *n_goal_p;
+  struct point_d *goal_p;
 
   pop(&goal_path); // trash closest
   current_goal = pop(&goal_path);
@@ -236,6 +238,7 @@ void sendWaypoints(void) {
 }
 
 void enterLoop(void) {
+  int index;
   int read_ret;
   int recv_msg_buffer[MAX_PIPE_BUFF / sizeof(int)] = {0};
   struct comm_way_req recv_msg_req;
@@ -259,7 +262,7 @@ void enterLoop(void) {
           pose->x = recv_msg_buffer[0];
           pose->y = recv_msg_buffer[1];
           int obs_index = 3;
-          for (int index = 0; index < recv_msg_buffer[2]; index++) {
+          for (index = 0; index < recv_msg_buffer[2]; index++) {
             int obs_x = recv_msg_buffer[obs_index + (index * 2)];
             int obs_y = recv_msg_buffer[obs_index + (index * 2 + 1)];
             obstacle_map[obs_x][obs_y] = true;
@@ -294,6 +297,8 @@ void enterLoop(void) {
 }
 
 int main(int argc, const char **argv) {
+  int i, j;
+
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");
     return -1;
@@ -312,8 +317,8 @@ int main(int argc, const char **argv) {
   free(goal_d);
   goal_path = newList();
 
-  for (int i = 0; i < GRID_NUM; i++) {
-    for (int j = 0; j < GRID_NUM; j++) {
+  for (i = 0; i < GRID_NUM; i++) {
+    for (j = 0; j < GRID_NUM; j++) {
       obstacle_map[i][j] = false;
     }
   }

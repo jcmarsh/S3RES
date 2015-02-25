@@ -1,5 +1,5 @@
 /*
- * fd_client.cpp
+ * fd_client.c
  *
  * James Marshall May 3 2014
  */
@@ -8,6 +8,7 @@
 #include "../include/commtypes.h"
 
 int requestFDS(int sock_fd, struct typed_pipe* pipes, int pipe_count) {
+  int i;
   struct msghdr hdr;
   struct iovec data;
   struct cmsghdr *cmsg;
@@ -24,7 +25,7 @@ int requestFDS(int sock_fd, struct typed_pipe* pipes, int pipe_count) {
   hdr.msg_iovlen = 1; // number of iovec data structs, here only one
   hdr.msg_flags = 0;
 
-  cmsg = (cmsghdr*)malloc(CMSG_LEN(sizeof(int) * pipe_count));
+  cmsg = (struct cmsghdr*)malloc(CMSG_LEN(sizeof(int) * pipe_count));
   hdr.msg_control = cmsg;
   hdr.msg_controllen = CMSG_LEN(sizeof(int) * pipe_count);
 
@@ -35,7 +36,7 @@ int requestFDS(int sock_fd, struct typed_pipe* pipes, int pipe_count) {
   }
 
   // recover types_msg
-  for (int i = 0; i < pipe_count * 2; i = i + 2) {
+  for (i = 0; i < pipe_count * 2; i = i + 2) {
     pipes[i/2].type = (comm_message_t) types_msg[i];
     if (types_msg[i + 1] == 0) { // the pipe is a read side
       pipes[i/2].fd_in = 1; // Set to actual fd in a hot minute
@@ -47,7 +48,7 @@ int requestFDS(int sock_fd, struct typed_pipe* pipes, int pipe_count) {
   }
 
   // recover pipe fds
-  for (int i = 0; i < pipe_count; i++) {
+  for (i = 0; i < pipe_count; i++) {
     if (pipes[i].fd_in != 0) {
       pipes[i].fd_in = ((int *)CMSG_DATA(cmsg))[i];
     } else {

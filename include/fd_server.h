@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "commtypes.h"
+ 
 struct server_data{
   struct sockaddr_un address;
   socklen_t address_length;

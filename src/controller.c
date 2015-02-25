@@ -4,7 +4,6 @@ extern void setPipeIndexes(void);
 extern void enterLoop(void);
 extern void testSDCHandler(int signo, siginfo_t *si, void *unused);
 
-extern cpu_speed_t cpu_speed;
 extern int priority;
 extern int pipe_count;
 extern struct typed_pipe pipes[];
@@ -29,7 +28,7 @@ int initReplica(void) {
     return -1;
   }
 
-  InitTAS(DEFAULT_CPU, &cpu_speed, priority);
+  InitTAS(DEFAULT_CPU, priority);
   
   return 0;
 }
@@ -41,6 +40,8 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
     printf("(%ld)\n", curr_time - parent_time);
   #endif
     
+  int index = 0;
+
   // fork
   pid_t currentPID = fork();
   
@@ -50,8 +51,8 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
       initReplica();
 
       // clean up pipes
-      for (int i = 0; i < pipe_count; i++) {
-        resetPipe(&pipes[i]);
+      for (index = 0; index < pipe_count; index++) {
+        resetPipe(&pipes[index]);
       }
 
       // unblock the signals (restart handler, inject SDC)

@@ -27,7 +27,6 @@ bool timer_started;
 struct replica replicas[REP_MAX];
 
 // TAS Stuff
-cpu_speed_t cpu_speed;
 int voter_priority;
 
 // FD server
@@ -52,7 +51,8 @@ int parseArgs(int argc, const char **argv);
 int main(int argc, const char **argv);
 void doOneUpdate();
 void processData(struct typed_pipe pipe, int pipe_index);
-void resetVotingState();
+void resetVotingState(int pipe_num);
+void resetVotingStateAll();
 void checkSend(int pipe_num, bool checkSDC);
 void processFromRep(int replica_num, int pipe_num);
 void restartReplica(int restarter, int restartee);
@@ -63,10 +63,11 @@ void timeout_sighandler(int signo, siginfo_t *si, void *unused) {
 }
 
 void startReplicas(void) {
+  int i;
   initReplicas(replicas, rep_count, controller_name, voter_priority + 5);
   createPipes(replicas, rep_count, ext_pipes, pipe_count);
   forkReplicas(replicas, rep_count);
-  for (int i = 0; i < rep_count; i++) {
+  for (i = 0; i < rep_count; i++) {
     if (acceptSendFDS(&sd, &(replicas[i].pid), replicas[i].rep_pipes, replicas[i].pipe_count) < 0) {
       printf("VoterD acceptSendFDS call failed\n");
       exit(-1);
@@ -74,8 +75,9 @@ void startReplicas(void) {
   }
 }
 
-void restartHandler() {
+void voterRestartHandler() {
   // Timer went off, so the timer_stop_index is the pipe which is awaiting a rep
+  int p_index, r_index, i;
 
   switch (rep_type) {
     case SMR:
@@ -85,7 +87,7 @@ void restartHandler() {
       startReplicas();
       
       // Resend last data
-      for (int p_index = 0; p_index < pipe_count; p_index++) {
+      for (p_index = 0; p_index < pipe_count; p_index++) {
         int read_fd = ext_pipes[p_index].fd_in;
         if (read_fd != 0) {
           processData(ext_pipes[p_index], p_index);    
@@ -96,7 +98,7 @@ void restartHandler() {
     case DMR:
       // Same as TMR
     case TMR:
-      for (int r_index = 0; r_index < rep_count; r_index++) {
+      for (r_index = 0; r_index < rep_count; r_index++) {
         if (replicas[r_index].voted[timer_stop_index] == false) {
 
           // This is the failed replica, restart it
@@ -108,7 +110,7 @@ void restartHandler() {
 
           // Send along the response from the other two replicas.
           // also copy over the previous vote state and pipe buffers
-          for (int i = 0; i < replicas[restarter].pipe_count; i++) {
+          for (i = 0; i < replicas[restarter].pipe_count; i++) {
             replicas[restartee].voted[i] = replicas[restarter].voted[i];
             memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
             replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
@@ -121,13 +123,14 @@ void restartHandler() {
 }
 
 void cleanupReplica(int rep_index) {
+  int i;
   // Kill old replica
   kill(replicas[rep_index].pid, SIGKILL); // Make sure it is dead.
   waitpid(-1, NULL, WNOHANG); // cleans up the zombie // Actually doesn't // Well, now it does.
 
   
   // cleanup replica data structure
-  for (int i = 0; i < replicas[rep_index].pipe_count; i++) {
+  for (i = 0; i < replicas[rep_index].pipe_count; i++) {
     if (replicas[rep_index].vot_pipes[i].fd_in > 0) {
       close(replicas[rep_index].vot_pipes[i].fd_in);
     }
@@ -181,7 +184,7 @@ int initVoterD() {
   struct sigevent sev;
   sigset_t mask;
 
-  InitTAS(DEFAULT_CPU, &cpu_speed, voter_priority);
+  InitTAS(DEFAULT_CPU, voter_priority);
 
   // timeout_fd
   if (pipe(timeout_fd) == -1) {
@@ -213,7 +216,7 @@ int initVoterD() {
   // Setup fd server
   createFDS(&sd, controller_name);
 
-  resetVotingState();
+  resetVotingStateAll();
  
   startReplicas();
   
@@ -221,9 +224,10 @@ int initVoterD() {
 }
 
 int parseArgs(int argc, const char **argv) {
+  int i;
   int required_args = 5; // voter name, controller name, rep_type, timeout and priority
-  controller_name = const_cast<char*>(argv[1]);
-  rep_type = reptypeToEnum(const_cast<char*>(argv[2]));
+  controller_name = (char*) (argv[1]);
+  rep_type = reptypeToEnum((char*)(argv[2]));
   rep_count = rep_type;
   voting_timeout = atoi(argv[3]);
   voter_priority = atoi(argv[4]);
@@ -242,7 +246,7 @@ int parseArgs(int argc, const char **argv) {
         // puts("Usage: VoterD <controller_name> <rep_type> <timeout> <priority> <message_type:fd_in:fd_out> <...>");
     // return -1;
   } else {
-    for (int i = 0; (i < argc - required_args && i < PIPE_LIMIT); i++) {
+    for (i = 0; (i < argc - required_args && i < PIPE_LIMIT); i++) {
       deserializePipe(argv[i + required_args], &ext_pipes[pipe_count]);
       pipe_count++;
     }
@@ -250,7 +254,7 @@ int parseArgs(int argc, const char **argv) {
       printf("VoterD: Raise pipe limit.\n");
     }
   
-    for (int i = 0; i < pipe_count; i++) {
+    for (i = 0; i < pipe_count; i++) {
       if (ext_pipes[i].timed) {
         if (ext_pipes[i].fd_in != 0) {
           timer_start_index = i;
@@ -283,6 +287,7 @@ int main(int argc, const char **argv) {
 }
 
 void doOneUpdate() {
+  int p_index, r_index;
   int retval = 0;
 
   struct timeval select_timeout;
@@ -296,15 +301,15 @@ void doOneUpdate() {
   // Check for timeouts
   FD_SET(timeout_fd[0], &select_set);
   // Check external in pipes
-  for (int p_index = 0; p_index < pipe_count; p_index++) {
+  for (p_index = 0; p_index < pipe_count; p_index++) {
     if (ext_pipes[p_index].fd_in != 0) {
       int e_pipe_fd = ext_pipes[p_index].fd_in;
       FD_SET(e_pipe_fd, &select_set);
     }
   }
   // Check pipes from replicas
-  for (int r_index = 0; r_index < rep_count; r_index++) {
-    for (int p_index = 0; p_index < replicas[r_index].pipe_count; p_index++) {
+  for (r_index = 0; r_index < rep_count; r_index++) {
+    for (p_index = 0; p_index < replicas[r_index].pipe_count; p_index++) {
       int rep_pipe_fd = replicas[r_index].vot_pipes[p_index].fd_in;
       if (rep_pipe_fd != 0) {
         FD_SET(rep_pipe_fd, &select_set);      
@@ -321,14 +326,14 @@ void doOneUpdate() {
       retval = read(timeout_fd[0], timeout_byte, 1);
       if (retval > 0) {
         //printf("Restarting Rep.\n");
-        restartHandler();
+        voterRestartHandler();
       } else {
         // TODO: Do I care about this?
       }
     }
     
     // Check for data from external sources
-    for (int p_index = 0; p_index < pipe_count; p_index++) {
+    for (p_index = 0; p_index < pipe_count; p_index++) {
       int read_fd = ext_pipes[p_index].fd_in;
       if (read_fd != 0) {
         if (FD_ISSET(read_fd, &select_set)) {
@@ -339,8 +344,8 @@ void doOneUpdate() {
     }
 
     // Check all replicas for data
-    for (int r_index = 0; r_index < rep_count; r_index++) {
-      for (int p_index = 0; p_index < replicas[r_index].pipe_count; p_index++) {
+    for (r_index = 0; r_index < rep_count; r_index++) {
+      for (p_index = 0; p_index < replicas[r_index].pipe_count; p_index++) {
         struct typed_pipe* curr_pipe = &(replicas[r_index].vot_pipes[p_index]);
         if (curr_pipe->fd_in !=0) {
           if (FD_ISSET(curr_pipe->fd_in, &select_set)) {
@@ -355,6 +360,7 @@ void doOneUpdate() {
 ////////////////////////////////////////////////////////////////////////////////
 // Process data
 void processData(struct typed_pipe pipe, int pipe_index) {
+  int r_index;
   if (pipe_index == timer_start_index) {
     if (!timer_started) {
       timer_started = true;
@@ -370,7 +376,7 @@ void processData(struct typed_pipe pipe, int pipe_index) {
     }
   }
 
-  for (int r_index = 0; r_index < rep_count; r_index++) {
+  for (r_index = 0; r_index < rep_count; r_index++) {
     int written = write(replicas[r_index].vot_pipes[pipe_index].fd_out, pipe.buffer, pipe.buff_count);
     if (written != pipe.buff_count) {
       printf("VoterD: bytes written: %d\texpected: %d\n", written, pipe.buff_count);
@@ -382,20 +388,23 @@ void processData(struct typed_pipe pipe, int pipe_index) {
 ////////////////////////////////////////////////////////////////////////////////
 // reset / init voting state
 void resetVotingState(int pipe_num) {
-  for (int r_index = 0; r_index < rep_count; r_index++) {
+  int r_index;
+  for (r_index = 0; r_index < rep_count; r_index++) {
     replicas[r_index].voted[pipe_num] = false;
   }
 }
 
-void resetVotingState() {
-  for (int p_index = 0; p_index < pipe_count; p_index++) {
+void resetVotingStateAll() {
+  int p_index;
+  for (p_index = 0; p_index < pipe_count; p_index++) {
     resetVotingState(p_index);
   }
 }
 
 void checkSend(int pipe_num, bool checkSDC) {
+  int r_index, i;
   bool all_reporting = true;
-  for (int r_index = 0; r_index < rep_count; r_index++) {
+  for (r_index = 0; r_index < rep_count; r_index++) {
     // Check that all have reported
     all_reporting = all_reporting && replicas[r_index].voted[pipe_num];
   }
@@ -453,7 +462,7 @@ void checkSend(int pipe_num, bool checkSDC) {
     case TMR:
       // Send the solution that at least two agree on
       // TODO: What if buff_count is off?
-      for (int r_index = 0; r_index < rep_count; r_index++) {
+      for (r_index = 0; r_index < rep_count; r_index++) {
         if (memcmp(replicas[r_index].vot_pipes[pipe_num].buffer,
                    replicas[(r_index+1) % rep_count].vot_pipes[pipe_num].buffer,
                    replicas[r_index].vot_pipes[pipe_num].buff_count) == 0) {
@@ -469,7 +478,7 @@ void checkSend(int pipe_num, bool checkSDC) {
               restartReplica(r_index, restartee);
 
               // TODO: This is similar to code in the restart timeout handler
-              for (int i = 0; i < replicas[r_index].pipe_count; i++) {
+              for (i = 0; i < replicas[r_index].pipe_count; i++) {
                 replicas[restartee].voted[i] = replicas[r_index].voted[i];
                 memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[r_index].vot_pipes[i].buffer, replicas[r_index].vot_pipes[i].buff_count);
                 replicas[restartee].vot_pipes[i].buff_count = replicas[r_index].vot_pipes[i].buff_count;
