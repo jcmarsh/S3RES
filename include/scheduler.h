@@ -29,11 +29,7 @@ typedef enum {
 } sched_error_e;
 
 // test
-sched_error_e sched_set_realtime_policy( const pid_t pid, int priority, const int offset ); // keep
-
-sched_error_e sched_get_realtime_min_priority( int priority ); // kleep
-
-sched_error_e sched_get_realtime_max_priority( int priority ); // keep
+sched_error_e sched_set_realtime_policy( const pid_t pid, int *priority, const int offset ); // keep
 
 //-----------------------------------------------------------------------------
 

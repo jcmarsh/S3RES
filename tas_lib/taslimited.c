@@ -29,7 +29,7 @@ void call_setrlimit(int id, rlim_t c, rlim_t m)
 
 int InitTAS(cpu_id_t cpu, int prio_offset) {
   pid_t pid;
-  int priority; // TODO: This is only passed to scheduler call?
+  int priority; // TODO: This is never read, could at least check to see if call succeeded.
   int result;
 
   pid = getpid();
@@ -46,9 +46,9 @@ int InitTAS(cpu_id_t cpu, int prio_offset) {
   // Set Realtime Scheduling
   // set the process to be scheduled with realtime policy and max priority              
   //  priority = priority - 5; // running max priority is bad? testing. AHHH DOING THIS WRONG
-  result = sched_set_realtime_policy( pid, priority, prio_offset + 5);
+  result = sched_set_realtime_policy( pid, &priority, prio_offset + 5);
   if( result != SCHED_ERROR_NONE ) {
-    printf("(voter_d_driver) InitTAS() failed calling schedule_set_realtime_max(pid,priority): %d\n", result);
+    printf("InitTAS() failed calling schedule_set_realtime_policy(pid %d, priority %d, offset %d): %d\n", pid, priority, prio_offset + 5, result);
   }
 }
 
