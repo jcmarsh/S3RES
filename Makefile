@@ -2,6 +2,7 @@ all: regular
 
 regular: 
 	make -C ./controllers
+	make -C ./stage_control
 	make -C ./plumber
 	make -C ./fault_injection
 	make -C ./micro_test
@@ -14,6 +15,7 @@ install:
 
 clean:
 	make -C ./controllers clean
+	make -C ./stage_control clean
 	make -C ./plumber clean
 	make -C ./fault_injection clean
 	make -C ./micro_test clean
