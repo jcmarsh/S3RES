@@ -1,7 +1,11 @@
 SRC=../src/commtypes.c ../src/replicas.c ../src/fd_server.c ../voter/vote_buff.c
 INC=-I../include/
 
-all: Controllers MapperTest FilterTest FilterVoteTest ArtPotTest AStarTest EmptyTest #LoadTest
+all: comp vote
+
+comp: Controllers MapperTest FilterTest ArtPotTest AStarTest EmptyTest #LoadTest
+
+vote: Controllers Voters FilterVoteTest ArtPotVoteTest
 
 %.o: %.c
 	gcc -c -o $@ $< $(INC)
@@ -12,6 +16,11 @@ Micro:
 Controllers:
 	make -C ../controllers
 
+Voters:
+	make -C ../voter
+	cp ../voter/VoterM ./
+	cp ../voter/VoterD ./
+
 MapperTest: mapper_test.o $(SRC)
 	gcc -o MapperTest mapper_test.o $(SRC) -lrt -lTASLimited
 	cp ../controllers/Mapper ./
@@ -21,15 +30,15 @@ FilterTest: filter_test.o $(SRC)
 	cp ../controllers/Filter ./
 
 FilterVoteTest: filter_vote_test.o $(SRC)
-	make -C ../voter
-	cp ../voter/VoterM ./
-	cp ../voter/VoterD ./
 	gcc -o FilterVoteTest filter_vote_test.o $(SRC) -lrt -lTASLimited
 	cp ../controllers/Filter ./
 
-
 ArtPotTest: art_pot_test.o $(SRC)
 	gcc -o ArtPotTest art_pot_test.o $(SRC) -lrt -lTASLimited
+	cp ../controllers/ArtPot ./
+
+ArtPotVoteTest: art_pot_vote_test.o $(SRC)
+	gcc -o ArtPotVoteTest art_pot_vote_test.o $(SRC) -lrt -lTASLimited
 	cp ../controllers/ArtPot ./
 
 AStarTest: a_star_test.o $(SRC)
@@ -56,9 +65,12 @@ clean:
 	rm -rf FilterTest
 	rm -rf FilterVoteTest
 	rm -rf FilterTest_fd_server
+	rm -rf Filter_fd_server
 	rm -rf Filter
 	rm -rf ArtPotTest
+	rm -rf ArtPotVoteTest
 	rm -rf ArtPotTest_fd_server
+	rm -rf ArtPot_fd_server
 	rm -rf ArtPot
 	rm -rf AStarTest
 	rm -rf AStarTest_fd_server
