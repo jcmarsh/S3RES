@@ -24,8 +24,8 @@ int main(int argc, const char **argv) {
   }
 
   // Create client for the sim commands and connect
-  //  sim_client = playerc_client_create(0, "161.253.66.53", 6665);
-  sim_client = playerc_client_create(0, "127.0.0.1", 6665);
+  sim_client = playerc_client_create(0, "161.253.66.53", 6665);
+  //sim_client = playerc_client_create(0, "127.0.0.1", 6665);
   if (0 != playerc_client_connect(sim_client)) {
     return -1;
   }
