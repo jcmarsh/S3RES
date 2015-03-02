@@ -216,7 +216,7 @@ void sendWaypoints(void) {
 
   pop(&goal_path); // trash closest
   current_goal = pop(&goal_path);
-  if (current_goal == NULL) {
+  if (current_goal == NULL) { // TODO: these contingences never happen.
     commSendWaypoints(pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
   } else {
     goal_p = degridify(current_goal->x, current_goal->y);
@@ -282,7 +282,7 @@ void enterLoop(void) {
         read_ret = read(pipes[way_req_index].fd_in, &recv_msg_req, sizeof(struct comm_way_req));
         if (read_ret > 0 && !update_sent) {
           if (goal_path->head == NULL) {
-            commSendWaypoints(pipes[way_res_index], -7.0, -7.0, 0.0, -7.0, -7.0, 0.0);
+            commSendWaypoints(pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
           } else {
             sendWaypoints();
           }

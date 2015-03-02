@@ -11,13 +11,13 @@
 
 // Configuration parameters
 #define VEL_SCALE 1
-#define DIST_EPSILON .4
+#define DIST_EPSILON .5
 #define GOAL_RADIUS 0
 #define GOAL_EXTENT .5
 #define GOAL_SCALE 1
 #define OBST_RADIUS .1
-#define OBST_EXTENT .5
-#define OBST_SCALE 1.5
+#define OBST_EXTENT .70
+#define OBST_SCALE 1
 
 #define PIPE_COUNT 4
 
