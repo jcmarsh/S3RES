@@ -78,19 +78,11 @@ int main(int argc, const char **argv) {
   while(1) {
     usleep(1000);
     // Calculate velocity and minimum distance from an obstacle.
-    // I hope that this is accurate.
-    // For velocity I will also need to track time. Lame.
-    // Should also check distance from start and from goal to trigger the start of the stats and the end.
-
-    // check if haven't start or already done
-
-    // Velocity
-    // read data
 
     long current_time = playerc_simulation_get_time(simulation, 0);
     double pos_x, pos_y, pos_a;
     playerc_simulation_get_pose2d(simulation, "hank", &pos_x, &pos_y, &pos_a);
-    printf("Pos at time %ld is (%f, %f) - %f\n", current_time, pos_x, pos_y, pos_a);
+    //printf("Pos at time %ld is (%f, %f) - %f\n", current_time, pos_x, pos_y, pos_a);
 
     if (dist(pos_x, pos_y, START_X, START_Y) < DIST_EPS) {
       // nothing, too close to start
@@ -98,13 +90,10 @@ int main(int argc, const char **argv) {
       // nothing, too close to end
     } else {
       // calc velocity
+      double distance = -1;
       if (prev_x != -999) {
-        double distance = dist(prev_x, prev_y, pos_x, pos_y);
-        printf("Velocity = %f\n", distance / (current_time - prev_time));
+        distance = dist(prev_x, prev_y, pos_x, pos_y);
       }
-      prev_time = current_time;
-      prev_x = pos_x;
-      prev_y = pos_y;
 
       // obstacle distance
       // Read data
@@ -116,12 +105,17 @@ int main(int argc, const char **argv) {
         }
       }
 
-      // print if all
-      printf("Min dist: %f\n", min); 
+      printf("Velocity = %f\tMin dist = %f\n", (distance / (current_time - prev_time) * 1000 * 1000), min); 
+      
+      prev_time = current_time;
+      prev_x = pos_x;
+      prev_y = pos_y;
     }
   }
 
   // Shutdown
+  playerc_client_disconnect(robot_client);
+  playerc_client_destroy(robot_client);
   playerc_client_disconnect(sim_client);
   playerc_client_destroy(sim_client);
 
