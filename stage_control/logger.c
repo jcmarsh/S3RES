@@ -72,27 +72,32 @@ int main(int argc, const char **argv) {
   // end todo
 
   int index = 0;
-  long prev_time = playerc_simulation_get_time(simulation, 0); // TODO: in msec?
+  double prev_time = robot_client->datatime;
   double prev_x = -999, prev_y = -999;
-  printf("Previous time = %ld\n", prev_time);
+
   while(1) {
     usleep(1000);
     // Calculate velocity and minimum distance from an obstacle.
 
-    long current_time = playerc_simulation_get_time(simulation, 0);
+    //long current_time = playerc_simulation_get_time(simulation, 0);
     double pos_x, pos_y, pos_a;
     playerc_simulation_get_pose2d(simulation, "hank", &pos_x, &pos_y, &pos_a);
-    //printf("Pos at time %ld is (%f, %f) - %f\n", current_time, pos_x, pos_y, pos_a);
+    double current_time = robot_client->datatime;
+    // printf("Pos at time %f is (%f, %f) - %f\n", current_time, pos_x, pos_y, pos_a);
 
     if (dist(pos_x, pos_y, START_X, START_Y) < DIST_EPS) {
       // nothing, too close to start
-    } else if (dist(pos_x, pos_y, GOAL_X, GOAL_Y) < DIST_EPS) {
+    } else if (dist(pos_x, pos_y, GOAL_X, GOAL_Y) < DIST_EPS + .8) { // Robot stops short
+      prev_x = -999;
+      prev_y = -999;
       // nothing, too close to end
     } else {
       // calc velocity
       double distance = -1;
       if (prev_x != -999) {
         distance = dist(prev_x, prev_y, pos_x, pos_y);
+      } else {
+	printf("Start of new run\n");
       }
 
       // obstacle distance
@@ -105,8 +110,9 @@ int main(int argc, const char **argv) {
         }
       }
 
-      printf("Velocity = %f\tMin dist = %f\n", (distance / (current_time - prev_time) * 1000 * 1000), min); 
-      
+      //printf("Velocity = %f\tMin dist = %f\n", distance / (current_time - prev_time), min); 
+      printf("(%f,\t%f)\n", distance / (current_time - prev_time), min); 
+
       prev_time = current_time;
       prev_x = pos_x;
       prev_y = pos_y;
