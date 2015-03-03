@@ -111,7 +111,9 @@ int main(int argc, const char **argv) {
       }
 
       //printf("Velocity = %f\tMin dist = %f\n", distance / (current_time - prev_time), min); 
-      printf("(%f,\t%f)\n", distance / (current_time - prev_time), min); 
+      if ((distance / (current_time - prev_time)) >= 0) { // prevent velocity from being reported with only one reading
+	printf("(%f,\t%f,\t%f,\t%f)\n", distance / (current_time - prev_time), min, pos_x, pos_y); 
+      }
 
       prev_time = current_time;
       prev_x = pos_x;
