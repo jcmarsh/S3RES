@@ -48,7 +48,7 @@ void setPipeIndexes(void) {
 
   way_req_index = -1;
   way_res_index = -1;
-  for (i = 0; i < PIPE_COUNT; i++) {
+  for (i = 0; i < pipe_count; i++) {
     switch (pipes[i].type) {
       case RANGE_POSE_DATA:
         data_index = i;
@@ -78,7 +78,10 @@ int parseArgs(int argc, const char **argv) {
   priority = atoi(argv[1]);
   if (argc < 4) { // Must request fds
     pid_t currentPID = getpid();
-    if (connectRecvFDS(currentPID, pipes, PIPE_COUNT, name) < 0) {
+    // TODO: plumber should pass number of pipes even if it will connectFDS.
+    // This would solve problems with using in different configs
+    pipe_count = 4;
+    if (connectRecvFDS(currentPID, pipes, pipe_count, name) < 0) {
       printf("Error in %s: failed on connectRecvFDS call. Exiting.\n", name);
       exit(-1);
     }
@@ -157,7 +160,12 @@ void command(void) {
   
     vel_cmd[0] = sqrt(pow(delta_x, 2) + pow(delta_y, 2));
     vel_cmd[1] = atan2(delta_y, delta_x);
-    vel_cmd[0] = VEL_SCALE * vel_cmd[0] * (abs(M_PI - vel_cmd[1]) / M_PI);
+    // TODO: Need to make sure we don't get stuck on 180degree turns...
+    if (fabs(M_PI - vel_cmd[1]) > 2) { // Only go forward if mostly pointed at goal
+      vel_cmd[0] = VEL_SCALE * vel_cmd[0];
+    } else {
+      vel_cmd[0] = 0.0;
+    }
     vel_cmd[1] = VEL_SCALE * vel_cmd[1];
   } else { // within distance epsilon. And already tried next goal.
     vel_cmd[0] = 0.0;

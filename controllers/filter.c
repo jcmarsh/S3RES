@@ -48,8 +48,9 @@ int parseArgs(int argc, const char **argv) {
   if (argc < 4) { // Must request fds
     // printf("Usage: Filter <pipe_in> <pipe_out_0> <pipe_out_1>\n");
     pid_t currentPID = getpid();
+    // TODO: Seriously, this needs to be passed by plumber... er the voter. Whatever.
+    pipe_count = 3; //PIPE_COUNT;
     connectRecvFDS(currentPID, pipes, PIPE_COUNT, name);
-    pipe_count = PIPE_COUNT;
   } else {
     deserializePipe(argv[2], &pipes[data_index]);
     deserializePipe(argv[3], &pipes[average_index]);
