@@ -10,13 +10,13 @@
 #include "../include/controller.h"
 
 // Configuration parameters
-#define VEL_SCALE 1
-#define DIST_EPSILON .5
+#define VEL_SCALE 2
+#define DIST_EPSILON .6
 #define GOAL_RADIUS 0
 #define GOAL_EXTENT .5
 #define GOAL_SCALE 1
-#define OBST_RADIUS .1
-#define OBST_EXTENT .70
+#define OBST_RADIUS .3
+#define OBST_EXTENT .5
 #define OBST_SCALE 1
 
 #define PIPE_COUNT 4
