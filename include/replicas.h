@@ -30,7 +30,7 @@ struct replica {
   int pipe_count;
   struct typed_pipe vot_pipes[PIPE_LIMIT]; // Voter side of pipes
   struct typed_pipe rep_pipes[PIPE_LIMIT]; // rep side of pipes
-  bool voted[PIPE_LIMIT];
+  int voted[PIPE_LIMIT];
 
   // Possibly put a pointer to entry function
   replica_status status;

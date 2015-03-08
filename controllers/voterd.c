@@ -75,6 +75,18 @@ void startReplicas(void) {
   }
 }
 
+// return the index of the rep that is furthest behind in voting
+int behindRep(int pipe_num) {
+  int r_index = 0;
+  int mostBehind = r_index;
+  for (r_index = 0; r_index < rep_count; r_index++) {
+    if (replicas[r_index].voted[pipe_num] < replicas[mostBehind].voted[pipe_num]) {
+      mostBehind = r_index;
+    }
+  }
+  return mostBehind;
+}
+
 void voterRestartHandler() {
   // Timer went off, so the timer_stop_index is the pipe which is awaiting a rep
   int p_index, r_index, i;
@@ -97,28 +109,23 @@ void voterRestartHandler() {
       return;
     case DMR:
       // Same as TMR
-    case TMR:
-      for (r_index = 0; r_index < rep_count; r_index++) {
-        if (replicas[r_index].voted[timer_stop_index] == false) {
+    case TMR: ; // the semicolon is needed becasue C.
+      // This is the failed replica, restart it (it's most behind, so probably the failed rep...)
+      // TODO: This bit might be wrong.... should really have per rep watchdogs.
+      int restartee = behindRep(timer_stop_index);
+      int restarter = (restartee + (rep_count - 1)) % rep_count;
+      
+      restartReplica(restarter, restartee);
 
-          // This is the failed replica, restart it
-          // Send a signal to the rep's friend
-          int restarter = (r_index + (rep_count - 1)) % rep_count;
-          int restartee = r_index;
-
-          restartReplica(restarter, restartee);
-
-          // Send along the response from the other two replicas.
-          // also copy over the previous vote state and pipe buffers
-          for (i = 0; i < replicas[restarter].pipe_count; i++) {
-            replicas[restartee].voted[i] = replicas[restarter].voted[i];
-            memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
-            replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
-            checkSend(i, false); // DO NOT check for SDC (one has failed)
-          }
-          return;
-        }
+      // Send along the response from the other two replicas.
+      // also copy over the previous vote state and pipe buffers
+      for (i = 0; i < replicas[restarter].pipe_count; i++) {
+        replicas[restartee].voted[i] = replicas[restarter].voted[i];
+        memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
+        replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
+        checkSend(i, false); // DO NOT check for SDC (one has failed)
       }
+      return;
   }
 }
 
@@ -254,6 +261,7 @@ int parseArgs(int argc, const char **argv) {
       printf("VoterD: Raise pipe limit.\n");
     }
   
+    // Need to have a similar setup to associate vote pipe with input?
     for (i = 0; i < pipe_count; i++) {
       if (ext_pipes[i].timed) {
         if (ext_pipes[i].fd_in != 0) {
@@ -325,7 +333,7 @@ void doOneUpdate() {
     if (FD_ISSET(timeout_fd[0], &select_set)) {
       retval = read(timeout_fd[0], timeout_byte, 1);
       if (retval > 0) {
-        //printf("Restarting Rep.\n");
+        printf("Restarting Rep. due to timeout. Name %s\n", controller_name);
         voterRestartHandler();
       } else {
         // TODO: Do I care about this?
@@ -376,7 +384,22 @@ void processData(struct typed_pipe pipe, int pipe_index) {
     }
   }
 
+  // TODO: See issue #9 Right now this only works for AStar algorithm.
+  int starting = 0; //behindRep(pipe_index + 2); // most behind rep gets data first
+  if (controller_name[1] == 'S') { // && replicas[0].vot_pipes[pipe_index].type == MAP_UPDATE) {
+    starting = behindRep(3);
+    //printf("word from the votes 3: %d, %d, %d\t Choice: %d\n", replicas[0].voted[3], replicas[1].voted[3], replicas[2].voted[3], starting);
+  }
   for (r_index = 0; r_index < rep_count; r_index++) {
+    int dontcare = 0;
+    if (controller_name[1] == 'S') {
+      if (r_index == starting) {
+        sched_set_realtime_policy(replicas[r_index].pid, &dontcare, voter_priority - 1 + 5);
+      } else {
+        sched_set_realtime_policy(replicas[r_index].pid, &dontcare, voter_priority + 5);
+      }
+    }
+    
     int written = write(replicas[r_index].vot_pipes[pipe_index].fd_out, pipe.buffer, pipe.buff_count);
     if (written != pipe.buff_count) {
       printf("VoterD: bytes written: %d\texpected: %d\n", written, pipe.buff_count);
@@ -390,7 +413,7 @@ void processData(struct typed_pipe pipe, int pipe_index) {
 void resetVotingState(int pipe_num) {
   int r_index;
   for (r_index = 0; r_index < rep_count; r_index++) {
-    replicas[r_index].voted[pipe_num] = false;
+    replicas[r_index].voted[pipe_num] = 0;
   }
 }
 
@@ -406,7 +429,8 @@ void checkSend(int pipe_num, bool checkSDC) {
   bool all_reporting = true;
   for (r_index = 0; r_index < rep_count; r_index++) {
     // Check that all have reported
-    all_reporting = all_reporting && replicas[r_index].voted[pipe_num];
+    all_reporting = all_reporting && 
+      (replicas[r_index].voted[pipe_num] == replicas[(r_index + 1) % rep_count].voted[pipe_num]);
   }
 
   if (!all_reporting) {
@@ -472,9 +496,8 @@ void checkSend(int pipe_num, bool checkSDC) {
             if (memcmp(replicas[r_index].vot_pipes[pipe_num].buffer,
                        replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num].buffer,
                        replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
-              //printf("Voting disagreement: caught SDC on pipe: %d\n", pipe_num);
-
               int restartee = (r_index + 2) % rep_count;
+              printf("Voting disagreement: caught SDC Name %s\t Rep %d\t Pipe %d\n", controller_name, restartee, pipe_num);
               restartReplica(r_index, restartee);
 
               // TODO: This is similar to code in the restart timeout handler
@@ -510,14 +533,11 @@ void processFromRep(int replica_num, int pipe_num) {
     perror("Failed to copy buffer\n");
   }
 
-  if (replicas[replica_num].voted[pipe_num] == true) {
-    // This happens when one of the reps has failed, but the watchdog has not expired yet. Other reps are responding to the next round of data.
-    // The old data is simply dropped, since new data is arriving. A solution sending the old result could be made, but a second set of buffers would be needed.
-    // TODO: It would be BAD if a rep sent a second response by accident.... this needs to be more robust.
-    //printf("ERROR: Replica already voted. Name %s\t Rep %d\t Pipe %d\n", controller_name, replica_num, pipe_num);
-    resetVotingState(pipe_num);
+  replicas[replica_num].voted[pipe_num]++;
+
+  if (replicas[replica_num].voted[pipe_num] > 50) {
+    printf("Run-away lag detected: %s - rep 0, 1, 2: %d, %d, %d\n", controller_name, replicas[0].voted[pipe_num], replicas[1].voted[pipe_num], replicas[2].voted[pipe_num]);
   }
-  replicas[replica_num].voted[pipe_num] = true;
 
   checkSend(pipe_num, true);
 }
