@@ -11,7 +11,7 @@
 
 #define RANGE_COUNT 16
 #define PIPE_COUNT 3
-#define OBS_THRES 3
+#define OBS_THRES 2
 
 struct typed_pipe pipes[PIPE_COUNT];
 int pipe_count = PIPE_COUNT;

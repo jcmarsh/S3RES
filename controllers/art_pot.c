@@ -161,7 +161,7 @@ void command(void) {
     vel_cmd[0] = sqrt(pow(delta_x, 2) + pow(delta_y, 2));
     vel_cmd[1] = atan2(delta_y, delta_x);
     // TODO: Need to make sure we don't get stuck on 180degree turns...
-    if (fabs(M_PI - vel_cmd[1]) > 2) { // Only go forward if mostly pointed at goal
+    if (fabs(M_PI - vel_cmd[1]) > 2.75) { // Only go forward if mostly pointed at goal
       vel_cmd[0] = VEL_SCALE * vel_cmd[0];
     } else {
       vel_cmd[0] = 0.0;

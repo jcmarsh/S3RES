@@ -168,8 +168,8 @@ void command(void) {
       if (findNode(closed_set, curr_neigh) != NULL) {
         // if neighbor in closed - already explored so skip
         free(curr_neigh);
-      } else {
-        double tent_g_score = curr_neigh->g_score + estDistance(curr_neigh->x, curr_neigh->y, current->x, current->y);
+      } else {        
+        double tent_g_score = current->g_score + estDistance(curr_neigh->x, curr_neigh->y, current->x, current->y);
         struct node_t* neigh_from_open = findNode(open_set, curr_neigh);
         if (neigh_from_open == NULL || tent_g_score < neigh_from_open->g_score) {
           curr_neigh->back_link = current;
@@ -195,7 +195,7 @@ void command(void) {
     struct node_t *node_b = peek(goal_path, 1);
     if (nodeEqauls(node_a, current_goal) && nodeEqauls(node_b, n_current_goal)) {
       // don't send
-    } else {  
+    } else {
       sendWaypoints();
       update_sent = true;
     }

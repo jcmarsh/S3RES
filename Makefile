@@ -8,7 +8,7 @@ regular:
 	make -C ./micro_test
 	make -C ./test
 
-install:
+install: regular
 	make -C ./controllers copy
 	make -C ./plumber copy
 	make -C ./fault_injection copy
