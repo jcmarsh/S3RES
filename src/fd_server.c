@@ -49,7 +49,7 @@ int sendFDS(int connection_fd, struct typed_pipe* pipes, int pipe_count) { // pi
     }
   }
 
-  int retval = sendmsg(connection_fd, &hdr, 0);
+  int retval = TEMP_FAILURE_RETRY(sendmsg(connection_fd, &hdr, 0));
 
   if(retval < 0) {
     perror("FD_server sendmsg() failed");
@@ -112,9 +112,11 @@ int acceptSendFDS(struct server_data * sd, pid_t *pid, struct typed_pipe* pipes,
   int connection_fd;
   int retval = 0;
 
-  if ((connection_fd = accept(sd->sock_fd, (struct sockaddr *) &(sd->address), &(sd->address_length))) > -1) {
+  connection_fd = TEMP_FAILURE_RETRY(accept(sd->sock_fd, (struct sockaddr *) &(sd->address), &(sd->address_length)));
+  if (connection_fd > -1) {
     // send read end to client
     if (sendFDS(connection_fd, pipes, pipe_count) < 0) {
+      perror("FD_Server failed to sendFDS");
       retval = -1;
       goto accept_send_FDS_out;
     }
@@ -125,7 +127,7 @@ int acceptSendFDS(struct server_data * sd, pid_t *pid, struct typed_pipe* pipes,
   }
 
   // read pid
-  retval = read(connection_fd, pid, sizeof(pid_t));
+  retval = TEMP_FAILURE_RETRY(read(connection_fd, pid, sizeof(pid_t)));
   if (retval != sizeof(pid_t)) {
     perror("FD_Server failed to read pid");
     retval = -1;

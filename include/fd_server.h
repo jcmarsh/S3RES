@@ -3,6 +3,11 @@
  *
  * James Marshall May 3 2014
  */
+
+#define _GNU_SOURCE 1
+
+#include <error.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <linux/un.h>
 #include <sys/socket.h>

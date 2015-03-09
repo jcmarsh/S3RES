@@ -29,7 +29,7 @@ int requestFDS(int sock_fd, struct typed_pipe* pipes, int pipe_count) {
   hdr.msg_control = cmsg;
   hdr.msg_controllen = CMSG_LEN(sizeof(int) * pipe_count);
 
-  retval = recvmsg(sock_fd, &hdr, 0);
+  retval = TEMP_FAILURE_RETRY(recvmsg(sock_fd, &hdr, 0));
   if (retval < 0) {
     perror("FD_client: RECVMSG error");
     return -1;
@@ -98,7 +98,7 @@ int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const ch
   }
   //snprintf(address.sun_path, UNIX_PATH_MAX, actual_name);
   
-  if(connect(sock_fd, (struct sockaddr *) &address, sizeof(struct sockaddr_un)) != 0) {
+  if(TEMP_FAILURE_RETRY(connect(sock_fd, (struct sockaddr *) &address, sizeof(struct sockaddr_un))) != 0) {
     perror("Replica connect() failed");
     retval = -1;
     goto connect_recv_FDS_sock_out;
@@ -110,7 +110,7 @@ int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const ch
   }
 
   // Send pid
-  if (write(sock_fd, &pid, sizeof(pid_t)) < 0) {
+  if (TEMP_FAILURE_RETRY(write(sock_fd, &pid, sizeof(pid_t))) < 0) {
     perror("FD_client write for pid failed");
     retval = -1;
   }
