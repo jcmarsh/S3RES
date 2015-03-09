@@ -4,6 +4,8 @@
  * James Marshall
  */
 
+#include "../include/commtypes.h"
+
 #include <assert.h>
 #include <math.h>
 #include <signal.h>
@@ -18,7 +20,6 @@
 #include "../include/bench_config.h"
 #include "../include/taslimited.h"
 #include "../include/replicas.h"
-#include "../include/commtypes.h"
 
 // Replica related data
 struct replica replica;
@@ -108,8 +109,8 @@ void enterLoop() {
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
       if (FD_ISSET(trans_pipes[0].fd_in, &select_set)) {
-        retval = read(trans_pipes[0].fd_in, &range_pose_data_msg, sizeof(struct comm_range_pose_data));
-        if (retval > 0) {
+        retval = TEMP_FAILURE_RETRY(read(trans_pipes[0].fd_in, &range_pose_data_msg, sizeof(struct comm_range_pose_data)));
+        if (retval == sizeof(struct comm_range_pose_data)) {
           if (waiting_response) {
             printf("ERROR, sending data but still waiting on previous response.\n");
           }
@@ -119,18 +120,22 @@ void enterLoop() {
             last = generate_timestamp();
           #endif
 
-          if (write(replica.vot_pipes[0].fd_out, &range_pose_data_msg, sizeof(struct comm_range_pose_data)) != sizeof(struct comm_range_pose_data)) {
+          if (TEMP_FAILURE_RETRY(write(replica.vot_pipes[0].fd_out, &range_pose_data_msg, sizeof(struct comm_range_pose_data)) != sizeof(struct comm_range_pose_data))) {
             perror("BenchMarker failed range data write");
           }
+        } else if (retval > 0) {
+          printf("Bench pipe 0 read did no match expected size.\n");
+        } else if (retval < 0) {
+          perror("Bench - pipe 0 read problems");
         } else {
-          perror("Bench: read (from translator) should have worked"); // EINTR?
+          perror("Bench retval == 0 on pipe 0");
         }
       }
 
       if (FD_ISSET(replica.vot_pipes[1].fd_in, &select_set)) {
         // Second part of the cycle: response from replica
-        retval = read(replica.vot_pipes[1].fd_in, &mov_cmd_msg, sizeof(struct comm_mov_cmd));
-        if (retval > 0) {
+        retval = TEMP_FAILURE_RETRY(read(replica.vot_pipes[1].fd_in, &mov_cmd_msg, sizeof(struct comm_mov_cmd)));
+        if (retval == sizeof(struct comm_mov_cmd)) {
           waiting_response = false;
 
           #ifdef TIME_FULL_BENCH
@@ -139,11 +144,15 @@ void enterLoop() {
           #endif
 
           // data was set by read in enterLoop
-          if (write(trans_pipes[1].fd_out, &mov_cmd_msg, sizeof(struct comm_mov_cmd)) != sizeof(struct comm_mov_cmd)) {
+          if (TEMP_FAILURE_RETRY(write(trans_pipes[1].fd_out, &mov_cmd_msg, sizeof(struct comm_mov_cmd)) != sizeof(struct comm_mov_cmd))) {
             perror("Bencmarker failed mov_cmd write");
           }
+        } else if (retval > 0) {
+          printf("Bench pipe 1 read did no match expected size.\n");
+        } else if (retval < 0) {
+          perror("Bench - pipe 1 read problems");
         } else {
-          perror("Bench: read (from replica) should have worked"); // EINTR?
+          perror("Bench retval == 0 on pipe 1");
         }
       }
     }

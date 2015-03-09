@@ -8,7 +8,7 @@ author: James Taylor : jrt@gwu.edu
 #define _CPU_H_
 
 //-----------------------------------------------------------------------------
-#define _GNU_SOURCE
+//#define _GNU_SOURCE
 
 #include <sys/types.h>
 

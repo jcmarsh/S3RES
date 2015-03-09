@@ -5,13 +5,14 @@
  * Author - James Marshall
  */
 
+#include "../include/controller.h"
+ 
 #include <assert.h>
 #include <signal.h>
 #include <string.h>
 #include <sys/wait.h>
 #include <time.h>
 
-#include "../include/controller.h"
 #include "../include/replicas.h"
 #include "../include/fd_server.h"
 
@@ -59,7 +60,7 @@ void restartReplica(int restarter, int restartee);
 void cleanupReplica(int rep_index);
 
 void timeout_sighandler(int signo, siginfo_t *si, void *unused) {
-  assert(write(timeout_fd[1], timeout_byte, 1) == 1);
+  assert(TEMP_FAILURE_RETRY(write(timeout_fd[1], timeout_byte, 1) == 1));
 }
 
 void startReplicas(void) {
@@ -331,12 +332,13 @@ void doOneUpdate() {
   if (retval > 0) {
     // Check for failed replica (time out)
     if (FD_ISSET(timeout_fd[0], &select_set)) {
-      retval = read(timeout_fd[0], timeout_byte, 1);
-      if (retval > 0) {
+      retval = TEMP_FAILURE_RETRY(read(timeout_fd[0], timeout_byte, 1));
+      if (retval > 0) { // Only one byte, so I can't imagine how that could be interrupted.
         printf("Restarting Rep. due to timeout. Name %s\n", controller_name);
         voterRestartHandler();
       } else {
-        // TODO: Do I care about this?
+        printf("Voter - Controller %s\n", controller_name);
+        perror("Voter - read error on timeout pipe");
       }
     }
     
@@ -345,8 +347,16 @@ void doOneUpdate() {
       int read_fd = ext_pipes[p_index].fd_in;
       if (read_fd != 0) {
         if (FD_ISSET(read_fd, &select_set)) {
-          ext_pipes[p_index].buff_count = read(read_fd, ext_pipes[p_index].buffer, MAX_PIPE_BUFF);
-          processData(ext_pipes[p_index], p_index);
+          ext_pipes[p_index].buff_count = TEMP_FAILURE_RETRY(read(read_fd, ext_pipes[p_index].buffer, MAX_PIPE_BUFF));
+          if (ext_pipes[p_index].buff_count > 0) { // TODO: read may still have been interrupted
+            processData(ext_pipes[p_index], p_index);
+          } else if (ext_pipes[p_index].buff_count < 0) {
+            printf("Voter - Controller %s pipe %d\n", controller_name, p_index);
+            perror("Voter - read error on external pipe");
+          } else {
+            printf("Voter - Controller %s pipe %d\n", controller_name, p_index);
+            perror("Voter - read == 0 on external pipe");
+          }
         }
       }
     }
@@ -362,6 +372,21 @@ void doOneUpdate() {
         }
       }
     }
+  }
+}
+
+void writeBuffer(int fd_out, char** buffer, int buff_count) {
+  int retval = TEMP_FAILURE_RETRY(write(fd_out, buffer, buff_count));
+  if (retval == buff_count) {
+    // success, do nothing
+  } else if (retval > 0) { // TODO: resume write? 
+    printf("Voter for %s, pipe %d, bytes written: %d\texpected: %d\n", controller_name, fd_out, retval, buff_count);
+    perror("Voter wrote partial message");
+  } else if (retval < 0) {
+    printf("Voter for %s failed write fd: %d\n", controller_name, fd_out);
+    perror("Voter write");
+  } else {
+    printf("Voter wrote == 0 for %s fd: %d\n", controller_name, fd_out);
   }
 }
 
@@ -400,11 +425,7 @@ void processData(struct typed_pipe pipe, int pipe_index) {
       }
     }
     
-    int written = write(replicas[r_index].vot_pipes[pipe_index].fd_out, pipe.buffer, pipe.buff_count);
-    if (written != pipe.buff_count) {
-      printf("VoterD: bytes written: %d\texpected: %d\n", written, pipe.buff_count);
-      perror("VoterD failed write to replica\n");
-    }
+    writeBuffer(replicas[r_index].vot_pipes[pipe_index].fd_out, pipe.buffer, pipe.buff_count);
   }
 }
 
@@ -417,7 +438,7 @@ void resetVotingState(int pipe_num) {
   }
 }
 
-void resetVotingStateAll() {
+void resetVotingStateAll(void) {
   int p_index;
   for (p_index = 0; p_index < pipe_count; p_index++) {
     resetVotingState(p_index);
@@ -454,21 +475,13 @@ void checkSend(int pipe_num, bool checkSDC) {
   switch (rep_type) {
     case SMR: 
       // Only one rep, so pretty much have to trust it
-      retval = write(ext_pipes[pipe_num].fd_out, replicas[0].vot_pipes[pipe_num].buffer,
-                        replicas[0].vot_pipes[pipe_num].buff_count);
-      if (retval == 0) {
-        perror("Seriously Voter?");
-      }
+      writeBuffer(ext_pipes[pipe_num].fd_out, replicas[0].vot_pipes[pipe_num].buffer, replicas[0].vot_pipes[pipe_num].buff_count);
       
       resetVotingState(pipe_num);
       return;
     case DMR:
       // Can detect, and check what to do
-      retval = write(ext_pipes[pipe_num].fd_out, replicas[0].vot_pipes[pipe_num].buffer,
-                        replicas[0].vot_pipes[pipe_num].buff_count);
-      if (retval == 0) {
-        perror("Seriously Voter?");
-      }
+      writeBuffer(ext_pipes[pipe_num].fd_out, replicas[0].vot_pipes[pipe_num].buffer, replicas[0].vot_pipes[pipe_num].buff_count);
 
       if (checkSDC) {
         if (memcmp(replicas[0].vot_pipes[pipe_num].buffer,
@@ -511,11 +524,7 @@ void checkSend(int pipe_num, bool checkSDC) {
           }
           resetVotingState(pipe_num);
 
-          retval = write(ext_pipes[pipe_num].fd_out, replicas[r_index].vot_pipes[pipe_num].buffer,
-                replicas[r_index].vot_pipes[pipe_num].buff_count);
-          if (retval == 0) {
-            perror("Seriously Voter?");
-          }
+          writeBuffer(ext_pipes[pipe_num].fd_out, replicas[r_index].vot_pipes[pipe_num].buffer, replicas[r_index].vot_pipes[pipe_num].buff_count);
           return;
         } 
       }
@@ -528,16 +537,20 @@ void checkSend(int pipe_num, bool checkSDC) {
 // Process output from replica; vote on it
 void processFromRep(int replica_num, int pipe_num) {
   struct typed_pipe* curr_pipe = &(replicas[replica_num].vot_pipes[pipe_num]);
-  curr_pipe->buff_count = read(curr_pipe->fd_in, curr_pipe->buffer, MAX_PIPE_BUFF);
-  if (curr_pipe->buff_count <= 0) {
-    perror("Failed to copy buffer\n");
+  curr_pipe->buff_count = TEMP_FAILURE_RETRY(read(curr_pipe->fd_in, curr_pipe->buffer, MAX_PIPE_BUFF));
+  // TODO: Read may have been interrupted
+  if (curr_pipe->buff_count > 0) {
+    replicas[replica_num].voted[pipe_num]++;
+    if (replicas[replica_num].voted[pipe_num] > 1) {
+      printf("Run-away lag detected: %s - rep 0, 1, 2: %d, %d, %d\n", controller_name, replicas[0].voted[pipe_num], replicas[1].voted[pipe_num], replicas[2].voted[pipe_num]);
+    }
+
+    checkSend(pipe_num, true);
+  } else if (curr_pipe->buff_count < 0) {
+    printf("Voter - Controller %s, rep %d, pipe %d\n", controller_name, replica_num, pipe_num);
+    perror("Voter - read problem on internal pipe");
+  } else {
+    printf("Voter - Controller %s, rep %d, pipe %d\n", controller_name, replica_num, pipe_num);
+    perror("Voter - read == 0 on internal pipe");
   }
-
-  replicas[replica_num].voted[pipe_num]++;
-
-  if (replicas[replica_num].voted[pipe_num] > 50) {
-    printf("Run-away lag detected: %s - rep 0, 1, 2: %d, %d, %d\n", controller_name, replicas[0].voted[pipe_num], replicas[1].voted[pipe_num], replicas[2].voted[pipe_num]);
-  }
-
-  checkSend(pipe_num, true);
 }

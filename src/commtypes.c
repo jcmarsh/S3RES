@@ -100,7 +100,7 @@ int commSendWaypoints(struct typed_pipe pipe,
   msg.n_point[INDEX_Y] = n_way_y;
   msg.n_point[INDEX_A] = n_way_a;
 
-  return write(pipe.fd_out, &msg, sizeof(struct comm_way_res));
+  return TEMP_FAILURE_RETRY(write(pipe.fd_out, &msg, sizeof(struct comm_way_res)));
 }
 
 void commCopyWaypoints(struct comm_way_res * recv_msg, double * waypoints, double * n_waypoints) {
@@ -123,7 +123,7 @@ int commSendWaypointRequest(struct typed_pipe pipe) {
   struct comm_way_req send_msg;
   memset(&send_msg, 0, sizeof(struct comm_way_req));
 
-  return write(pipe.fd_out, &send_msg, sizeof(struct comm_way_req));
+  return TEMP_FAILURE_RETRY(write(pipe.fd_out, &send_msg, sizeof(struct comm_way_req)));
 }
 
 
@@ -139,7 +139,7 @@ int commSendMoveCommand(struct typed_pipe pipe, double vel_0, double vel_1) {
   msg.vel_cmd[0] = vel_0;
   msg.vel_cmd[1] = vel_1;
 
-  return write(pipe.fd_out, &msg, sizeof(struct comm_mov_cmd));
+  return TEMP_FAILURE_RETRY(write(pipe.fd_out, &msg, sizeof(struct comm_mov_cmd)));
 }
 
 int commSendMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg) {
@@ -166,7 +166,7 @@ int commSendMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg) {
     }
   }
   
-  return write(pipe.fd_out, buffer, sizeof(int) * buff_count);
+  return TEMP_FAILURE_RETRY(write(pipe.fd_out, buffer, sizeof(int) * buff_count));
 }
 
 int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_data) {
@@ -187,7 +187,7 @@ int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_d
     msg.pose[index] = pose_data[index];
   }
 
-  return write(pipe.fd_out, &msg, sizeof(struct comm_range_pose_data));
+  return TEMP_FAILURE_RETRY(write(pipe.fd_out, &msg, sizeof(struct comm_range_pose_data)));
 }
 
 int commSendAck(struct typed_pipe pipe) {
@@ -199,7 +199,7 @@ int commSendAck(struct typed_pipe pipe) {
   struct comm_ack msg;
   memset(&msg, 0, sizeof(struct comm_ack));
 
-  return write(pipe.fd_out, &msg, sizeof(struct comm_ack));
+  return TEMP_FAILURE_RETRY(write(pipe.fd_out, &msg, sizeof(struct comm_ack)));
 }
 
 void commCopyRanger(struct comm_range_pose_data * recv_msg, double * range_data, double * pose_data) {

@@ -1,8 +1,9 @@
+#include "../include/commtypes.h"
+
 #include <signal.h>
 
 #include "../include/bench_config.h"
 #include "../include/taslimited.h"
-#include "../include/commtypes.h"
 #include "../include/fd_client.h"
 
 #define TIMEOUT_SIGNAL SIGRTMIN + 0 // The voter's watchdog timer

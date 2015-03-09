@@ -4,9 +4,10 @@
  * James Marshall
  */
 
+#include "../include/controller.h"
+
 #include <math.h>
 
-#include "../include/controller.h"
 #include "../include/mapping.h"
 
 #define PIPE_COUNT 4
@@ -257,8 +258,8 @@ void enterLoop(void) {
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
       if (FD_ISSET(pipes[updates_index].fd_in, &select_set)) {
-        read_ret = read(pipes[updates_index].fd_in, &recv_msg_buffer, sizeof(recv_msg_buffer));
-        if (read_ret > 0) {
+        read_ret = TEMP_FAILURE_RETRY(read(pipes[updates_index].fd_in, &recv_msg_buffer, sizeof(recv_msg_buffer)));
+        if (read_ret > 0) { // TODO: Read may still have been interrupted.
           pose->x = recv_msg_buffer[0];
           pose->y = recv_msg_buffer[1];
           int obs_index = 3;
@@ -272,24 +273,24 @@ void enterLoop(void) {
           if (recv_msg_buffer[2] > 0) { // New obstacle arrived
             command(); // will set update_sent to true if that is the case.            
           }
-        } else if (read_ret == -1) {
-          perror("AStar - read blocking");
+        } else if (read_ret < 0) {
+          perror("AStar - read error on updates_index");
         } else {
-          perror("AStar read_ret == 0?");
+          perror("AStar read_ret == 0 on updates_index");
         }
       }
       if (FD_ISSET(pipes[way_req_index].fd_in, &select_set)) {
-        read_ret = read(pipes[way_req_index].fd_in, &recv_msg_req, sizeof(struct comm_way_req));
+        read_ret = TEMP_FAILURE_RETRY(read(pipes[way_req_index].fd_in, &recv_msg_req, sizeof(struct comm_way_req)));
         if (read_ret > 0 && !update_sent) {
           if (goal_path->head == NULL) {
             commSendWaypoints(pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
           } else {
             sendWaypoints();
           }
-        } else if (read_ret == -1) {
-          perror("AStar - read blocking");
+        } else if (read_ret < 0) {
+          perror("AStar - read error on way_req_index");
         } else if (read_ret == 0) {
-          perror("AStar read_ret == 0?");
+          perror("AStar read_ret == 0 on way_req_index");
         }
       }  
     }

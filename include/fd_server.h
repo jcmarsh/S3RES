@@ -4,10 +4,8 @@
  * James Marshall May 3 2014
  */
 
-#define _GNU_SOURCE 1
+#include "commtypes.h"
 
-#include <error.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <linux/un.h>
 #include <sys/socket.h>
@@ -15,7 +13,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "commtypes.h"
  
 struct server_data{
   struct sockaddr_un address;

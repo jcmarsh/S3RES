@@ -5,9 +5,8 @@
  * James Marshall
  */
 
-#include <math.h>
-
 #include "../include/controller.h"
+#include <math.h>
 
 // Configuration parameters
 #define VEL_SCALE 2
@@ -157,11 +156,11 @@ void command(void) {
 
     delta_x = delta_x / total_factors;
     delta_y = delta_y / total_factors;
-  
+
     vel_cmd[0] = sqrt(pow(delta_x, 2) + pow(delta_y, 2));
     vel_cmd[1] = atan2(delta_y, delta_x);
-    // TODO: Need to make sure we don't get stuck on 180degree turns...
-    if (fabs(M_PI - vel_cmd[1]) > 2.75) { // Only go forward if mostly pointed at goal
+
+    if (fabs(vel_cmd[1]) < 1) { // Only go forward if mostly pointed at goal
       vel_cmd[0] = VEL_SCALE * vel_cmd[0];
     } else {
       vel_cmd[0] = 0.0;
@@ -202,28 +201,30 @@ void enterLoop(void) {
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
       if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
-        read_ret = read(pipes[data_index].fd_in, &recv_msg_data, sizeof(struct comm_range_pose_data));
-        if (read_ret > 0) {
-          // TODO check for erros
+        read_ret = TEMP_FAILURE_RETRY(read(pipes[data_index].fd_in, &recv_msg_data, sizeof(struct comm_range_pose_data)));
+        if (read_ret == sizeof(struct comm_range_pose_data)) {
           commCopyRanger(&recv_msg_data, ranges, pos);
           // Calculates and sends the new command
           command();
+        } else if (read_ret > 0) {
+          printf("ArtPot read data_index did not match expected size.\n");
         } else if (read_ret < 0) {
-          perror("ArtPot - read problems");
+          perror("ArtPot - read data_index problems");
         } else {
-          perror("ArtPot read_ret == 0?");
+          perror("ArtPot read_ret == 0 on data_index");
         }
       }
       if (PIPE_COUNT == pipe_count) {
         if (FD_ISSET(pipes[way_res_index].fd_in, &select_set)) {
-          read_ret = read(pipes[way_res_index].fd_in, &recv_msg_way, sizeof(struct comm_way_res));
-          if (read_ret > 0) {
-            // TODO check for erros
+          read_ret = TEMP_FAILURE_RETRY(read(pipes[way_res_index].fd_in, &recv_msg_way, sizeof(struct comm_way_res)));
+          if (read_ret == sizeof(struct comm_way_res)) {
             commCopyWaypoints(&recv_msg_way, goal, next_goal);
+          } else if (read_ret > 0) {
+            printf("ArtPot read way_res_index did not match expected size.\n");
           } else if (read_ret < 0) {
-            perror("ArtPot - read problems");
+            perror("ArtPot - read way_res_index problems");
           } else {
-            perror("ArtPot read_ret == 0?");
+            perror("ArtPot read_ret == 0 on way_res_index");
           } 
         }
       }

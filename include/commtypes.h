@@ -5,6 +5,10 @@
 #ifndef _COMM_TYPES_H_
 #define _COMM_TYPES_H_
 
+#define _GNU_SOURCE 1
+#include <error.h>
+#include <errno.h>
+
 #include <stdbool.h>
 #include <unistd.h>
 

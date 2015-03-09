@@ -1,10 +1,12 @@
-#include "../include/cpu.h"
+
+#define _GNU_SOURCE
 
 #include <sched.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "../include/cpu.h"
 #include "../include/time.h"
 
 //-----------------------------------------------------------------------------
