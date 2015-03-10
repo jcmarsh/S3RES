@@ -6,7 +6,7 @@
  */
 
 #include "../include/controller.h"
- 
+
 #include <assert.h>
 #include <signal.h>
 #include <string.h>
@@ -18,6 +18,7 @@
 
 #define REP_MAX 3
 #define PERIOD_NSEC 120000 // Max time for voting in nanoseconds (120 micro seconds)
+#define VOTER_PRIO_OFFSET 20 // Replicas run with a +20 offset (low prio)
 
 long voting_timeout;
 int timer_start_index;
@@ -65,7 +66,7 @@ void timeout_sighandler(int signo, siginfo_t *si, void *unused) {
 
 void startReplicas(void) {
   int i;
-  initReplicas(replicas, rep_count, controller_name, voter_priority + 5);
+  initReplicas(replicas, rep_count, controller_name, voter_priority + VOTER_PRIO_OFFSET);
   createPipes(replicas, rep_count, ext_pipes, pipe_count);
   forkReplicas(replicas, rep_count);
   for (i = 0; i < rep_count; i++) {
@@ -86,6 +87,17 @@ int behindRep(int pipe_num) {
     }
   }
   return mostBehind;
+}
+
+int aheadRep(int pipe_num) {
+  int r_index = 0;
+  int mostAhead = r_index;
+  for (r_index = 0; r_index < rep_count; r_index++) {
+    if (replicas[r_index].voted[pipe_num] > replicas[mostAhead].voted[pipe_num]) {
+      mostAhead= r_index;
+    }
+  }
+  return mostAhead;
 }
 
 void voterRestartHandler() {
@@ -175,7 +187,7 @@ void restartReplica(int restarter, int restartee) {
   }
 
   // re-init failed rep, create pipes
-  initReplicas(&(replicas[restartee]), 1, controller_name, voter_priority + 5);
+  initReplicas(&(replicas[restartee]), 1, controller_name, voter_priority + VOTER_PRIO_OFFSET);
   createPipes(&(replicas[restartee]), 1, ext_pipes, pipe_count);
   // send new pipe through fd server (should have a request)
 
@@ -390,6 +402,33 @@ void writeBuffer(int fd_out, char** buffer, int buff_count) {
   }
 }
 
+void balanceReps(void) {
+  int starting = 0; //behindRep(pipe_index + 2); // most behind rep gets data first
+  int gap = 0;
+  int index = 0;
+  for (index = 0; index < pipe_count; index++) {
+    if (replicas[0].vot_pipes[index].fd_in != 0) { // out from the rep, in to the voter
+      if ((replicas[aheadRep(index)].voted[index] - 0) > gap) { //replicas[behindRep(i)].voted[i]) > gap) {
+        gap = replicas[aheadRep(index)].voted[index] - 0; //replicas[behindRep(i)].voted[i];
+        starting = behindRep(index);
+      }
+    }
+  }
+
+  for (index = 0; index < rep_count; index++) {    
+    int dontcare = 0;
+    if (index == starting) {
+      if (sched_set_realtime_policy(replicas[index].pid, &dontcare, voter_priority - 1 + VOTER_PRIO_OFFSET) != 0) {
+        printf("Voter error call sched_set_realtime_policy for %s, priority %d\n", controller_name, voter_priority - 1 + VOTER_PRIO_OFFSET);
+      }
+    } else {
+      if (sched_set_realtime_policy(replicas[index].pid, &dontcare, voter_priority + VOTER_PRIO_OFFSET) != 0) {
+        printf("Voter error call sched_set_realtime_policy for %s, priority %d\n", controller_name, voter_priority + VOTER_PRIO_OFFSET);
+      }
+    }
+  }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Process data
 void processData(struct typed_pipe pipe, int pipe_index) {
@@ -409,22 +448,9 @@ void processData(struct typed_pipe pipe, int pipe_index) {
     }
   }
 
-  // TODO: See issue #9 Right now this only works for AStar algorithm.
-  int starting = 0; //behindRep(pipe_index + 2); // most behind rep gets data first
-  if (controller_name[1] == 'S') { // && replicas[0].vot_pipes[pipe_index].type == MAP_UPDATE) {
-    starting = behindRep(3);
-    //printf("word from the votes 3: %d, %d, %d\t Choice: %d\n", replicas[0].voted[3], replicas[1].voted[3], replicas[2].voted[3], starting);
-  }
+  //balanceReps();
+
   for (r_index = 0; r_index < rep_count; r_index++) {
-    int dontcare = 0;
-    if (controller_name[1] == 'S') {
-      if (r_index == starting) {
-        sched_set_realtime_policy(replicas[r_index].pid, &dontcare, voter_priority - 1 + 5);
-      } else {
-        sched_set_realtime_policy(replicas[r_index].pid, &dontcare, voter_priority + 5);
-      }
-    }
-    
     writeBuffer(replicas[r_index].vot_pipes[pipe_index].fd_out, pipe.buffer, pipe.buff_count);
   }
 }
@@ -539,10 +565,14 @@ void processFromRep(int replica_num, int pipe_num) {
   struct typed_pipe* curr_pipe = &(replicas[replica_num].vot_pipes[pipe_num]);
   curr_pipe->buff_count = TEMP_FAILURE_RETRY(read(curr_pipe->fd_in, curr_pipe->buffer, MAX_PIPE_BUFF));
   // TODO: Read may have been interrupted
+
+  balanceReps();
+
   if (curr_pipe->buff_count > 0) {
     replicas[replica_num].voted[pipe_num]++;
+
     if (replicas[replica_num].voted[pipe_num] > 1) {
-      printf("Run-away lag detected: %s - rep 0, 1, 2: %d, %d, %d\n", controller_name, replicas[0].voted[pipe_num], replicas[1].voted[pipe_num], replicas[2].voted[pipe_num]);
+      printf("Run-away lag detected: %s pipe - %d - rep 0, 1, 2: %d, %d, %d\n", controller_name, pipe_num, replicas[0].voted[pipe_num], replicas[1].voted[pipe_num], replicas[2].voted[pipe_num]);
     }
 
     checkSend(pipe_num, true);

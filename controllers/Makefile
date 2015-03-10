@@ -17,7 +17,7 @@ regular:
 	gcc $(FLAGS) -o VoterD voterd.c ../src/commtypes.c ../src/replicas.c ../src/fd_server.c ../src/fd_client.c $(LIB)
 	gcc $(FLAGS) -o Min min.c ../src/commtypes.c ../src/replicas.c
 
-copy: regular
+copy:
 	cp ArtPot ../../stage/experiments/
 	cp AStar ../../stage/experiments/
 	cp BenchMarker ../../stage/experiments/

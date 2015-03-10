@@ -13,7 +13,6 @@
 #define PIPE_COUNT 4
 
 bool obstacle_map[GRID_NUM][GRID_NUM];
-bool update_sent = false;
 
 // Controller state
 struct point_i* goal;
@@ -198,7 +197,6 @@ void command(void) {
       // don't send
     } else {
       sendWaypoints();
-      update_sent = true;
     }
   }
 }
@@ -269,9 +267,8 @@ void enterLoop(void) {
             obstacle_map[obs_x][obs_y] = true;
           }
           commSendAck(pipes[ack_index]);
-          update_sent = false;
           if (recv_msg_buffer[2] > 0) { // New obstacle arrived
-            command(); // will set update_sent to true if that is the case.            
+            command();
           }
         } else if (read_ret < 0) {
           perror("AStar - read error on updates_index");
@@ -281,7 +278,7 @@ void enterLoop(void) {
       }
       if (FD_ISSET(pipes[way_req_index].fd_in, &select_set)) {
         read_ret = TEMP_FAILURE_RETRY(read(pipes[way_req_index].fd_in, &recv_msg_req, sizeof(struct comm_way_req)));
-        if (read_ret > 0 && !update_sent) {
+        if (read_ret > 0) {
           if (goal_path->head == NULL) {
             commSendWaypoints(pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
           } else {
@@ -328,4 +325,3 @@ int main(int argc, const char **argv) {
 
   return 0;
 }
-

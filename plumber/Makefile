@@ -3,7 +3,7 @@ default: pb.l pb.y
 	flex pb.l
 	cc -g -o plumber ../src/commtypes.c plumbing.c pb.tab.c lex.yy.c -lfl
 
-copy: default
+copy:
 	cp plumber ../../stage/experiments/
 
 # It makes me cry that I am doing this hack.
