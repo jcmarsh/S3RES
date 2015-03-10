@@ -17,7 +17,6 @@ void initReplicas(struct replica reps[], int rep_num, const char* name, int prio
     memcpy(new_rep->name, name, strlen(name) + 1);
     new_rep->pid = -1;
     new_rep->priority = priority;
-    new_rep->status = RUNNING;
 
     // clean up pipes if this replica is not fresh
     if (new_rep->pipe_count != 0) {

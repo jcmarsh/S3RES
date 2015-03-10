@@ -13,12 +13,6 @@
 #include <stdio.h>
 #include "commtypes.h"
 
-typedef enum {
-  RUNNING,
-  CRASHED,
-  FINISHED
-} replica_status; 
-
  // Represents one redundant execution, implemented as a thread
 struct replica {
   pid_t pid; // The pid of the thread
@@ -31,9 +25,6 @@ struct replica {
   struct typed_pipe vot_pipes[PIPE_LIMIT]; // Voter side of pipes
   struct typed_pipe rep_pipes[PIPE_LIMIT]; // rep side of pipes
   int voted[PIPE_LIMIT];
-
-  // Possibly put a pointer to entry function
-  replica_status status;
 };  
 
 /*

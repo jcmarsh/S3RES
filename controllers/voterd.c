@@ -565,11 +565,9 @@ void processFromRep(int replica_num, int pipe_num) {
   struct typed_pipe* curr_pipe = &(replicas[replica_num].vot_pipes[pipe_num]);
   curr_pipe->buff_count = TEMP_FAILURE_RETRY(read(curr_pipe->fd_in, curr_pipe->buffer, MAX_PIPE_BUFF));
   // TODO: Read may have been interrupted
-
-  balanceReps();
-
   if (curr_pipe->buff_count > 0) {
     replicas[replica_num].voted[pipe_num]++;
+    balanceReps();
 
     if (replicas[replica_num].voted[pipe_num] > 1) {
       printf("Run-away lag detected: %s pipe - %d - rep 0, 1, 2: %d, %d, %d\n", controller_name, pipe_num, replicas[0].voted[pipe_num], replicas[1].voted[pipe_num], replicas[2].voted[pipe_num]);
