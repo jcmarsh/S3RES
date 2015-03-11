@@ -103,6 +103,7 @@ void command(void) {
   double dist, theta, delta_x, delta_y, v, tao, obs_x, obs_y;
   double vel_cmd[2];
   int total_factors, i;
+  bool request_way = false;
   
   // Head towards the goal! odom_pose: 0-x, 1-y, 2-theta
   dist = sqrt(pow(goal[INDEX_X] - pos[INDEX_X], 2)  + pow(goal[INDEX_Y] - pos[INDEX_Y], 2));
@@ -113,7 +114,7 @@ void command(void) {
     goal[INDEX_Y] = next_goal[INDEX_Y];
     goal[INDEX_A] = next_goal[INDEX_A];
 
-    commSendWaypointRequest(pipes[way_req_index]);
+    request_way = true;
 
     dist = sqrt(pow(goal[INDEX_X] - pos[INDEX_X], 2)  + pow(goal[INDEX_Y] - pos[INDEX_Y], 2));
     theta = atan2(goal[INDEX_Y] - pos[INDEX_Y], goal[INDEX_X] - pos[INDEX_X]) - pos[INDEX_A];
@@ -157,6 +158,11 @@ void command(void) {
     delta_x = delta_x / total_factors;
     delta_y = delta_y / total_factors;
 
+    //if ((fabs(delta_x) < .02) && (fabs(delta_y) < .02)) {
+    //  printf("We're just too close: %f, %f\n", delta_x, delta_y);
+    //  request_way = true;
+    //}
+
     vel_cmd[0] = sqrt(pow(delta_x, 2) + pow(delta_y, 2));
     vel_cmd[1] = atan2(delta_y, delta_x);
 
@@ -174,6 +180,10 @@ void command(void) {
   if (insertSDC) {
     insertSDC = false;
     vel_cmd[0] += 1;
+  }
+
+  if (request_way) {
+    commSendWaypointRequest(pipes[way_req_index]);
   }
 
   // Write move command

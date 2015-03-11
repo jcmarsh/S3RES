@@ -166,7 +166,11 @@ int commSendMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg) {
     }
   }
   
-  return TEMP_FAILURE_RETRY(write(pipe.fd_out, buffer, sizeof(int) * buff_count));
+  int written = TEMP_FAILURE_RETRY(write(pipe.fd_out, buffer, sizeof(int) * buff_count));
+  if (written != buff_count * sizeof(int)) { // TODO: more should check this
+    perror("Write for commSendMapUpdate did not complete.\n");
+  }
+  return written;
 }
 
 int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_data) {

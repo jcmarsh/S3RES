@@ -160,6 +160,11 @@ void command(void) {
       break;
     }
 
+    if (current == NULL) { // TODO: this shouldn't happen.
+      printf("How the #$*& did that happen?\n");
+      solution = false;
+      break;
+    }
     // add current to closedset
     addNode(&closed_set, current, estDistanceG(current->x, current->y));
     struct l_list_t *neighbors = genNeighbors(current);
@@ -197,6 +202,7 @@ void command(void) {
       // don't send
     } else {
       sendWaypoints();
+      //printMap(obstacle_map, goal_path);
     }
   }
 }
@@ -258,14 +264,26 @@ void enterLoop(void) {
       if (FD_ISSET(pipes[updates_index].fd_in, &select_set)) {
         read_ret = TEMP_FAILURE_RETRY(read(pipes[updates_index].fd_in, &recv_msg_buffer, sizeof(recv_msg_buffer)));
         if (read_ret > 0) { // TODO: Read may still have been interrupted.
-          pose->x = recv_msg_buffer[0];
-          pose->y = recv_msg_buffer[1];
-          int obs_index = 3;
-          for (index = 0; index < recv_msg_buffer[2]; index++) {
+          int ints_proced = 0;
+          //printf("AStar read %d bytes\n", read_ret);
+read_next:
+          pose->x = recv_msg_buffer[ints_proced++];
+          pose->y = recv_msg_buffer[ints_proced++];
+          int obs_count = ints_proced++;
+          int obs_index = ints_proced;
+          for (index = 0; index < recv_msg_buffer[obs_count]; index++) {
             int obs_x = recv_msg_buffer[obs_index + (index * 2)];
+            ints_proced++;
             int obs_y = recv_msg_buffer[obs_index + (index * 2 + 1)];
+            ints_proced++;
+            //printf("\tAStar received %d of %d: (%d, %d)\n", index, recv_msg_buffer[2], obs_x, obs_y);
             obstacle_map[obs_x][obs_y] = true;
           }
+          if ((ints_proced * sizeof(int)) < read_ret) {
+            goto read_next;
+          }
+          //printf("AStar read %d bytes and proced %ld\n", read_ret, (ints_proced * sizeof(int)));
+
           commSendAck(pipes[ack_index]);
           if (recv_msg_buffer[2] > 0) { // New obstacle arrived
             command();

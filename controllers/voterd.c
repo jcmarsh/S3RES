@@ -448,7 +448,7 @@ void processData(struct typed_pipe pipe, int pipe_index) {
     }
   }
 
-  //balanceReps();
+  balanceReps();
 
   for (r_index = 0; r_index < rep_count; r_index++) {
     writeBuffer(replicas[r_index].vot_pipes[pipe_index].fd_out, pipe.buffer, pipe.buff_count);
