@@ -170,6 +170,7 @@ int commSendMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg) {
   if (written != buff_count * sizeof(int)) { // TODO: more should check this
     perror("Write for commSendMapUpdate did not complete.\n");
   }
+
   return written;
 }
 
@@ -184,6 +185,7 @@ int commRecvMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg) {
   if (read_ret > 0) { // TODO: Read may still have been interrupted.
     int ints_processed = 0;
     int index = 0;
+    int msg_obs_index = 0;
     msg->obs_count = 0;
 
     //printf("AStar read %d bytes\n", read_ret);
@@ -193,15 +195,17 @@ read_next:
     msg->obs_count += recv_msg_buffer[ints_processed++];
     int obs_index = ints_processed;
     for (index = 0; index < recv_msg_buffer[obs_index - 1]; index++) {
-      msg->obs_x[obs_index + index] = recv_msg_buffer[obs_index + (index * 2)];
+      msg->obs_x[msg_obs_index] = recv_msg_buffer[obs_index + (index * 2)];
       ints_processed++;
-      msg->obs_y[obs_index + index] = recv_msg_buffer[obs_index + (index * 2 + 1)];
+      msg->obs_y[msg_obs_index] = recv_msg_buffer[obs_index + (index * 2 + 1)];
       ints_processed++;
+      msg_obs_index++;
     }
     if ((ints_processed * sizeof(int)) < read_ret) {
       goto read_next;
     }
   }
+
   return read_ret;
 }
 
