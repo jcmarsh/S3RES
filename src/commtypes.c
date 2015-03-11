@@ -173,6 +173,38 @@ int commSendMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg) {
   return written;
 }
 
+int commRecvMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg) {
+  if (pipe.fd_in == 0 || pipe.type != MAP_UPDATE) {
+    printf("commRecvMapUpdate Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe.type], pipe.fd_in);
+    return 0;
+  }
+  int recv_msg_buffer[MAX_PIPE_BUFF / sizeof(int)] = {0};
+
+  int read_ret = TEMP_FAILURE_RETRY(read(pipe.fd_in, &recv_msg_buffer, sizeof(recv_msg_buffer)));
+  if (read_ret > 0) { // TODO: Read may still have been interrupted.
+    int ints_processed = 0;
+    int index = 0;
+    msg->obs_count = 0;
+
+    //printf("AStar read %d bytes\n", read_ret);
+read_next:
+    msg->pose_x = recv_msg_buffer[ints_processed++];
+    msg->pose_y = recv_msg_buffer[ints_processed++];
+    msg->obs_count += recv_msg_buffer[ints_processed++];
+    int obs_index = ints_processed;
+    for (index = 0; index < recv_msg_buffer[obs_index - 1]; index++) {
+      msg->obs_x[obs_index + index] = recv_msg_buffer[obs_index + (index * 2)];
+      ints_processed++;
+      msg->obs_y[obs_index + index] = recv_msg_buffer[obs_index + (index * 2 + 1)];
+      ints_processed++;
+    }
+    if ((ints_processed * sizeof(int)) < read_ret) {
+      goto read_next;
+    }
+  }
+  return read_ret;
+}
+
 int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_data) {
   if (pipe.fd_out == 0 || pipe.type != RANGE_POSE_DATA) {
     printf("commSendRanger Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe.type], pipe.fd_out);

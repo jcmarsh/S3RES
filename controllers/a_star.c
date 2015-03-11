@@ -95,8 +95,8 @@ int parseArgs(int argc, const char **argv) {
   priority = atoi(argv[1]);
   if (argc < 6) {
     pid_t currentPID = getpid();
-    //connectRecvFDS(currentPID, pipes, PIPE_COUNT, "AStarTest"); // For test purposes
-    connectRecvFDS(currentPID, pipes, PIPE_COUNT, name);
+    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "AStarTest"); // For test purposes
+    //connectRecvFDS(currentPID, pipes, PIPE_COUNT, name);
     setPipeIndexes();
   } else {
     for (i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {
@@ -219,7 +219,7 @@ void sendWaypoints(void) {
   struct point_d *n_goal_p;
   struct point_d *goal_p;
 
-  pop(&goal_path); // trash closest
+  free(pop(&goal_path)); // trash closest
   current_goal = pop(&goal_path);
   if (current_goal == NULL) { // TODO: these contingences never happen.
     commSendWaypoints(pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
@@ -245,8 +245,12 @@ void sendWaypoints(void) {
 void enterLoop(void) {
   int index;
   int read_ret;
-  int recv_msg_buffer[MAX_PIPE_BUFF / sizeof(int)] = {0};
   struct comm_way_req recv_msg_req;
+  struct comm_map_update recv_map_update;
+  int obs_x[200] = {0}; // TODO: This isn't great... and should be checked I suppose.
+  int obs_y[200] = {0};
+  recv_map_update.obs_x = obs_x;
+  recv_map_update.obs_y = obs_y;
 
   struct timeval select_timeout;
   fd_set select_set;
@@ -262,30 +266,16 @@ void enterLoop(void) {
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
       if (FD_ISSET(pipes[updates_index].fd_in, &select_set)) {
-        read_ret = TEMP_FAILURE_RETRY(read(pipes[updates_index].fd_in, &recv_msg_buffer, sizeof(recv_msg_buffer)));
-        if (read_ret > 0) { // TODO: Read may still have been interrupted.
-          int ints_proced = 0;
-          //printf("AStar read %d bytes\n", read_ret);
-read_next:
-          pose->x = recv_msg_buffer[ints_proced++];
-          pose->y = recv_msg_buffer[ints_proced++];
-          int obs_count = ints_proced++;
-          int obs_index = ints_proced;
-          for (index = 0; index < recv_msg_buffer[obs_count]; index++) {
-            int obs_x = recv_msg_buffer[obs_index + (index * 2)];
-            ints_proced++;
-            int obs_y = recv_msg_buffer[obs_index + (index * 2 + 1)];
-            ints_proced++;
-            //printf("\tAStar received %d of %d: (%d, %d)\n", index, recv_msg_buffer[2], obs_x, obs_y);
-            obstacle_map[obs_x][obs_y] = true;
+        read_ret = commRecvMapUpdate(pipes[updates_index], &recv_map_update);
+        if (read_ret > 0) {
+          pose->x = recv_map_update.pose_x;
+          pose->y = recv_map_update.pose_y;
+          for (index = 0; index < recv_map_update.obs_count; index++) {
+            obstacle_map[recv_map_update.obs_x[index]][recv_map_update.obs_y[index]] = true;
           }
-          if ((ints_proced * sizeof(int)) < read_ret) {
-            goto read_next;
-          }
-          //printf("AStar read %d bytes and proced %ld\n", read_ret, (ints_proced * sizeof(int)));
-
           commSendAck(pipes[ack_index]);
-          if (recv_msg_buffer[2] > 0) { // New obstacle arrived
+          if (recv_map_update.obs_count > 0) { // New obstacle arrived
+            // TODO: Also command if waypoint requested
             command();
           }
         } else if (read_ret < 0) {
