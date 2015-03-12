@@ -15,6 +15,7 @@
 
 #include "../include/replicas.h"
 #include "../include/fd_server.h"
+#include "../include/scheduler.h"
 
 #define REP_MAX 3
 #define PERIOD_NSEC 120000 // Max time for voting in nanoseconds (120 micro seconds)
@@ -48,14 +49,15 @@ timer_t timerid;
 struct itimerspec its;
 
 // Functions!
-int initVoterD();
+int initVoterD(void);
 int parseArgs(int argc, const char **argv);
 int main(int argc, const char **argv);
-void doOneUpdate();
+void doOneUpdate(void);
 void processData(struct typed_pipe pipe, int pipe_index);
 void resetVotingState(int pipe_num);
-void resetVotingStateAll();
-void checkSend(int pipe_num, bool checkSDC);
+void resetVotingStateAll(void);
+void sendPipe(int pipe_num, int replica_num);
+void checkSDC(int pipe_num);
 void processFromRep(int replica_num, int pipe_num);
 void restartReplica(int restarter, int restartee);
 void cleanupReplica(int rep_index);
@@ -100,7 +102,7 @@ int aheadRep(int pipe_num) {
   return mostAhead;
 }
 
-void voterRestartHandler() {
+void voterRestartHandler(void) {
   // Timer went off, so the timer_stop_index is the pipe which is awaiting a rep
   int p_index, r_index, i;
 
@@ -123,21 +125,11 @@ void voterRestartHandler() {
     case DMR:
       // Same as TMR
     case TMR: ; // the semicolon is needed becasue C.
-      // This is the failed replica, restart it (it's most behind, so probably the failed rep...)
-      // TODO: This bit might be wrong.... should really have per rep watchdogs.
+      // The failed rep should be the one behind on the timer pipe
       int restartee = behindRep(timer_stop_index);
       int restarter = (restartee + (rep_count - 1)) % rep_count;
-      
-      restartReplica(restarter, restartee);
 
-      // Send along the response from the other two replicas.
-      // also copy over the previous vote state and pipe buffers
-      for (i = 0; i < replicas[restarter].pipe_count; i++) {
-        replicas[restartee].voted[i] = replicas[restarter].voted[i];
-        memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
-        replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
-        checkSend(i, false); // DO NOT check for SDC (one has failed)
-      }
+      restartReplica(restarter, restartee);
       return;
   }
 }
@@ -169,6 +161,16 @@ void cleanupReplica(int rep_index) {
 }
 
 void restartReplica(int restarter, int restartee) {
+  // Send along the response from the other two replicas.
+  // also copy over the previous vote state and pipe buffers
+  int i;
+  for (i = 0; i < replicas[restarter].pipe_count; i++) {
+    replicas[restartee].voted[i] = replicas[restarter].voted[i];
+    memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
+    replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
+    sendPipe(i, restarter);
+  }
+
   #ifdef TIME_RESTART_REPLICA
     timestamp_t last = generate_timestamp();
   #endif
@@ -200,7 +202,7 @@ void restartReplica(int restarter, int restartee) {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
-int initVoterD() {
+int initVoterD(void) {
   struct sigevent sev;
   sigset_t mask;
 
@@ -307,7 +309,7 @@ int main(int argc, const char **argv) {
   return 0;
 }
 
-void doOneUpdate() {
+void doOneUpdate(void) {
   int p_index, r_index;
   int retval = 0;
 
@@ -417,14 +419,21 @@ void balanceReps(void) {
 
   for (index = 0; index < rep_count; index++) {    
     int dontcare = 0;
+    int offset;
     if (index == starting) {
-      if (sched_set_realtime_policy(replicas[index].pid, &dontcare, voter_priority - 1 + VOTER_PRIO_OFFSET) != 0) {
-        printf("Voter error call sched_set_realtime_policy for %s, priority %d\n", controller_name, voter_priority - 1 + VOTER_PRIO_OFFSET);
-      }
+      offset = voter_priority - 1 + VOTER_PRIO_OFFSET;
     } else {
-      if (sched_set_realtime_policy(replicas[index].pid, &dontcare, voter_priority + VOTER_PRIO_OFFSET) != 0) {
-        printf("Voter error call sched_set_realtime_policy for %s, priority %d\n", controller_name, voter_priority + VOTER_PRIO_OFFSET);
-      }
+      offset = voter_priority + VOTER_PRIO_OFFSET;
+    }
+    int retval = sched_set_realtime_policy(replicas[index].pid, &dontcare, offset);
+    if (retval == 0) {
+      // Do nothing, worked fine.
+    } else if (retval == SCHED_ERROR_NOEXIST) {
+      printf("Voter restarting %s - %d, detected by scheduling failure\n", controller_name, index);
+      int restarter = (index + (rep_count - 1)) % rep_count;
+      restartReplica(restarter, index);
+    } else {
+      printf("Voter error call sched_set_realtime_policy for %s, priority %d, retval: %d\n", controller_name, offset, retval);
     }
   }
 }
@@ -471,19 +480,23 @@ void resetVotingStateAll(void) {
   }
 }
 
-void checkSend(int pipe_num, bool checkSDC) {
-  int r_index, i;
+bool allReporting(int pipe_num) {
   bool all_reporting = true;
+  int r_index;
   for (r_index = 0; r_index < rep_count; r_index++) {
     // Check that all have reported
     all_reporting = all_reporting && 
       (replicas[r_index].voted[pipe_num] == replicas[(r_index + 1) % rep_count].voted[pipe_num]);
   }
 
-  if (!all_reporting) {
+  return all_reporting;
+}
+
+void sendPipe(int pipe_num, int replica_num) {
+  if (!allReporting(pipe_num)) {
     return;
   }
-
+  
   if (pipe_num == timer_stop_index) {  
     // reset the timer
     its.it_interval.tv_sec = 0;
@@ -497,30 +510,32 @@ void checkSend(int pipe_num, bool checkSDC) {
     timer_started = false;
   }
 
-  int retval;
+  writeBuffer(ext_pipes[pipe_num].fd_out, replicas[replica_num].vot_pipes[pipe_num].buffer, replicas[replica_num].vot_pipes[pipe_num].buff_count);
+  
+  resetVotingState(pipe_num);
+}
+
+void checkSDC(int pipe_num) {
+  int r_index;
+
+  if (!allReporting(pipe_num)) {
+    return;
+  }
+
   switch (rep_type) {
     case SMR: 
       // Only one rep, so pretty much have to trust it
-      writeBuffer(ext_pipes[pipe_num].fd_out, replicas[0].vot_pipes[pipe_num].buffer, replicas[0].vot_pipes[pipe_num].buff_count);
-      
-      resetVotingState(pipe_num);
+      sendPipe(pipe_num, 0);
       return;
     case DMR:
       // Can detect, and check what to do
-      writeBuffer(ext_pipes[pipe_num].fd_out, replicas[0].vot_pipes[pipe_num].buffer, replicas[0].vot_pipes[pipe_num].buff_count);
-
-      if (checkSDC) {
-        if (memcmp(replicas[0].vot_pipes[pipe_num].buffer,
-                   replicas[1].vot_pipes[pipe_num].buffer,
-                   replicas[0].vot_pipes[pipe_num].buff_count) != 0) {
-          printf("Voting disagreement: caught SDC in DMR but can't do anything about it.\n");
-
-          // Can't restart so don't know which is wrong.
-          // restartReplica(r_index, (r_index + 2) % rep_count);
-        }
+      if (memcmp(replicas[0].vot_pipes[pipe_num].buffer,
+                 replicas[1].vot_pipes[pipe_num].buffer,
+                 replicas[0].vot_pipes[pipe_num].buff_count) != 0) {
+        printf("Voting disagreement: caught SDC in DMR but can't do anything about it.\n");
       }
-      
-      resetVotingState(pipe_num);
+
+      sendPipe(pipe_num, 0);
       return;
     case TMR:
       // Send the solution that at least two agree on
@@ -530,27 +545,18 @@ void checkSend(int pipe_num, bool checkSDC) {
                    replicas[(r_index+1) % rep_count].vot_pipes[pipe_num].buffer,
                    replicas[r_index].vot_pipes[pipe_num].buff_count) == 0) {
 
-          if (checkSDC) {
-            // If the third doesn't agree, it should be restarted.
-            if (memcmp(replicas[r_index].vot_pipes[pipe_num].buffer,
-                       replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num].buffer,
-                       replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
-              int restartee = (r_index + 2) % rep_count;
-              printf("Voting disagreement: caught SDC Name %s\t Rep %d\t Pipe %d\n", controller_name, restartee, pipe_num);
-              restartReplica(r_index, restartee);
+          // If the third doesn't agree, it should be restarted.
+          if (memcmp(replicas[r_index].vot_pipes[pipe_num].buffer,
+                     replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num].buffer,
+                     replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
+            int restartee = (r_index + 2) % rep_count;
+            printf("Voting disagreement: caught SDC Name %s\t Rep %d\t Pipe %d\n", controller_name, restartee, pipe_num);
 
-              // TODO: This is similar to code in the restart timeout handler
-              for (i = 0; i < replicas[r_index].pipe_count; i++) {
-                replicas[restartee].voted[i] = replicas[r_index].voted[i];
-                memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[r_index].vot_pipes[i].buffer, replicas[r_index].vot_pipes[i].buff_count);
-                replicas[restartee].vot_pipes[i].buff_count = replicas[r_index].vot_pipes[i].buff_count;
-                //checkSend(i, false); // DO NOT check for SDC (one has failed)
-              }
-            }
+            restartReplica(r_index, restartee);
+          } else {
+            // If all agree, send and be happy. Otherwise the send is done as part of the restart process
+            sendPipe(pipe_num, r_index);
           }
-          resetVotingState(pipe_num);
-
-          writeBuffer(ext_pipes[pipe_num].fd_out, replicas[r_index].vot_pipes[pipe_num].buffer, replicas[r_index].vot_pipes[pipe_num].buff_count);
           return;
         } 
       }
@@ -573,7 +579,7 @@ void processFromRep(int replica_num, int pipe_num) {
       printf("Run-away lag detected: %s pipe - %d - rep 0, 1, 2: %d, %d, %d\n", controller_name, pipe_num, replicas[0].voted[pipe_num], replicas[1].voted[pipe_num], replicas[2].voted[pipe_num]);
     }
 
-    checkSend(pipe_num, true);
+    checkSDC(pipe_num);
   } else if (curr_pipe->buff_count < 0) {
     printf("Voter - Controller %s, rep %d, pipe %d\n", controller_name, replica_num, pipe_num);
     perror("Voter - read problem on internal pipe");

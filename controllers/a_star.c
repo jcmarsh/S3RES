@@ -95,8 +95,8 @@ int parseArgs(int argc, const char **argv) {
   priority = atoi(argv[1]);
   if (argc < 6) {
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "AStarTest"); // For test purposes
-    //connectRecvFDS(currentPID, pipes, PIPE_COUNT, name);
+    //connectRecvFDS(currentPID, pipes, PIPE_COUNT, "AStarTest"); // For test purposes
+    connectRecvFDS(currentPID, pipes, PIPE_COUNT, name);
     setPipeIndexes();
   } else {
     for (i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {
@@ -286,7 +286,7 @@ void enterLoop(void) {
       }
       if (FD_ISSET(pipes[way_req_index].fd_in, &select_set)) {
         read_ret = TEMP_FAILURE_RETRY(read(pipes[way_req_index].fd_in, &recv_msg_req, sizeof(struct comm_way_req)));
-        if (read_ret > 0) {
+        if (read_ret > 0) { // TODO: Do these calls stack up?
           if (goal_path->head == NULL) {
             commSendWaypoints(pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
           } else {
