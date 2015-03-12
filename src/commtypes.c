@@ -220,7 +220,7 @@ int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_d
   struct comm_range_pose_data msg;
   memset(&msg, 0, sizeof(struct comm_range_pose_data));
 
-  for (index = 0; index < 16; index++) {
+  for (index = 0; index < RANGER_COUNT; index++) {
     msg.ranges[index] = ranger_data[index];
   }
   for (index = 0; index < 3; index++) {
@@ -245,7 +245,7 @@ int commSendAck(struct typed_pipe pipe) {
 void commCopyRanger(struct comm_range_pose_data * recv_msg, double * range_data, double * pose_data) {
   int index = 0;
 
-  for (index = 0; index < 16; index++) {
+  for (index = 0; index < RANGER_COUNT; index++) {
     range_data[index] = recv_msg->ranges[index];
   }
   for (index = 0; index < 3; index++) {

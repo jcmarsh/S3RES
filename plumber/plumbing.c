@@ -114,6 +114,7 @@ char* serializeRep(replication_t rep_type) {
 // TODO: compare to "forkSingleReplica" in replicas.cpp
 int launch_node(struct nodelist* nodes) {
 	pid_t currentPID = 0;
+
 	char** rep_argv;
 	// TODO: handle args
 	int i;
@@ -125,15 +126,18 @@ int launch_node(struct nodelist* nodes) {
 		int other_arg = 0;
 		if (curr->rep_strat == NONE) {
 			// launch with no replication
-			rep_count = 3 + curr->pipe_count;
+			rep_count = 4 + curr->pipe_count;
 			rep_argv = malloc(sizeof(char *) * rep_count);
 			rep_argv[0] = curr->value;
 			rep_argv[1] = curr->priority;
-			other_arg = 2;
+			if (asprintf(&(rep_argv[2]), "%d", curr->pipe_count) < 0) {
+				perror("Plumber failed arg pipe_num write");
+			}
+			other_arg = 3;
 			rep_argv[rep_count - 1] = NULL;
 		} else {
-			// launch with voter
-			int rep_count = 6 + curr->pipe_count;
+			// launch with voter // TODO: Add pipe count?
+			rep_count = 6 + curr->pipe_count;
 			rep_argv = malloc(sizeof(char *) * rep_count);
 			rep_argv[0] = curr->voter_name;
 			rep_argv[1] = curr->value;

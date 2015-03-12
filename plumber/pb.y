@@ -135,11 +135,12 @@ int main(int argc, char **argv) {
   }
 
   // fds are passed in as arguments
-  if (argc >= 4) {
-    deserializePipe(argv[2], &data_in);
-    deserializePipe(argv[3], &cmd_out);   
+  if (argc >= 5) {
+    // pipe num is passed in argv[2], but should always be 2
+    deserializePipe(argv[3], &data_in);
+    deserializePipe(argv[4], &cmd_out);
   } else {
-    printf("Usage: plumber <priority> <RANGE_POSE_DATA:fd_in:0> <MSG_CMD:0:fd_out>\n");
+    printf("Usage: plumber <priority> <pipe_num> <RANGE_POSE_DATA:fd_in:0> <MSG_CMD:0:fd_out>\n");
     printf("\tConfiguration file is: config_plumber.cfg\n");
     return(1);
   }

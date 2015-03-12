@@ -38,12 +38,13 @@ int parseArgs(int argc, const char **argv) {
   setPipeIndexes();
   // TODO: error checking
   priority = atoi(argv[1]);
-  if (argc < 3) { // Must request fds
+  pipe_count = 2; // For now always 2
+  if (argc < 5) { // Must request fds
     pid_t pid = getpid();
-    connectRecvFDS(pid, pipes, 2, "Empty");
+    connectRecvFDS(pid, pipes, pipe_count, "Empty");
   } else {
-    deserializePipe(argv[2], &pipes[read_in_index]);
-    deserializePipe(argv[3], &pipes[write_out_index]);
+    deserializePipe(argv[3], &pipes[read_in_index]);
+    deserializePipe(argv[4], &pipes[write_out_index]);
   }
 
   return 0;

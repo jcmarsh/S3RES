@@ -60,13 +60,14 @@ int initBenchMarker() {
 
 int parseArgs(int argc, const char **argv) {
   priority = atoi(argv[1]);
-  if (argc < 4) {
-    puts("Usage: BenchMarker <read_in_fd> <write_out_fd>");
+  // pipe_count should always be 2
+  if (argc < 5) {
+    puts("Usage: BenchMarker <priority> <pipe_num> <read_in_fd> <write_out_fd>");
     return -1;
   }
 
-  deserializePipe(argv[2], &trans_pipes[0]);
-  deserializePipe(argv[3], &trans_pipes[1]);
+  deserializePipe(argv[3], &trans_pipes[0]);
+  deserializePipe(argv[4], &trans_pipes[1]);
 
   return 0;
 }

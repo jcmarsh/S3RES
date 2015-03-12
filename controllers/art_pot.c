@@ -75,23 +75,18 @@ int parseArgs(int argc, const char **argv) {
 
   // TODO: error checking
   priority = atoi(argv[1]);
-  if (argc < 4) { // Must request fds
+  pipe_count = atoi(argv[2]);
+  if (argc < 5) { // Must request fds
     pid_t currentPID = getpid();
     // TODO: plumber should pass number of pipes even if it will connectFDS.
     // This would solve problems with using in different configs
-    pipe_count = 4;
     if (connectRecvFDS(currentPID, pipes, pipe_count, name) < 0) {
       printf("Error in %s: failed on connectRecvFDS call. Exiting.\n", name);
       exit(-1);
     }
   } else {
-    for (i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {
-      deserializePipe(argv[i + 2], &pipes[i]);
-    }
-    if (argc < 6) {
-      pipe_count = 2; // no planner, now waypoint req/res
-    } else {
-      pipe_count = PIPE_COUNT;
+    for (i = 0; (i < argc - 3) && (i < PIPE_COUNT); i++) {
+      deserializePipe(argv[i + 3], &pipes[i]);
     }
   }
   setPipeIndexes();

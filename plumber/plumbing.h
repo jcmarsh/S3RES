@@ -19,7 +19,6 @@ struct node {
 	char* voter_name; // from config file: local_nav = (ArtPot)VoterB
 	char* voter_timer; // easier to keep as a char* - needs to be to pass as an arg anyways
 
-	// comm will need to be changed to multiple named pipes
 	int pipe_count;
 	struct typed_pipe pipes[PIPE_LIMIT];
 };

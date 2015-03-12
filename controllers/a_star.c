@@ -93,14 +93,15 @@ int parseArgs(int argc, const char **argv) {
   int i;
   // TODO: error checking
   priority = atoi(argv[1]);
+  pipe_count = atoi(argv[2]); // Right now always 4
   if (argc < 6) {
     pid_t currentPID = getpid();
     //connectRecvFDS(currentPID, pipes, PIPE_COUNT, "AStarTest"); // For test purposes
-    connectRecvFDS(currentPID, pipes, PIPE_COUNT, name);
+    connectRecvFDS(currentPID, pipes, pipe_count, name);
     setPipeIndexes();
   } else {
-    for (i = 0; (i < argc - 2) && (i < PIPE_COUNT); i++) {
-      deserializePipe(argv[i + 2], &pipes[i]);
+    for (i = 0; (i < argc - 3) && (i < PIPE_COUNT); i++) {
+      deserializePipe(argv[i + 3], &pipes[i]);
     }
     setPipeIndexes();
   }

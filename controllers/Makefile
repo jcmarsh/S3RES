@@ -12,6 +12,7 @@ regular:
 	gcc $(FLAGS) -o BenchMarker benchmarker.c ../src/commtypes.c ../src/replicas.c $(LIB)
 	gcc $(FLAGS) -o Empty empty.c $(SRC) $(LIB) 
 	gcc $(FLAGS) -o Filter filter.c $(SRC) $(LIB) 
+	gcc $(FLAGS) -o Logger logger.c $(SRC) $(LIB) -lm
 	gcc $(FLAGS) -o PassThrough pass_through.c $(LIB) 
 	gcc $(FLAGS) -o Mapper mapper.c $(SRC) ../src/mapping.c $(LIB) -lm
 	gcc $(FLAGS) -o VoterD voterd.c ../src/commtypes.c ../src/replicas.c ../src/fd_server.c ../src/fd_client.c $(LIB)
@@ -23,6 +24,7 @@ copy:
 	cp BenchMarker ../../stage/experiments/
 	cp Empty ../../stage/experiments/
 	cp Filter ../../stage/experiments/
+	cp Logger ../../stage/experiments/
 	cp PassThrough ../../stage/experiments/
 	cp Mapper ../../stage/experiments/
 	cp VoterD ../../stage/experiments/
@@ -33,6 +35,7 @@ clean:
 	rm -f BenchMarker
 	rm -f Empty
 	rm -f Filter
+	rm -f Logger
 	rm -f PassThrough
 	rm -f Mapper
 	rm -f VoterD

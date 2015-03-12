@@ -1,17 +1,20 @@
 /*
- * Simple filter that averages the three values previous values for
- * Ranger readings.
+ * Records range and position data to a log file.
  *
  * James Marshall
  */
 
-#include "../include/controller.h"
+ // TODO: Select file name, open, and write out to it.
 
-// Configuration parameters
-#define WINDOW_SIZE 3
-#define PIPE_COUNT 4 // But sometimes 2, sometimes 3 // TODO: need to rework for logger
+#include "../include/controller.h"
+#include <math.h>
+
+#define GOAL_X      7.0
+#define GOAL_Y      7.0
+#define PIPE_COUNT  1
 
 int pipe_count = PIPE_COUNT;
+
 double ranges[RANGER_COUNT] = {0};
 // range and pose data is sent together...
 double pose[3];
@@ -19,63 +22,70 @@ double pose[3];
 // pipe 0 is data in, 1 is filtered (averaged) out, 2 is just regular out
 struct typed_pipe pipes[PIPE_COUNT];
 int data_index;
-int out_index[PIPE_COUNT - 1];
 
 // TAS related
 int priority;
 
-const char* name = "Filter";
+const char* name = "Logger";
 
 void enterLoop();
 void command();
 
-bool insertSDC = false;
 void testSDCHandler(int signo, siginfo_t *si, void *unused) {
-  insertSDC = true;
+  printf("Logger has no test SDC code. Should not be injecting faults here.\n");
 }
 
 void setPipeIndexes(void) {
-  int i;
   data_index = 0;
-  for (i = 1; i < PIPE_COUNT; i++) {
-    out_index[i - 1] = i;
-  }
 }
 
 int parseArgs(int argc, const char **argv) {
   setPipeIndexes();
-  int i;
-
   // TODO: Check for errors
   priority = atoi(argv[1]);
-  pipe_count = atoi(argv[2]);
-  if (argc < 5) { // Must request fds
-    // printf("Usage: Filter <priority> <pipe_num> <pipe_in> <pipe_out_0> <pipe_out_1>\n");
+  if (argc < 4) { // Must request fds
+    // printf("Usage: Logger <priority> <pipe_num> <pipe_in>\n");
     pid_t currentPID = getpid();
-    // TODO: Seriously, this needs to be passed by plumber... er the voter. Whatever.
-    connectRecvFDS(currentPID, pipes, pipe_count, name);
+    connectRecvFDS(currentPID, pipes, PIPE_COUNT, name);
   } else {
     deserializePipe(argv[3], &pipes[data_index]);
-    for (i = 4; i < 4 + pipe_count - 1; i++) {
-      deserializePipe(argv[i], &pipes[out_index[i - 4]]);
-    }
   }
 
   return 0;
 }
 
+double prev_x = 0, prev_y = 0;
+timestamp_t prev_time = 0;
 void command(void) {
-  int i;
+  int index = 0;
+  timestamp_t current_time = generate_timestamp(); // TODO lookup timestamps
 
-  if (insertSDC) {
-    insertSDC = false;
-    ranges[0]++;
-  }
+  // find minimum obs distance
+  // calculate speed
+  double distance_goal = sqrt(((pose[0] - GOAL_X) * (pose[0] - GOAL_X)) + ((pose[1] - GOAL_Y) * (pose[1] - GOAL_Y)));
+  if (distance_goal < .8) { // Robot stops short
+    // Skip; too close to end
+  } else if (prev_time == 0) {
+    // Skip; first cycle 
+  } else {
+    // calc velocity
+    double velocity = sqrt(((pose[0] - prev_x) * (pose[0] - prev_x)) + ((pose[1] - prev_y) * (pose[1] - prev_y)));
+    velocity = velocity / (current_time - prev_time); // TODO: Adjust to human measurements.
+      
+    // obstacle distance  
+    double min = 1000; // approximately infinite.
+    for (index = 0; index < RANGER_COUNT; index++) {
+      if (ranges[index] < min) {
+        min = ranges[index];
+      }
+    }
 
-  // Write out averaged range data (with pose)
-  for (i = 1; i < pipe_count; i++) {
-    commSendRanger(pipes[out_index[i - 1]], ranges, pose);
+    printf("(%f,\t%f,\t%f,\t%f)\n", velocity, min, pose[0], pose[1]); 
+
   }
+  prev_time = current_time;
+  prev_x = pose[0];
+  prev_y = pose[1];
 }
 
 void enterLoop(void) {
@@ -101,11 +111,11 @@ void enterLoop(void) {
           // Calculates and sends the new command
           command();
         } else if (read_ret > 0) {
-          printf("Filter read data_index did not match expected size.\n");
+          printf("Logger read data_index did not match expected size.\n");
         } else if (read_ret < 0) {
-          perror("Filter - read data_index problems");
+          perror("Logger - read data_index problems");
         } else {
-          perror("Filter read_ret == 0 on data_index");
+          perror("Logger read_ret == 0 on data_index");
         }
       }
     }

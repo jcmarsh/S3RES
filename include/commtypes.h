@@ -16,6 +16,8 @@
 #define PIPE_LIMIT 10
 // Max number of bytes
 #define MAX_PIPE_BUFF 1024
+// Number of range sensors
+#define RANGER_COUNT 16
 
 typedef enum {
   COMM_ERROR,
@@ -66,7 +68,7 @@ struct comm_mov_cmd {
 };
 
 struct comm_range_pose_data {
-  double ranges[16];
+  double ranges[RANGER_COUNT];
   double pose[3];
 };
 
