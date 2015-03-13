@@ -11,6 +11,8 @@
 #include <signal.h>
 #include <string.h>
 #include <sys/wait.h>
+//#include <linux/prctl.h>
+#include <sys/prctl.h>
 #include <time.h>
 
 #include "../include/replicas.h"
@@ -104,7 +106,7 @@ int aheadRep(int pipe_num) {
 
 void voterRestartHandler(void) {
   // Timer went off, so the timer_stop_index is the pipe which is awaiting a rep
-  int p_index, r_index, i;
+  int p_index;
 
   switch (rep_type) {
     case SMR:
@@ -207,6 +209,11 @@ int initVoterD(void) {
   sigset_t mask;
 
   InitTAS(DEFAULT_CPU, voter_priority);
+
+  // Set as subreaper
+  if (prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) < 0) {
+    perror("Voter not set as subreaper");
+  }
 
   // timeout_fd
   if (pipe(timeout_fd) == -1) {
@@ -315,6 +322,17 @@ void doOneUpdate(void) {
 
   struct timeval select_timeout;
   fd_set select_set;
+
+  // Check for dead reps, get pid and see if it is a rep thought to be alive still
+  pid_t deceased = waitpid(-1, NULL, WNOHANG); // Seems to take a while for to clean up zombies
+  for (r_index = 0; r_index < rep_count; r_index++) {
+    if (replicas[r_index].pid == deceased) {
+      printf("Restarting Rep. due to reaping. Name %s\tPid %d\n", controller_name, deceased);
+      int restarter = (r_index + (rep_count - 1)) % rep_count;
+
+      restartReplica(restarter, r_index);
+    }
+  }
 
   // See if any of the read pipes have anything
   select_timeout.tv_sec = 1;
@@ -428,10 +446,10 @@ void balanceReps(void) {
     int retval = sched_set_realtime_policy(replicas[index].pid, &dontcare, offset);
     if (retval == 0) {
       // Do nothing, worked fine.
-    } else if (retval == SCHED_ERROR_NOEXIST) {
+    /*} else if (retval == SCHED_ERROR_NOEXIST) {
       printf("Voter restarting %s - %d, detected by scheduling failure\n", controller_name, index);
       int restarter = (index + (rep_count - 1)) % rep_count;
-      restartReplica(restarter, index);
+      restartReplica(restarter, index); */ // No longer needed because voter is a subreaper
     } else {
       printf("Voter error call sched_set_realtime_policy for %s, priority %d, retval: %d\n", controller_name, offset, retval);
     }

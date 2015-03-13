@@ -73,7 +73,7 @@ void command(void) {
   } else {
     // calc velocity
     double velocity = sqrt(((pose[0] - prev_x) * (pose[0] - prev_x)) + ((pose[1] - prev_y) * (pose[1] - prev_y)));
-    double time_elapsed = ((current_time - prev_time) / (1000000 * 2300.0)); //3092.0));
+    double time_elapsed = ((current_time - prev_time) / (1000000 * 3092.0)); // did the math: matches J. Taylor's time.cpp
     velocity = velocity / time_elapsed;
 
     // obstacle distance  
