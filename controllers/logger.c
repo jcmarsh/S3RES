@@ -8,6 +8,7 @@
 
 #include "../include/controller.h"
 #include <math.h>
+#include <time.h>
 
 #define GOAL_X      7.0
 #define GOAL_Y      7.0
@@ -27,6 +28,8 @@ int data_index;
 int priority;
 
 const char* name = "Logger";
+
+FILE *log_file;
 
 void enterLoop();
 void command();
@@ -70,8 +73,9 @@ void command(void) {
   } else {
     // calc velocity
     double velocity = sqrt(((pose[0] - prev_x) * (pose[0] - prev_x)) + ((pose[1] - prev_y) * (pose[1] - prev_y)));
-    velocity = velocity / (current_time - prev_time); // TODO: Adjust to human measurements.
-      
+    double time_elapsed = ((current_time - prev_time) / (1000000 * 2300.0)); //3092.0));
+    velocity = velocity / time_elapsed;
+
     // obstacle distance  
     double min = 1000; // approximately infinite.
     for (index = 0; index < RANGER_COUNT; index++) {
@@ -80,7 +84,7 @@ void command(void) {
       }
     }
 
-    printf("(%f,\t%f,\t%f,\t%f)\n", velocity, min, pose[0], pose[1]); 
+    fprintf(log_file, "(%f,\t%f,\t%f,\t%f,\t%f)\n", min, velocity, time_elapsed, pose[0], pose[1]); 
 
   }
   prev_time = current_time;
@@ -122,14 +126,40 @@ void enterLoop(void) {
   }
 }
 
+// Create a log file... could use date / time in log name
+// something like "11_3_8:15am_log.txt". Seems better than log_00.txt
+int openFile(void) {
+  time_t t = time(NULL);
+  struct tm tm = *localtime(&t);
+  char * file_name;
+
+  if (asprintf(&file_name, "./%d-%d_%d-%d-%d_log.txt", tm.tm_mday, tm.tm_mon + 1, tm.tm_hour, tm.tm_min, tm.tm_sec) < 0) {
+    perror("Logger failed to create file name char*");
+    return -1;
+  }
+
+  log_file = fopen(file_name, "w");
+  if (log_file == NULL) {
+    perror("Logger failed open file");
+    return -1;
+  }
+
+  fprintf(log_file, "(min,\tvel,\ttime_e,\tX,\tY)\n"); 
+}
+
 int main(int argc, const char **argv) {
   if (parseArgs(argc, argv) < 0) {
-    puts("ERROR: failure parsing args.");
+    printf("Logger ERROR: failure parsing args.\n");
     return -1;
   }
 
   if (initReplica() < 0) {
-    puts("ERROR: failure in setup function.");
+    printf("Logger ERROR: failure in setup function.\n");
+    return -1;
+  }
+
+  if (openFile() <  0) {
+    printf("Logger ERROR: failure in findOpenFile.\n");
     return -1;
   }
 
