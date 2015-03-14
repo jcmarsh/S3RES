@@ -69,6 +69,45 @@ void deserializePipe(const char* serial, struct typed_pipe *pipe) {
   free(type);
 }
 
+void printBuffer(struct typed_pipe *pipe) {
+  printf("Print Buffer type %s, buff_count %d:\n", MESSAGE_T[pipe->type], pipe->buff_count);
+  int i;
+  switch (pipe->type) {
+    case COMM_ERROR:
+      printf("Uh, that's an error type... no buffer\n");
+      break;
+    case WAY_REQ:
+      printf("\tNo data.\n");
+      break;
+    case WAY_RES: ;
+      struct comm_way_res *way_res = (struct comm_way_res *) pipe->buffer;
+      printf("\tpoint (%f, %f) - %f\n", way_res->point[0], way_res->point[1], way_res->point[2]);
+      printf("\tn_point (%f, %f) - %f\n", way_res->n_point[0], way_res->n_point[1], way_res->n_point[2]);
+      break;
+    case MOV_CMD: ;
+      struct comm_mov_cmd *mov_cmd = (struct comm_mov_cmd *) pipe->buffer;
+      printf("\tvel_cmd (%f, %f)\n", mov_cmd->vel_cmd[0], mov_cmd->vel_cmd[1]);
+      break;
+    case RANGE_POSE_DATA: ;
+      struct comm_range_pose_data *rp_data = (struct comm_range_pose_data *) pipe->buffer;
+      for (i = 0; i < RANGER_COUNT; i++) {
+        printf("\tRange reading: %f\n", rp_data->ranges[i]);
+      }
+      printf("\tpose (%f, %f) - %f\n", rp_data->pose[0], rp_data->pose[1], rp_data->pose[2]);
+      break;
+    case MAP_UPDATE: ;
+      struct comm_map_update *map_update = (struct comm_map_update *) pipe->buffer;
+      printf("\tpose: (%d, %d)\t Obs count: %d\n", map_update->pose_x, map_update->pose_y, map_update->obs_count);
+      for (i = 0; i < map_update->obs_count; i++) {
+        printf("\tObs: (%d, %d)\n", map_update->obs_x[i], map_update->obs_y[i]);
+      }
+      break;
+    case COMM_ACK:
+      printf("\tNo data.\n");
+      break;
+  }
+}
+
 void resetPipe(struct typed_pipe* pipe) {
   pipe->type = COMM_ERROR;
   if (pipe->fd_in != 0) {

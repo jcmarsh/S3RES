@@ -162,29 +162,53 @@ void cleanupReplica(int rep_index) {
 }
 
 void restartReplica(int restarter, int restartee) {
-  // Send along the response from the other two replicas.
-  // also copy over the previous vote state and pipe buffers
-  int i;
-  for (i = 0; i < replicas[restarter].pipe_count; i++) {
-    replicas[restartee].voted[i] = replicas[restarter].voted[i];
-    memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
-    replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
-    sendPipe(i, restarter);
-  }
-
   #ifdef TIME_RESTART_REPLICA
     timestamp_t last = generate_timestamp();
   #endif
+
+  int i;
+  for (i = 0; i < replicas[restarter].pipe_count; i++) {
+    if (replicas[restarter].vot_pipes[i].fd_in != 0) {
+      replicas[restartee].voted[i] = replicas[restarter].voted[i];
+      int copied = memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
+      //if (copied != replicas[restarter].vot) RESUME HERE
+      replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
+      printf("Copied buffer for restartee:\n");
+      printBuffer(&(replicas[restartee].vot_pipes[i]));
+      sendPipe(i, restarter);
+    }
+  }
+  
   cleanupReplica(restartee);
 
-  #ifdef TIME_RESTART_SIGNAL
-    timestamp_t curr_time = generate_timestamp();
-    union sigval time_value;
-    time_value.sival_ptr = (void *)curr_time;
-    int retval = sigqueue(replicas[restarter].pid, RESTART_SIGNAL, time_value);
-  #else
-    int retval = kill(replicas[restarter].pid, RESTART_SIGNAL);
-  #endif /* TIME_RESTART_SIGNAL */
+  //#ifdef TIME_RESTART_SIGNAL
+  //  timestamp_t curr_time = generate_timestamp();
+  //  union sigval time_value;
+  //  time_value.sival_ptr = (void *)curr_time;
+  //  int retval = sigqueue(replicas[restarter].pid, RESTART_SIGNAL, time_value);
+  //#else
+
+  // Make the restarter the most special of all the replicas
+  for (i = 0; i < rep_count; i++) {    
+    int dontcare = 0;
+    int offset;
+    if (i != restartee) {
+      if (i == restarter) {
+        offset = voter_priority - 1 + VOTER_PRIO_OFFSET;
+      } else {
+        offset = voter_priority + VOTER_PRIO_OFFSET;
+      }
+      int retval = sched_set_realtime_policy(replicas[i].pid, &dontcare, offset);
+      if (retval == 0) {
+        // Do nothing, worked fine.
+      } else {
+        printf("Voter error call sched_set_realtime_policy in restartReplica for %s, priority %d, retval: %d\n", controller_name, offset, retval);
+      }
+    }
+  }
+
+  int retval = kill(replicas[restarter].pid, RESTART_SIGNAL);
+  //#endif /* TIME_RESTART_SIGNAL */
   if (retval < 0) {
     perror("VoterD Signal Problem");
   }
@@ -193,12 +217,23 @@ void restartReplica(int restarter, int restartee) {
   initReplicas(&(replicas[restartee]), 1, controller_name, voter_priority + VOTER_PRIO_OFFSET);
   createPipes(&(replicas[restartee]), 1, ext_pipes, pipe_count);
   // send new pipe through fd server (should have a request)
-
   acceptSendFDS(&sd, &(replicas[restartee].pid), replicas[restartee].rep_pipes, replicas[restartee].pipe_count);
+
+  /*
+  // Make sure everything is up to date.
+  for (i = 0; i < replicas[restarter].pipe_count; i++) {
+    replicas[restartee].voted[i] = replicas[restarter].voted[i];
+    memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
+    replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
+    sendPipe(i, restarter);
+  } */
+
+  // Send along the response from the other two replicas.
+  // also copy over the previous vote state and pipe buffers
   #ifdef TIME_RESTART_REPLICA
     timestamp_t current = generate_timestamp();
     printf("(%lld)\n", current - last);
-  #endif
+  #endif  
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -568,7 +603,9 @@ void checkSDC(int pipe_num) {
                      replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
             int restartee = (r_index + 2) % rep_count;
             printf("Voting disagreement: caught SDC Name %s\t Rep %d\t Pipe %d\n", controller_name, restartee, pipe_num);
-
+            printf("\tRestartee voted %d, r-index %d\n", replicas[restartee].voted[pipe_num], replicas[r_index].voted[pipe_num]);
+            printBuffer(&(replicas[restartee].vot_pipes[pipe_num]));
+            printBuffer(&(replicas[r_index].vot_pipes[pipe_num]));
             restartReplica(r_index, restartee);
           } else {
             // If all agree, send and be happy. Otherwise the send is done as part of the restart process

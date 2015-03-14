@@ -89,6 +89,8 @@ struct comm_ack {
 comm_message_t commToEnum(char* name);
 replication_t reptypeToEnum(char* type);
 
+void printBuffer(struct typed_pipe *pipe);
+
 // Typed pipes
 char* serializePipe(struct typed_pipe pipe);
 void deserializePipe(const char* serial, struct typed_pipe* pipe);
