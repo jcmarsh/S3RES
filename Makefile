@@ -1,12 +1,16 @@
 all: regular
 
-regular: 
+regular: libs
 	make -C ./controllers
 	make -C ./stage_control
 	make -C ./plumber
 	make -C ./fault_injection
 	make -C ./micro_test
 	make -C ./test
+
+libs:
+	make -C ./tas_lib
+	make -C ./player_translator_driver/build
 
 install: regular
 	make -C ./controllers copy

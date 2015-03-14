@@ -1,8 +1,12 @@
-default:
-	gcc -fpic -c taslimited.c cpu.c force.c scheduler.c time.c
+
+%.o: %.c
+	gcc -fpic -c -o $@ $<
+
+libTASLimited.so: taslimited.o cpu.o force.o scheduler.o time.o
 	gcc -shared -o libTASLimited.so taslimited.o cpu.o force.o scheduler.o time.o
 
-install: default
+
+install: libTASLimited.so
 	cp libTASLimited.so /usr/local/lib/
 
 clean:

@@ -1,12 +1,24 @@
 SRC=../src/commtypes.c ../src/replicas.c ../src/fd_server.c
 
-default:
-	gcc -o MapperTest mapper_test.c $(SRC) -lrt -lTASLimited
-	gcc -o FilterTest filter_test.c $(SRC) -lrt -lTASLimited
+all: MapperTest FilterTest ArtPotTest AStarTest
+
+%.o: %.c
+	gcc -c -o $@ $<
+
+MapperTest: mapper_test.o $(SRC)
+	gcc -o MapperTest mapper_test.o $(SRC) -lrt -lTASLimited
+
+FilterTest: filter_test.o $(SRC)
+	gcc -o FilterTest filter_test.o $(SRC) -lrt -lTASLimited
+
+ArtPotTest: art_pot_test.o $(SRC)
 	gcc -o ArtPotTest art_pot_test.c $(SRC) -lrt -lTASLimited
+
+AStarTest: a_star_test.o $(SRC)
 	gcc -o AStarTest a_star_test.c $(SRC) -lrt -lTASLimited
 
 clean:
+	rm *.o
 	rm -rf MapperTest
 	rm -rf MapperTest_fd_server
 	rm -rf FilterTest
