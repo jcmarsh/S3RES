@@ -66,7 +66,7 @@ void command(void) {
   // find minimum obs distance
   // calculate speed
   double distance_goal = sqrt(((pose[0] - GOAL_X) * (pose[0] - GOAL_X)) + ((pose[1] - GOAL_Y) * (pose[1] - GOAL_Y)));
-  if (distance_goal < .8) { // Robot stops short
+  if (distance_goal < 1) { // Robot stops short
     // Skip; too close to end
   } else if (prev_time == 0) {
     // Skip; first cycle 
@@ -133,7 +133,7 @@ int openFile(void) {
   struct tm tm = *localtime(&t);
   char * file_name;
 
-  if (asprintf(&file_name, "./%d-%d_%d-%d-%d_log.txt", tm.tm_mday, tm.tm_mon + 1, tm.tm_hour, tm.tm_min, tm.tm_sec) < 0) {
+  if (asprintf(&file_name, "./%2d-%2d_%2d-%2d-%2d_log.txt", tm.tm_mday, tm.tm_mon + 1, tm.tm_hour, tm.tm_min, tm.tm_sec) < 0) {
     perror("Logger failed to create file name char*");
     return -1;
   }
@@ -144,7 +144,7 @@ int openFile(void) {
     return -1;
   }
 
-  fprintf(log_file, "(min,\tvel,\ttime_e,\tX,\tY)\n"); 
+  fprintf(log_file, "(min_dist\t, velocity\t, time_elapsed\t, X position\t, Y position\n"); 
 }
 
 int main(int argc, const char **argv) {
