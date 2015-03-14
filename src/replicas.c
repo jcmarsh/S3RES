@@ -147,10 +147,8 @@ void forkReplicasSpecial(struct replica replicas[], int rep_num) {
     if (asprintf(&(rep_argv[2]), "%d", curr->pipe_count) < 0) {
       perror("Fork Replica Special failed arg pipe_num write");
     }
-    printf("Forking special: %s %s %s\n", rep_argv[0], rep_argv[1], rep_argv[2]);
     for (a_index = ARGV_REQ; a_index < curr->pipe_count + ARGV_REQ; a_index++) {
       rep_argv[a_index] = serializePipe(curr->rep_pipes[a_index - ARGV_REQ]);
-      printf("\tAdd special pipe: %s at %d\n", serializePipe(curr->rep_pipes[a_index - ARGV_REQ]), a_index);
     }
     rep_argv[rep_argc - 1] = NULL;
     curr->pid = forkSingle(rep_argv);

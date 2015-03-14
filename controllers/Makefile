@@ -4,7 +4,7 @@ LIB=-lrt -lTASLimited
 FLAGS=-O3
 #FLAGS=-g -O0 -Werror
 
-all: ArtPot AStar BenchMarker Empty Filter Logger PassThrough Mapper VoterD Min
+all: ArtPot AStar BenchMarker Empty Filter Logger Mapper VoterD
 
 %.o: %.c
 	gcc -c $(FLAGS) -o $@ $< 
@@ -46,12 +46,11 @@ copy:
 	cp Empty ../../stage/experiments/
 	cp Filter ../../stage/experiments/
 	cp Logger ../../stage/experiments/
-	cp PassThrough ../../stage/experiments/
 	cp Mapper ../../stage/experiments/
 	cp VoterD ../../stage/experiments/
 
 clean:
-	rm *.o
+	rm -f *.o
 	rm -f ArtPot
 	rm -f AStar
 	rm -f BenchMarker

@@ -13,7 +13,7 @@ EmptyRestart: empty_restart.o $(SRC)
 	gcc -O3 -o EmptyRestart empty_restart.o $(SRC) -lrt -lTASLimited
 
 clean:
-	rm *.o
+	rm -f *.o
 	rm -rf EmptyBench
 	rm -rf EmptyRestart
 	rm -rf Empty_fd_server
