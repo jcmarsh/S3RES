@@ -9,7 +9,7 @@ copy:
 	cp injector.py ../../stage/experiments
 
 clean:
-	rm *.o
+	rm -f *.o
 	rm -f inject_error
 
 

@@ -18,7 +18,7 @@ AStarTest: a_star_test.o $(SRC)
 	gcc -o AStarTest a_star_test.c $(SRC) -lrt -lTASLimited
 
 clean:
-	rm *.o
+	rm -f *.o
 	rm -rf MapperTest
 	rm -rf MapperTest_fd_server
 	rm -rf FilterTest
