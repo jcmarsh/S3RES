@@ -37,10 +37,6 @@ struct typed_pipe trans_pipes[2];
 int initBenchMarker();
 int parseArgs(int argc, const char **argv);
 void enterLoop();
-void sendWaypoints();
-void processOdom();
-void processRanger();
-void processCommand();
 
 int initBenchMarker() {
   int scheduler;

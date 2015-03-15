@@ -21,6 +21,8 @@ struct typed_pipe pipes[PIPE_COUNT];
 int data_index;
 int out_index[PIPE_COUNT - 1];
 
+int msg_id = 0; // TODO: Remove
+
 // TAS related
 int priority;
 
@@ -74,7 +76,8 @@ void command(void) {
 
   // Write out averaged range data (with pose)
   for (i = 1; i < pipe_count; i++) {
-    commSendRanger(pipes[out_index[i - 1]], ranges, pose);
+    commSendRanger(pipes[out_index[i - 1]], ranges, pose, msg_id); // TODO: Remove
+    //commSendRanger(pipes[out_index[i - 1]], ranges, pose);
   }
 }
 
@@ -98,6 +101,7 @@ void enterLoop(void) {
         read_ret = TEMP_FAILURE_RETRY(read(pipes[data_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data)));
         if (read_ret == sizeof(struct comm_range_pose_data)) {
           commCopyRanger(&recv_msg, ranges, pose);
+          msg_id = recv_msg.msg_id; // TODO: Remove
           // Calculates and sends the new command
           command();
         } else if (read_ret > 0) {

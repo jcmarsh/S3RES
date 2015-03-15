@@ -33,6 +33,8 @@ int pipe_count = PIPE_COUNT; // 4 with a planner, 2 otherwise
 struct typed_pipe pipes[PIPE_COUNT]; // 0 is data_in, 1 is cmd_out
 int data_index, out_index, way_req_index, way_res_index;
 
+int msg_id = 0; // TODO: Remove
+
 // TAS related
 int priority;
 
@@ -94,12 +96,19 @@ int parseArgs(int argc, const char **argv) {
   return 0;
 }
 
+int command_loop = 0; // TODO: Remove
 void command(void) {
   double dist, theta, delta_x, delta_y, v, tao, obs_x, obs_y;
   double vel_cmd[2];
   int total_factors, i;
   bool request_way = false;
   
+  pid_t currentPID = getpid();
+  if (msg_id != command_loop) {
+    printf("ERROR: ArtPot (%d) On message %d and command loop %d\n", currentPID, msg_id, command_loop); // TODO: Remove
+  }
+  command_loop++;
+
   // Head towards the goal! odom_pose: 0-x, 1-y, 2-theta
   dist = sqrt(pow(goal[INDEX_X] - pos[INDEX_X], 2)  + pow(goal[INDEX_Y] - pos[INDEX_Y], 2));
   theta = atan2(goal[INDEX_Y] - pos[INDEX_Y], goal[INDEX_X] - pos[INDEX_X]) - pos[INDEX_A];
@@ -209,6 +218,7 @@ void enterLoop(void) {
         read_ret = TEMP_FAILURE_RETRY(read(pipes[data_index].fd_in, &recv_msg_data, sizeof(struct comm_range_pose_data)));
         if (read_ret == sizeof(struct comm_range_pose_data)) {
           commCopyRanger(&recv_msg_data, ranges, pos);
+          msg_id = recv_msg_data.msg_id; // TODO: Remove
           // Calculates and sends the new command
           command();
         } else if (read_ret > 0) {

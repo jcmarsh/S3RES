@@ -12,6 +12,7 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
+#include <linux/prctl.h>
 #include <time.h>
 
 #include "../include/replicas.h"
@@ -54,7 +55,7 @@ int initVoterD(void);
 int parseArgs(int argc, const char **argv);
 int main(int argc, const char **argv);
 void doOneUpdate(void);
-void processData(struct typed_pipe pipe, int pipe_index);
+void processData(struct typed_pipe *pipe, int pipe_index);
 void resetVotingState(int pipe_num);
 void resetVotingStateAll(void);
 void sendPipe(int pipe_num, int replica_num);
@@ -118,7 +119,7 @@ void voterRestartHandler(void) {
       for (p_index = 0; p_index < pipe_count; p_index++) {
         int read_fd = ext_pipes[p_index].fd_in;
         if (read_fd != 0) {
-          processData(ext_pipes[p_index], p_index);    
+          processData(&(ext_pipes[p_index]), p_index);    
         }
       }
 
@@ -139,8 +140,7 @@ void cleanupReplica(int rep_index) {
   int i;
   // Kill old replica
   kill(replicas[rep_index].pid, SIGKILL); // Make sure it is dead.
-  waitpid(-1, NULL, WNOHANG); // cleans up the zombie // Actually doesn't // Well, now it does.
-
+  //waitpid(-1, NULL, WNOHANG); // cleans up the zombie // Actually doesn't // Well, now it does.
   
   // cleanup replica data structure
   for (i = 0; i < replicas[rep_index].pipe_count; i++) {
@@ -162,23 +162,26 @@ void cleanupReplica(int rep_index) {
 }
 
 void restartReplica(int restarter, int restartee) {
+  int i;
+
   #ifdef TIME_RESTART_REPLICA
     timestamp_t last = generate_timestamp();
   #endif
 
-  int i;
-  for (i = 0; i < replicas[restarter].pipe_count; i++) {
-    if (replicas[restarter].vot_pipes[i].fd_in != 0) {
-      replicas[restartee].voted[i] = replicas[restarter].voted[i];
-      int copied = memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
-      //if (copied != replicas[restarter].vot) RESUME HERE
-      replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
-      printf("Copied buffer for restartee:\n");
-      printBuffer(&(replicas[restartee].vot_pipes[i]));
-      sendPipe(i, restarter);
+  // reset timer
+  if (timer_started) {  // TODO: will this cause the timer to get out of sync? timing the wrong periods?
+    // reset the timer
+    its.it_interval.tv_sec = 0;
+    its.it_interval.tv_nsec = 0;
+    its.it_value.tv_sec = 0;
+    its.it_value.tv_nsec = 0;
+
+    if (timer_settime(timerid, 0, &its, NULL) == -1) {
+      perror("VoterD timer_settime failed");
     }
+    timer_started = false;
   }
-  
+
   cleanupReplica(restartee);
 
   //#ifdef TIME_RESTART_SIGNAL
@@ -219,21 +222,20 @@ void restartReplica(int restarter, int restartee) {
   // send new pipe through fd server (should have a request)
   acceptSendFDS(&sd, &(replicas[restartee].pid), replicas[restartee].rep_pipes, replicas[restartee].pipe_count);
 
-  /*
-  // Make sure everything is up to date.
   for (i = 0; i < replicas[restarter].pipe_count; i++) {
-    replicas[restartee].voted[i] = replicas[restarter].voted[i];
-    memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
-    replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
-    sendPipe(i, restarter);
-  } */
+    if (replicas[restarter].vot_pipes[i].fd_in != 0) { // && replicas[restarter].voted[i] > 0) { // was causing problems with the timer
+      replicas[restartee].voted[i] = replicas[restarter].voted[i];
+      memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
+      replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
+      replicas[restartee].vot_pipes[i].msg_count = replicas[restarter].vot_pipes[i].msg_count;
+      sendPipe(i, restarter);
+    }
+  }
 
-  // Send along the response from the other two replicas.
-  // also copy over the previous vote state and pipe buffers
   #ifdef TIME_RESTART_REPLICA
     timestamp_t current = generate_timestamp();
     printf("(%lld)\n", current - last);
-  #endif  
+  #endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -243,11 +245,6 @@ int initVoterD(void) {
   sigset_t mask;
 
   InitTAS(DEFAULT_CPU, voter_priority);
-
-  // Set as subreaper
-  if (prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) < 0) {
-    perror("Voter not set as subreaper");
-  }
 
   // timeout_fd
   if (pipe(timeout_fd) == -1) {
@@ -357,16 +354,7 @@ void doOneUpdate(void) {
   struct timeval select_timeout;
   fd_set select_set;
 
-  // Check for dead reps, get pid and see if it is a rep thought to be alive still
-  pid_t deceased = waitpid(-1, NULL, WNOHANG); // Seems to take a while for to clean up zombies
-  for (r_index = 0; r_index < rep_count; r_index++) {
-    if (replicas[r_index].pid == deceased) {
-      printf("Restarting Rep. due to reaping. Name %s\tPid %d\n", controller_name, deceased);
-      int restarter = (r_index + (rep_count - 1)) % rep_count;
-
-      restartReplica(restarter, r_index);
-    }
-  }
+  waitpid(-1, NULL, WNOHANG); // Seems to take a while for to clean up zombies
 
   // See if any of the read pipes have anything
   select_timeout.tv_sec = 1;
@@ -415,7 +403,7 @@ void doOneUpdate(void) {
         if (FD_ISSET(read_fd, &select_set)) {
           ext_pipes[p_index].buff_count = TEMP_FAILURE_RETRY(read(read_fd, ext_pipes[p_index].buffer, MAX_PIPE_BUFF));
           if (ext_pipes[p_index].buff_count > 0) { // TODO: read may still have been interrupted
-            processData(ext_pipes[p_index], p_index);
+            processData(&(ext_pipes[p_index]), p_index);
           } else if (ext_pipes[p_index].buff_count < 0) {
             printf("Voter - Controller %s pipe %d\n", controller_name, p_index);
             perror("Voter - read error on external pipe");
@@ -480,10 +468,8 @@ void balanceReps(void) {
     int retval = sched_set_realtime_policy(replicas[index].pid, &dontcare, offset);
     if (retval == 0) {
       // Do nothing, worked fine.
-    /*} else if (retval == SCHED_ERROR_NOEXIST) {
-      printf("Voter restarting %s - %d, detected by scheduling failure\n", controller_name, index);
-      int restarter = (index + (rep_count - 1)) % rep_count;
-      restartReplica(restarter, index); */ // No longer needed because voter is a subreaper
+    } else if (retval == SCHED_ERROR_NOEXIST) {
+      // Likely means that the process as died. Will restart through a timeout.
     } else {
       printf("Voter error call sched_set_realtime_policy for %s, priority %d, retval: %d\n", controller_name, offset, retval);
     }
@@ -492,7 +478,7 @@ void balanceReps(void) {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process data
-void processData(struct typed_pipe pipe, int pipe_index) {
+void processData(struct typed_pipe *pipe, int pipe_index) {
   int r_index;
   if (pipe_index == timer_start_index) {
     if (!timer_started) {
@@ -512,7 +498,7 @@ void processData(struct typed_pipe pipe, int pipe_index) {
   balanceReps();
 
   for (r_index = 0; r_index < rep_count; r_index++) {
-    writeBuffer(replicas[r_index].vot_pipes[pipe_index].fd_out, pipe.buffer, pipe.buff_count);
+    writeBuffer(replicas[r_index].vot_pipes[pipe_index].fd_out, pipe->buffer, pipe->buff_count);
   }
 }
 
@@ -602,10 +588,7 @@ void checkSDC(int pipe_num) {
                      replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num].buffer,
                      replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
             int restartee = (r_index + 2) % rep_count;
-            printf("Voting disagreement: caught SDC Name %s\t Rep %d\t Pipe %d\n", controller_name, restartee, pipe_num);
-            printf("\tRestartee voted %d, r-index %d\n", replicas[restartee].voted[pipe_num], replicas[r_index].voted[pipe_num]);
-            printBuffer(&(replicas[restartee].vot_pipes[pipe_num]));
-            printBuffer(&(replicas[r_index].vot_pipes[pipe_num]));
+            printf("Voting disagreement: caught SDC Name %s\t Rep %d\t Pipe %d\t pid %d\n", controller_name, restartee, pipe_num, replicas[restartee].pid);
             restartReplica(r_index, restartee);
           } else {
             // If all agree, send and be happy. Otherwise the send is done as part of the restart process
@@ -624,12 +607,17 @@ void checkSDC(int pipe_num) {
 void processFromRep(int replica_num, int pipe_num) {
   struct typed_pipe* curr_pipe = &(replicas[replica_num].vot_pipes[pipe_num]);
   curr_pipe->buff_count = TEMP_FAILURE_RETRY(read(curr_pipe->fd_in, curr_pipe->buffer, MAX_PIPE_BUFF));
+
+
   // TODO: Read may have been interrupted
   if (curr_pipe->buff_count > 0) {
+    curr_pipe->msg_count++; // TODO: Remove
     replicas[replica_num].voted[pipe_num]++;
+    
     balanceReps();
 
     if (replicas[replica_num].voted[pipe_num] > 1) {
+      // Happens when a process has died. // TODO: Suppress warning.
       printf("Run-away lag detected: %s pipe - %d - rep 0, 1, 2: %d, %d, %d\n", controller_name, pipe_num, replicas[0].voted[pipe_num], replicas[1].voted[pipe_num], replicas[2].voted[pipe_num]);
     }
 

@@ -70,7 +70,7 @@ void deserializePipe(const char* serial, struct typed_pipe *pipe) {
 }
 
 void printBuffer(struct typed_pipe *pipe) {
-  printf("Print Buffer type %s, buff_count %d:\n", MESSAGE_T[pipe->type], pipe->buff_count);
+  printf("Print Buffer type %s, buff_count %d, msg count: %d\n", MESSAGE_T[pipe->type], pipe->buff_count, pipe->msg_count);
   int i;
   switch (pipe->type) {
     case COMM_ERROR:
@@ -90,8 +90,8 @@ void printBuffer(struct typed_pipe *pipe) {
       break;
     case RANGE_POSE_DATA: ;
       struct comm_range_pose_data *rp_data = (struct comm_range_pose_data *) pipe->buffer;
-      for (i = 0; i < RANGER_COUNT; i++) {
-        printf("\tRange reading: %f\n", rp_data->ranges[i]);
+      for (i = 0; i < RANGER_COUNT; i = i + 4) {
+        printf("\tRange reading: %f %f %f %f\n", rp_data->ranges[i], rp_data->ranges[i+1], rp_data->ranges[i+2], rp_data->ranges[i+3]);
       }
       printf("\tpose (%f, %f) - %f\n", rp_data->pose[0], rp_data->pose[1], rp_data->pose[2]);
       break;
@@ -248,7 +248,9 @@ read_next:
   return read_ret;
 }
 
-int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_data) {
+// TODO: Revert
+//int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_data) {
+int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_data, int msg_id) {
   if (pipe.fd_out == 0 || pipe.type != RANGE_POSE_DATA) {
     printf("commSendRanger Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe.type], pipe.fd_out);
     return 0;
@@ -258,6 +260,7 @@ int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_d
 
   struct comm_range_pose_data msg;
   memset(&msg, 0, sizeof(struct comm_range_pose_data));
+  msg.msg_id = msg_id;
 
   for (index = 0; index < RANGER_COUNT; index++) {
     msg.ranges[index] = ranger_data[index];

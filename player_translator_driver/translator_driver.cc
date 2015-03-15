@@ -340,10 +340,12 @@ void TranslatorDriver::ProcessOdom(player_position2d_data_t &data)
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process ranger data
+int msg_id = 0; // TODO: Remove
 void TranslatorDriver::ProcessRanger(player_ranger_data_range_t &data)
 {
   int index = 0;
   struct comm_range_pose_data send_msg;
+  send_msg.msg_id = msg_id++; // TODO: Remove
 
   for (index = 0; index < 16; index++) {
     send_msg.ranges[index] = data.ranges[index];
