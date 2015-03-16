@@ -9,7 +9,7 @@
 
 // Configuration parameters
 #define WINDOW_SIZE 3
-#define PIPE_COUNT 4 // But sometimes 2, sometimes 3 // TODO: need to rework for logger
+#define PIPE_COUNT 4 // But sometimes 2, sometimes 3
 
 int pipe_count = PIPE_COUNT;
 double ranges[RANGER_COUNT] = {0};
@@ -20,8 +20,6 @@ double pose[3];
 struct typed_pipe pipes[PIPE_COUNT];
 int data_index;
 int out_index[PIPE_COUNT - 1];
-
-int msg_id = 0; // TODO: Remove
 
 // TAS related
 int priority;
@@ -54,7 +52,6 @@ int parseArgs(int argc, const char **argv) {
   if (argc < 5) { // Must request fds
     // printf("Usage: Filter <priority> <pipe_num> <pipe_in> <pipe_out_0> <pipe_out_1>\n");
     pid_t currentPID = getpid();
-    // TODO: Seriously, this needs to be passed by plumber... er the voter. Whatever.
     connectRecvFDS(currentPID, pipes, pipe_count, name);
   } else {
     deserializePipe(argv[3], &pipes[data_index]);
@@ -76,8 +73,7 @@ void command(void) {
 
   // Write out averaged range data (with pose)
   for (i = 1; i < pipe_count; i++) {
-    commSendRanger(pipes[out_index[i - 1]], ranges, pose, msg_id); // TODO: Remove
-    //commSendRanger(pipes[out_index[i - 1]], ranges, pose);
+    commSendRanger(pipes[out_index[i - 1]], ranges, pose);
   }
 }
 
@@ -101,7 +97,6 @@ void enterLoop(void) {
         read_ret = TEMP_FAILURE_RETRY(read(pipes[data_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data)));
         if (read_ret == sizeof(struct comm_range_pose_data)) {
           commCopyRanger(&recv_msg, ranges, pose);
-          msg_id = recv_msg.msg_id; // TODO: Remove
           // Calculates and sends the new command
           command();
         } else if (read_ret > 0) {

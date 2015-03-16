@@ -229,7 +229,7 @@ void sendWaypoints(void) {
     n_current_goal = pop(&goal_path);
     if (n_current_goal == NULL) {
       // At goal! (Err... right next to it) Just hang out I suppose. By sending same goal twice.
-      commSendWaypoints(pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
+      // commSendWaypoints(pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
     } else{
       n_goal_p = degridify(n_current_goal->x, n_current_goal->y);
       if (insertSDC) {

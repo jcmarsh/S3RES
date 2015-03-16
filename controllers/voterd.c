@@ -169,7 +169,7 @@ void restartReplica(int restarter, int restartee) {
   #endif
 
   // reset timer
-  if (timer_started) {  // TODO: will this cause the timer to get out of sync? timing the wrong periods?
+  if (timer_started) {
     // reset the timer
     its.it_interval.tv_sec = 0;
     its.it_interval.tv_nsec = 0;
@@ -227,7 +227,6 @@ void restartReplica(int restarter, int restartee) {
       replicas[restartee].voted[i] = replicas[restarter].voted[i];
       memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
       replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
-      replicas[restartee].vot_pipes[i].msg_count = replicas[restarter].vot_pipes[i].msg_count;
       sendPipe(i, restarter);
     }
   }
@@ -650,21 +649,14 @@ void processFromRep(int replica_num, int pipe_num) {
   struct typed_pipe* curr_pipe = &(replicas[replica_num].vot_pipes[pipe_num]);
   curr_pipe->buff_count = TEMP_FAILURE_RETRY(read(curr_pipe->fd_in, curr_pipe->buffer, MAX_PIPE_BUFF));
 
-
   // TODO: Read may have been interrupted
   if (curr_pipe->buff_count > 0) {
-    curr_pipe->msg_count++; // TODO: Remove
     replicas[replica_num].voted[pipe_num]++;
-    
-    if (controller_name[1] == 'S') {
-      //printf("AStar pipe - %d - rep votes: %d, %d, %d\n", pipe_num, replicas[0].voted[pipe_num], replicas[1].voted[pipe_num], replicas[2].voted[pipe_num]);
-    }
 
     balanceReps();
     
-
     if (replicas[replica_num].voted[pipe_num] > 1) {
-      // Happens when a process has died. // TODO: Suppress warning.
+      // Happens when a process has died.
       // printf("Run-away lag detected: %s pipe - %d - rep 0, 1, 2: %d, %d, %d\n", controller_name, pipe_num, replicas[0].voted[pipe_num], replicas[1].voted[pipe_num], replicas[2].voted[pipe_num]);
     }
 

@@ -8,11 +8,9 @@
 
 #include <assert.h>
 #include <math.h>
-#include <signal.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <sched.h> // TODO: Move to taslib?
 #include <stdio.h>
 #include <stdlib.h>
 

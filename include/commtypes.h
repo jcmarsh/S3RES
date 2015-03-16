@@ -50,7 +50,6 @@ struct typed_pipe {
   int fd_in;
   int fd_out;
 
-  int msg_count; // TODO: Remove. Only to be used for debugging purposes.
   int buff_count;
   char* buffer[MAX_PIPE_BUFF];
 };
@@ -69,7 +68,6 @@ struct comm_mov_cmd {
 };
 
 struct comm_range_pose_data {
-  int msg_id; // TODO: Remove. Only to be used for debugging purposes.
   double ranges[RANGER_COUNT];
   double pose[3];
 };
@@ -110,9 +108,7 @@ int commSendMoveCommand(struct typed_pipe pipe, double vel_0, double vel_1);
 int commSendMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg);
 int commRecvMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg);
 
-// TODO: Revert
-//int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_data);
-int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_data, int msg_id);
+int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_data);
 void commCopyRanger(struct comm_range_pose_data * recv_msg, double * range_data, double * pose_data);
 
 int commSendAck(struct typed_pipe pipe);

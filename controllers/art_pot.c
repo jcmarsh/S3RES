@@ -33,8 +33,6 @@ int pipe_count = PIPE_COUNT; // 4 with a planner, 2 otherwise
 struct typed_pipe pipes[PIPE_COUNT]; // 0 is data_in, 1 is cmd_out
 int data_index, out_index, way_req_index, way_res_index;
 
-int msg_id = 0; // TODO: Remove
-
 // TAS related
 int priority;
 
@@ -80,8 +78,6 @@ int parseArgs(int argc, const char **argv) {
   pipe_count = atoi(argv[2]);
   if (argc < 5) { // Must request fds
     pid_t currentPID = getpid();
-    // TODO: plumber should pass number of pipes even if it will connectFDS.
-    // This would solve problems with using in different configs
     if (connectRecvFDS(currentPID, pipes, pipe_count, name) < 0) {
       printf("Error in %s: failed on connectRecvFDS call. Exiting.\n", name);
       exit(-1);
@@ -96,7 +92,6 @@ int parseArgs(int argc, const char **argv) {
   return 0;
 }
 
-int command_loop = 0; // TODO: Remove
 void command(void) {
   double dist, theta, delta_x, delta_y, v, tao, obs_x, obs_y;
   double vel_cmd[2];
@@ -104,10 +99,6 @@ void command(void) {
   bool request_way = false;
   
   pid_t currentPID = getpid();
-  if (msg_id != command_loop) {
-    //printf("ERROR: ArtPot (%d) On message %d and command loop %d\n", currentPID, msg_id, command_loop); // TODO: Remove
-  }
-  command_loop++;
 
   // Head towards the goal! odom_pose: 0-x, 1-y, 2-theta
   dist = sqrt(pow(goal[INDEX_X] - pos[INDEX_X], 2)  + pow(goal[INDEX_Y] - pos[INDEX_Y], 2));
@@ -162,11 +153,6 @@ void command(void) {
     delta_x = delta_x / total_factors;
     delta_y = delta_y / total_factors;
 
-    //if ((fabs(delta_x) < .02) && (fabs(delta_y) < .02)) {
-    //  printf("We're just too close: %f, %f\n", delta_x, delta_y);
-    //  request_way = true;
-    //}
-
     vel_cmd[0] = sqrt(pow(delta_x, 2) + pow(delta_y, 2));
     vel_cmd[1] = atan2(delta_y, delta_x);
 
@@ -218,7 +204,6 @@ void enterLoop(void) {
         read_ret = TEMP_FAILURE_RETRY(read(pipes[data_index].fd_in, &recv_msg_data, sizeof(struct comm_range_pose_data)));
         if (read_ret == sizeof(struct comm_range_pose_data)) {
           commCopyRanger(&recv_msg_data, ranges, pos);
-          msg_id = recv_msg_data.msg_id; // TODO: Remove
           // Calculates and sends the new command
           command();
         } else if (read_ret > 0) {
