@@ -220,7 +220,7 @@ void sendWaypoints(void) {
   struct point_d *n_goal_p;
   struct point_d *goal_p;
 
-  free(pop(&goal_path)); // trash closest
+  //free(pop(&goal_path)); // trash closest
   current_goal = pop(&goal_path);
   if (current_goal == NULL) { // TODO: these contingences never happen.
     commSendWaypoints(pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);

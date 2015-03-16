@@ -133,7 +133,7 @@ int openFile(void) {
   struct tm tm = *localtime(&t);
   char * file_name;
 
-  if (asprintf(&file_name, "./%2d-%2d_%2d-%2d-%2d_log.txt", tm.tm_mday, tm.tm_mon + 1, tm.tm_hour, tm.tm_min, tm.tm_sec) < 0) {
+  if (asprintf(&file_name, "./%02d-%02d_%02d-%02d-%02d_log.txt", tm.tm_mday, tm.tm_mon + 1, tm.tm_hour, tm.tm_min, tm.tm_sec) < 0) {
     perror("Logger failed to create file name char*");
     return -1;
   }
