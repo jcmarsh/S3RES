@@ -57,7 +57,6 @@ int main(int argc, const char **argv);
 void doOneUpdate(void);
 void processData(struct typed_pipe *pipe, int pipe_index);
 void resetVotingState(int pipe_num);
-void resetVotingStateAll(void);
 void sendPipe(int pipe_num, int replica_num);
 void checkSDC(int pipe_num);
 void processFromRep(int replica_num, int pipe_num);
@@ -197,7 +196,7 @@ void restartReplica(int restarter, int restartee) {
     int offset;
     if (i != restartee) {
       if (i == restarter) {
-        offset = voter_priority - 1 + VOTER_PRIO_OFFSET;
+        offset = voter_priority - 2 + VOTER_PRIO_OFFSET;
       } else {
         offset = voter_priority + VOTER_PRIO_OFFSET;
       }
@@ -276,7 +275,7 @@ int initVoterD(void) {
   // Setup fd server
   createFDS(&sd, controller_name);
 
-  resetVotingStateAll();
+  initVotingState();
  
   startReplicas();
   
@@ -444,15 +443,29 @@ void writeBuffer(int fd_out, char** buffer, int buff_count) {
   }
 }
 
-void balanceReps(void) {
-  int starting = 0; //behindRep(pipe_index + 2); // most behind rep gets data first
+int rep_gap(int rep_num) {
+  int p_index = 0;
   int gap = 0;
+  for (p_index = 0; p_index < pipe_count; p_index++) {
+    if (replicas[0].vot_pipes[p_index].fd_in != 0) { // out from the rep, in to the voter
+      gap += replicas[aheadRep(p_index)].voted[p_index] - replicas[rep_num].voted[p_index];
+    }
+  }
+  return gap;
+}
+
+void balanceReps(void) {
+  int starting = 0; // most behind rep gets data first
+  int second = 1; // the most behind might be dead, so second to go is up next
   int index = 0;
-  for (index = 0; index < pipe_count; index++) {
-    if (replicas[0].vot_pipes[index].fd_in != 0) { // out from the rep, in to the voter
-      if ((replicas[aheadRep(index)].voted[index] - 0) > gap) { //replicas[behindRep(i)].voted[i]) > gap) {
-        gap = replicas[aheadRep(index)].voted[index] - 0; //replicas[behindRep(i)].voted[i];
-        starting = behindRep(index);
+
+
+  for (index = 0; index < rep_count; index++) {
+    if (rep_gap(index) > rep_gap(starting)) {
+      starting = index;
+    } else if (rep_gap(index) > rep_gap(second)) {
+      if (index != starting) {
+        second = index;
       }
     }
   }
@@ -461,6 +474,8 @@ void balanceReps(void) {
     int dontcare = 0;
     int offset;
     if (index == starting) {
+      offset = voter_priority - 2 + VOTER_PRIO_OFFSET;
+    } else if (index == second) {
       offset = voter_priority - 1 + VOTER_PRIO_OFFSET;
     } else {
       offset = voter_priority + VOTER_PRIO_OFFSET;
@@ -507,14 +522,17 @@ void processData(struct typed_pipe *pipe, int pipe_index) {
 void resetVotingState(int pipe_num) {
   int r_index;
   for (r_index = 0; r_index < rep_count; r_index++) {
-    replicas[r_index].voted[pipe_num] = 0;
+    replicas[r_index].voted[pipe_num]--; // = 0;
   }
 }
 
-void resetVotingStateAll(void) {
+void initVotingState(void) {
   int p_index;
+  int r_index;
   for (p_index = 0; p_index < pipe_count; p_index++) {
-    resetVotingState(p_index);
+    for (r_index = 0; r_index < rep_count; r_index++) {
+      replicas[r_index].voted[p_index] = 0;
+    }
   }
 }
 
@@ -602,9 +620,32 @@ void checkSDC(int pipe_num) {
   }
 }
 
+// New message came in, but already have a message
+void emergencyWrite(int pipe_num, int replica_num) {
+ switch (rep_type) {
+  case SMR: 
+    // Wut? This makes no sense
+    printf("Voter emergencyWrite error: SMR.");
+    return;
+  case DMR:
+    // Just send it.
+    writeBuffer(ext_pipes[pipe_num].fd_out, replicas[replica_num].vot_pipes[pipe_num].buffer, replicas[replica_num].vot_pipes[pipe_num].buff_count);
+    resetVotingState(pipe_num);
+    return;
+  case TMR:
+    // check if match? or just send it.
+    writeBuffer(ext_pipes[pipe_num].fd_out, replicas[replica_num].vot_pipes[pipe_num].buffer, replicas[replica_num].vot_pipes[pipe_num].buff_count);
+    resetVotingState(pipe_num);
+    return;
+  }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Process output from replica; vote on it
 void processFromRep(int replica_num, int pipe_num) {
+  if (replicas[replica_num].voted[pipe_num] >= 1) { // Already have a pending message... will lose data if read is done
+    emergencyWrite(pipe_num, replica_num);
+  }
   struct typed_pipe* curr_pipe = &(replicas[replica_num].vot_pipes[pipe_num]);
   curr_pipe->buff_count = TEMP_FAILURE_RETRY(read(curr_pipe->fd_in, curr_pipe->buffer, MAX_PIPE_BUFF));
 
@@ -614,11 +655,16 @@ void processFromRep(int replica_num, int pipe_num) {
     curr_pipe->msg_count++; // TODO: Remove
     replicas[replica_num].voted[pipe_num]++;
     
+    if (controller_name[1] == 'S') {
+      //printf("AStar pipe - %d - rep votes: %d, %d, %d\n", pipe_num, replicas[0].voted[pipe_num], replicas[1].voted[pipe_num], replicas[2].voted[pipe_num]);
+    }
+
     balanceReps();
+    
 
     if (replicas[replica_num].voted[pipe_num] > 1) {
       // Happens when a process has died. // TODO: Suppress warning.
-      printf("Run-away lag detected: %s pipe - %d - rep 0, 1, 2: %d, %d, %d\n", controller_name, pipe_num, replicas[0].voted[pipe_num], replicas[1].voted[pipe_num], replicas[2].voted[pipe_num]);
+      // printf("Run-away lag detected: %s pipe - %d - rep 0, 1, 2: %d, %d, %d\n", controller_name, pipe_num, replicas[0].voted[pipe_num], replicas[1].voted[pipe_num], replicas[2].voted[pipe_num]);
     }
 
     checkSDC(pipe_num);

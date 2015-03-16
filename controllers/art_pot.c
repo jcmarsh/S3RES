@@ -105,7 +105,7 @@ void command(void) {
   
   pid_t currentPID = getpid();
   if (msg_id != command_loop) {
-    printf("ERROR: ArtPot (%d) On message %d and command loop %d\n", currentPID, msg_id, command_loop); // TODO: Remove
+    //printf("ERROR: ArtPot (%d) On message %d and command loop %d\n", currentPID, msg_id, command_loop); // TODO: Remove
   }
   command_loop++;
 
