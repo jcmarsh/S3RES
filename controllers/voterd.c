@@ -57,6 +57,7 @@ int main(int argc, const char **argv);
 void doOneUpdate(void);
 void processData(struct typed_pipe *pipe, int pipe_index);
 void resetVotingState(int pipe_num);
+void initVotingState(void);
 void sendPipe(int pipe_num, int replica_num);
 void checkSDC(int pipe_num);
 void processFromRep(int replica_num, int pipe_num);

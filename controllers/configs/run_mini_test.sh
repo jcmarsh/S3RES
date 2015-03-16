@@ -6,7 +6,7 @@ ANOTHER_TIME=240s
 
 PINT_DIR=/home/jcmarsh/research/PINT
 CONFIG_DIR=$PINT_DIR/controllers/configs
-OUTPUT=$/home/jcmarsh/Dropbox/research/MyPaperAttempts/EMSOFT2015/mini_test_data/night
+OUTPUT=/home/jcmarsh/Dropbox/research/MyPaperAttempts/EMSOFT2015/mini_test_data/night
 
 ITARS=9
 
