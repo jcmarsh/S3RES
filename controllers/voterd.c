@@ -59,11 +59,13 @@ void processData(struct typed_pipe *pipe, int pipe_index);
 void resetVotingState(int pipe_num);
 void initVotingState(void);
 void sendPipe(int pipe_num, int replica_num);
+void stealBuffers(int rep_num, char **buffer, int *buff_count);
+void returnBuffers(int rep_num, char **buffer, int *buff_count);
 void checkSDC(int pipe_num);
 void processFromRep(int replica_num, int pipe_num);
 void restartReplica(int restarter, int restartee);
 void cleanupReplica(int rep_index);
-void writeBuffer(int fd_out, char** buffer, int buff_count);
+void writeBuffer(int fd_out, char* buffer, int buff_count);
 
 void timeout_sighandler(int signo, siginfo_t *si, void *unused) {
   assert(TEMP_FAILURE_RETRY(write(timeout_fd[1], timeout_byte, 1) == 1));
@@ -109,8 +111,9 @@ void voterRestartHandler(void) {
   // Timer went off, so the timer_stop_index is the pipe which is awaiting a rep
   int p_index;
 
+  // TODO: A lot of replication here, especially with SDC handling.
   switch (rep_type) {
-    case SMR:
+    case SMR: {
       // Need to cold restart the replica
       cleanupReplica(0);
 
@@ -124,16 +127,90 @@ void voterRestartHandler(void) {
         }
       }
 
-      return;
-    case DMR:
-      // Same as TMR
-    case TMR: ; // the semicolon is needed becasue C.
+      break;
+    }
+    case DMR: {
       // The failed rep should be the one behind on the timer pipe
       int restartee = behindRep(timer_stop_index);
       int restarter = (restartee + (rep_count - 1)) % rep_count;
+      
+      int i;
+      char **restarter_buffer = (char **)malloc(sizeof(char *) * PIPE_LIMIT);
+      if (restarter_buffer == NULL) {
+        perror("Voter failed to malloc memory");
+      }
+      for (i = 0; i < PIPE_LIMIT; i++) {
+        restarter_buffer[i] = (char *)malloc(sizeof(char) * MAX_PIPE_BUFF);
+        if (restarter_buffer[i] == NULL) {
+          perror("Voter failed to allocat memory");
+        }
+      }
+      int restarter_buff_count[PIPE_LIMIT] = {0};
+
+      // Steal the buffers from healthy reps. This stops them from processing mid restart
+      stealBuffers(restarter, restarter_buffer, restarter_buff_count);
 
       restartReplica(restarter, restartee);
-      return;
+
+      // Give the buffers back
+      returnBuffers(restartee, restarter_buffer, restarter_buff_count);
+      returnBuffers(restarter, restarter_buffer, restarter_buff_count);
+      // free the buffers
+      for (i = 0; i < PIPE_LIMIT; i++) {
+        free(restarter_buffer[i]);
+      }
+      free(restarter_buffer);
+      break;
+    }
+    case TMR: {// the semicolon is needed becasue C.
+      // The failed rep should be the one behind on the timer pipe
+      int restartee = behindRep(timer_stop_index);
+      int restarter = (restartee + (rep_count - 1)) % rep_count;
+      int other_rep = (restarter + (rep_count - 1)) % rep_count;
+
+      int i;
+      char **restarter_buffer = (char **)malloc(sizeof(char *) * PIPE_LIMIT);
+      if (restarter_buffer == NULL) {
+        perror("Voter failed to malloc memory");
+      }
+      char **other_rep_buffer = (char **)malloc(sizeof(char *) * PIPE_LIMIT);
+      if (other_rep_buffer == NULL) {
+        perror("Voter failed to malloc memory");
+      }
+      for (i = 0; i < PIPE_LIMIT; i++) {
+        restarter_buffer[i] = (char *)malloc(sizeof(char) * MAX_PIPE_BUFF);
+        if (restarter_buffer[i] == NULL) {
+          perror("Voter failed to allocat memory");
+        }
+        other_rep_buffer[i] = (char *)malloc(sizeof(char) * MAX_PIPE_BUFF);
+        if (other_rep_buffer[i] == NULL) {
+          perror("Voter failed to allocat memory");
+        }
+      }
+      int restarter_buff_count[PIPE_LIMIT] = {0};
+      int other_rep_buff_count[PIPE_LIMIT] = {0};
+
+      // Steal the buffers from healthy reps. This stops them from processing mid restart
+      stealBuffers(restarter, restarter_buffer, restarter_buff_count);
+      stealBuffers(other_rep, other_rep_buffer, other_rep_buff_count);
+
+      restartReplica(restarter, restartee);
+
+      // Give the buffers back
+      returnBuffers(restartee, restarter_buffer, restarter_buff_count);
+      returnBuffers(restarter, restarter_buffer, restarter_buff_count);
+      returnBuffers(other_rep, other_rep_buffer, other_rep_buff_count);
+      // free the buffers
+      for (i = 0; i < PIPE_LIMIT; i++) {
+        free(restarter_buffer[i]);
+        free(other_rep_buffer[i]);
+      }
+      free(restarter_buffer);
+      free(other_rep_buffer);
+      break;
+    }
+
+    return;
   }
 }
 
@@ -165,8 +242,10 @@ void cleanupReplica(int rep_index) {
   return;
 }
 
-void restartReplica(int restarter, int restartee) {
-  int i;
+// Steal the buffers from a single replica
+// buff_count and buffer should already be alocated.
+void stealBuffers(int rep_num, char **buffer, int *buff_count) {
+  int i = 0;
 
   struct timeval select_timeout;
   fd_set select_set;
@@ -174,29 +253,37 @@ void restartReplica(int restarter, int restartee) {
   select_timeout.tv_usec = 0;
 
   FD_ZERO(&select_set);
-  for (i = 0; i < replicas[restarter].pipe_count; i++) {
-    if (replicas[restarter].voter_rep_in_copy[i] != 0) {
-      FD_SET(replicas[restarter].voter_rep_in_copy[i], &select_set);
+  for (i = 0; i < replicas[rep_num].pipe_count; i++) {
+    if (replicas[rep_num].voter_rep_in_copy[i] != 0) {
+      FD_SET(replicas[rep_num].voter_rep_in_copy[i], &select_set);
     }
   }
-
-  char *buffer[PIPE_LIMIT];
-  int buff_count[PIPE_LIMIT] = {0};
 
   int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
   if (retval > 0) { // Copy buffers
-    for (i = 0; i < replicas[restarter].pipe_count; i++) {
-      if (FD_ISSET(replicas[restarter].voter_rep_in_copy[i], &select_set)) {
-        buffer[i] = (char *)malloc(sizeof(char) * MAX_PIPE_BUFF);
-        buff_count[i] = read(replicas[restarter].voter_rep_in_copy[i], &(buffer[i]), MAX_PIPE_BUFF);
+    for (i = 0; i < replicas[rep_num].pipe_count; i++) {
+      if (FD_ISSET(replicas[rep_num].voter_rep_in_copy[i], &select_set)) {
+        buff_count[i] = read(replicas[rep_num].voter_rep_in_copy[i], buffer[i], MAX_PIPE_BUFF);
         if (buff_count[i] < 0) {
           perror("Voter error stealing pipe");
         }
-        printf("buff_count %d = %d\n", i, buff_count[i]);
-        writeBuffer(replicas[restarter].vot_pipes[i].fd_out, &(buffer[i]), buff_count[i]);
       }
     }
+  }  
+}
+
+// replace buffers in a replica. Does NOT free the buffer (so the same one can be copied again)
+void returnBuffers(int rep_num, char **buffer, int *buff_count) {  
+  int i = 0;
+  for (i = 0; i < replicas[rep_num].pipe_count; i++) {
+    if (buff_count[i] > 0) {
+      writeBuffer(replicas[rep_num].vot_pipes[i].fd_out, buffer[i], buff_count[i]);
+    }
   }
+}
+
+void restartReplica(int restarter, int restartee) {
+  int i, retval;
 
   #ifdef TIME_RESTART_REPLICA
     timestamp_t last = generate_timestamp();
@@ -215,15 +302,6 @@ void restartReplica(int restarter, int restartee) {
     }
     timer_started = false;
   }
-
-  //for (i = 0; i < replicas[restarter].pipe_count; i++) {
-  //  if (replicas[restarter].vot_pipes[i].fd_in != 0) { // && replicas[restarter].voted[i] > 0) { // was causing problems with the timer
-  //    replicas[restartee].voted[i] = replicas[restarter].voted[i];
-  //    memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
-  //    replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
-  //    sendPipe(i, restarter);
-  //  }
-  //}
 
   cleanupReplica(restartee);
 
@@ -271,14 +349,6 @@ void restartReplica(int restarter, int restartee) {
       memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
       replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
       sendPipe(i, restarter);
-    }
-  }
-
-  // replace buffers in the new replica
-  for (i = 0; i < replicas[restartee].pipe_count; i++) {
-    if (buff_count[i] > 0) {
-      writeBuffer(replicas[restarter].vot_pipes[i].fd_out, &(buffer[i]), buff_count[i]);
-      free(buffer[i]);
     }
   }
 
@@ -479,7 +549,7 @@ void doOneUpdate(void) {
   }
 }
 
-void writeBuffer(int fd_out, char** buffer, int buff_count) {
+void writeBuffer(int fd_out, char* buffer, int buff_count) {
   int retval = TEMP_FAILURE_RETRY(write(fd_out, buffer, buff_count));
   if (retval == buff_count) {
     // success, do nothing
@@ -657,10 +727,49 @@ void checkSDC(int pipe_num) {
                      replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num].buffer,
                      replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
             int restartee = (r_index + 2) % rep_count;
+            int other_rep = (r_index + 1) % rep_count;
+            int restarter = r_index;
             printf("Voting disagreement: caught SDC Name %s\t Rep %d\t Pipe %d\t pid %d\n", controller_name, restartee, pipe_num, replicas[restartee].pid);
-            //printBuffer(&(replicas[r_index].vot_pipes[pipe_num]));
-            //printBuffer(&(replicas[restartee].vot_pipes[pipe_num]));
-            restartReplica(r_index, restartee);
+
+            int i;
+            char **restarter_buffer = (char **)malloc(sizeof(char *) * PIPE_LIMIT);
+            if (restarter_buffer == NULL) {
+              perror("Voter failed to malloc memory");
+            }
+            char **other_rep_buffer = (char **)malloc(sizeof(char *) * PIPE_LIMIT);
+            if (other_rep_buffer == NULL) {
+              perror("Voter failed to malloc memory");
+            }
+            for (i = 0; i < PIPE_LIMIT; i++) {
+              restarter_buffer[i] = (char *)malloc(sizeof(char) * MAX_PIPE_BUFF);
+              if (restarter_buffer[i] == NULL) {
+                perror("Voter failed to allocat memory");
+              }
+              other_rep_buffer[i] = (char *)malloc(sizeof(char) * MAX_PIPE_BUFF);
+              if (other_rep_buffer[i] == NULL) {
+                perror("Voter failed to allocat memory");
+              }
+            }
+            int restarter_buff_count[PIPE_LIMIT] = {0};
+            int other_rep_buff_count[PIPE_LIMIT] = {0};
+
+            // Steal the buffers from healthy reps. This stops them from processing mid restart
+            stealBuffers(restarter, restarter_buffer, restarter_buff_count);
+            stealBuffers(other_rep, other_rep_buffer, other_rep_buff_count);
+
+            restartReplica(restarter, restartee);
+
+            // Give the buffers back
+            returnBuffers(restartee, restarter_buffer, restarter_buff_count);
+            returnBuffers(restarter, restarter_buffer, restarter_buff_count);
+            returnBuffers(other_rep, other_rep_buffer, other_rep_buff_count);
+            // free the buffers
+            for (i = 0; i < PIPE_LIMIT; i++) {
+              free(restarter_buffer[i]);
+              free(other_rep_buffer[i]);
+            }
+            free(restarter_buffer);
+            free(other_rep_buffer);
           } else {
             // If all agree, send and be happy. Otherwise the send is done as part of the restart process
             sendPipe(pipe_num, r_index);

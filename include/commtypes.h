@@ -51,7 +51,7 @@ struct typed_pipe {
   int fd_out;
 
   int buff_count;
-  char* buffer[MAX_PIPE_BUFF];
+  char buffer[MAX_PIPE_BUFF];
 };
 
 struct comm_way_req {
