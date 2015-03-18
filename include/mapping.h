@@ -1,7 +1,7 @@
 #include <stdbool.h>
 
 // Configuration parameters
-#define GRID_NUM 96
+#define GRID_NUM 72
 #define MAP_SIZE 16
 #define OFFSET_X  8
 #define OFFSET_Y  8

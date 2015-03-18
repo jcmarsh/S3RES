@@ -57,8 +57,9 @@ int parseArgs(int argc, const char **argv) {
   return 0;
 }
 
-double prev_x = 0, prev_y = 0;
+double prev_x = -7.0, prev_y = -7.0;
 timestamp_t prev_time = 0;
+double time_elapsed = 0.0;
 void command(void) {
   int index = 0;
   timestamp_t current_time = generate_timestamp(); // TODO lookup timestamps
@@ -72,9 +73,17 @@ void command(void) {
     // Skip; first cycle 
   } else {
     // calc velocity
-    double velocity = sqrt(((pose[0] - prev_x) * (pose[0] - prev_x)) + ((pose[1] - prev_y) * (pose[1] - prev_y)));
-    double time_elapsed = ((current_time - prev_time) / (1000000 * 3092.0)); // did the math: matches J. Taylor's time.cpp
-    velocity = velocity / time_elapsed;
+    double velocity = 0.0;
+    double distance = sqrt(((pose[0] - prev_x) * (pose[0] - prev_x)) + ((pose[1] - prev_y) * (pose[1] - prev_y)));
+    double time_this_round = ((current_time - prev_time) / (1000000 * 3092.0)); // did the math: matches J. Taylor's time.cpp
+    time_elapsed = time_elapsed + time_this_round;    
+
+    if (pose[0] == prev_x && pose[1] == prev_y) {
+      velocity = 0.0;
+    } else {
+      velocity = distance / time_elapsed;
+      time_elapsed = 0.0;
+    }
 
     // obstacle distance  
     double min = 1000; // approximately infinite.
@@ -84,8 +93,7 @@ void command(void) {
       }
     }
 
-    fprintf(log_file, "(%f,\t%f,\t%f,\t%f,\t%f)\n", min, velocity, time_elapsed, pose[0], pose[1]); 
-
+    fprintf(log_file, "(%f,\t%f,\t%f,\t%f,\t%f,\t%f)\n", min, velocity, distance, time_this_round, pose[0], pose[1]); 
   }
   prev_time = current_time;
   prev_x = pose[0];
@@ -144,7 +152,7 @@ int openFile(void) {
     return -1;
   }
 
-  fprintf(log_file, "(min_dist\t, velocity\t, time_elapsed\t, X position\t, Y position\n"); 
+  fprintf(log_file, "(min_dist,\tvelocity,\tdistance,\ttime_elapsed,\tX position,\tY position\n"); 
 }
 
 int main(int argc, const char **argv) {
