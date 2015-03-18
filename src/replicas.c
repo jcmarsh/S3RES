@@ -53,11 +53,13 @@ void createPipesSpecial(struct replica reps[], int rep_num, struct typed_pipe ex
           rep->vot_pipes[rep->pipe_count].fd_in = 0;
           rep->vot_pipes[rep->pipe_count].fd_out = pipe_fds[1];
           rep->rep_pipes[rep->pipe_count].fd_in = pipe_fds[0];
+          rep->voter_rep_in_copy[rep->pipe_count] = pipe_fds[0]; // TODO: Necessary?
           rep->rep_pipes[rep->pipe_count].fd_out = 0;
         } else { // This pipe is outgoing (not friendly)
           rep->vot_pipes[rep->pipe_count].fd_in = pipe_fds[0];
           rep->vot_pipes[rep->pipe_count].fd_out = 0;
           rep->rep_pipes[rep->pipe_count].fd_in = 0;
+          rep->voter_rep_in_copy[rep->pipe_count] = 0; // TODO: Necessary?
           rep->rep_pipes[rep->pipe_count].fd_out = pipe_fds[1];
         }
         rep->pipe_count++;
@@ -86,11 +88,13 @@ void createPipes(struct replica reps[], int rep_num, struct typed_pipe ext_pipes
           rep->vot_pipes[rep->pipe_count].fd_in = 0;
           rep->vot_pipes[rep->pipe_count].fd_out = pipe_fds[1];
           rep->rep_pipes[rep->pipe_count].fd_in = pipe_fds[0];
+          rep->voter_rep_in_copy[rep->pipe_count] = pipe_fds[0];
           rep->rep_pipes[rep->pipe_count].fd_out = 0;
         } else { // This pipe is outgoing (not friendly)
           rep->vot_pipes[rep->pipe_count].fd_in = pipe_fds[0];
           rep->vot_pipes[rep->pipe_count].fd_out = 0;
           rep->rep_pipes[rep->pipe_count].fd_in = 0;
+          rep->voter_rep_in_copy[rep->pipe_count] = 0;
           rep->rep_pipes[rep->pipe_count].fd_out = pipe_fds[1];
         }
         rep->pipe_count++;

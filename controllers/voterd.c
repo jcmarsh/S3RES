@@ -21,7 +21,7 @@
 
 #define REP_MAX 3
 #define PERIOD_NSEC 120000 // Max time for voting in nanoseconds (120 micro seconds)
-#define VOTER_PRIO_OFFSET 20 // Replicas run with a +20 offset (low prio)
+#define VOTER_PRIO_OFFSET 5 // Replicas run with a +20 offset (low prio)
 
 long voting_timeout;
 int timer_start_index;
@@ -63,6 +63,7 @@ void checkSDC(int pipe_num);
 void processFromRep(int replica_num, int pipe_num);
 void restartReplica(int restarter, int restartee);
 void cleanupReplica(int rep_index);
+void writeBuffer(int fd_out, char** buffer, int buff_count);
 
 void timeout_sighandler(int signo, siginfo_t *si, void *unused) {
   assert(TEMP_FAILURE_RETRY(write(timeout_fd[1], timeout_byte, 1) == 1));
@@ -156,6 +157,9 @@ void cleanupReplica(int rep_index) {
     if (replicas[rep_index].rep_pipes[i].fd_out > 0) {
       close(replicas[rep_index].rep_pipes[i].fd_out);
     }
+    if (replicas[rep_index].voter_rep_in_copy[i] > 0) {
+      close(replicas[rep_index].voter_rep_in_copy[i]);
+    }
   }
 
   return;
@@ -163,6 +167,36 @@ void cleanupReplica(int rep_index) {
 
 void restartReplica(int restarter, int restartee) {
   int i;
+
+  struct timeval select_timeout;
+  fd_set select_set;
+  select_timeout.tv_sec = 0;
+  select_timeout.tv_usec = 0;
+
+  FD_ZERO(&select_set);
+  for (i = 0; i < replicas[restarter].pipe_count; i++) {
+    if (replicas[restarter].voter_rep_in_copy[i] != 0) {
+      FD_SET(replicas[restarter].voter_rep_in_copy[i], &select_set);
+    }
+  }
+
+  char *buffer[PIPE_LIMIT];
+  int buff_count[PIPE_LIMIT] = {0};
+
+  int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
+  if (retval > 0) { // Copy buffers
+    for (i = 0; i < replicas[restarter].pipe_count; i++) {
+      if (FD_ISSET(replicas[restarter].voter_rep_in_copy[i], &select_set)) {
+        buffer[i] = (char *)malloc(sizeof(char) * MAX_PIPE_BUFF);
+        buff_count[i] = read(replicas[restarter].voter_rep_in_copy[i], &(buffer[i]), MAX_PIPE_BUFF);
+        if (buff_count[i] < 0) {
+          perror("Voter error stealing pipe");
+        }
+        printf("buff_count %d = %d\n", i, buff_count[i]);
+        writeBuffer(replicas[restarter].vot_pipes[i].fd_out, &(buffer[i]), buff_count[i]);
+      }
+    }
+  }
 
   #ifdef TIME_RESTART_REPLICA
     timestamp_t last = generate_timestamp();
@@ -181,6 +215,15 @@ void restartReplica(int restarter, int restartee) {
     }
     timer_started = false;
   }
+
+  //for (i = 0; i < replicas[restarter].pipe_count; i++) {
+  //  if (replicas[restarter].vot_pipes[i].fd_in != 0) { // && replicas[restarter].voted[i] > 0) { // was causing problems with the timer
+  //    replicas[restartee].voted[i] = replicas[restarter].voted[i];
+  //    memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
+  //    replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
+  //    sendPipe(i, restarter);
+  //  }
+  //}
 
   cleanupReplica(restartee);
 
@@ -201,7 +244,7 @@ void restartReplica(int restarter, int restartee) {
       } else {
         offset = voter_priority + VOTER_PRIO_OFFSET;
       }
-      int retval = sched_set_realtime_policy(replicas[i].pid, &dontcare, offset);
+      retval = sched_set_realtime_policy(replicas[i].pid, &dontcare, offset);
       if (retval == 0) {
         // Do nothing, worked fine.
       } else {
@@ -210,7 +253,7 @@ void restartReplica(int restarter, int restartee) {
     }
   }
 
-  int retval = kill(replicas[restarter].pid, RESTART_SIGNAL);
+  retval = kill(replicas[restarter].pid, RESTART_SIGNAL);
   //#endif /* TIME_RESTART_SIGNAL */
   if (retval < 0) {
     perror("VoterD Signal Problem");
@@ -228,6 +271,14 @@ void restartReplica(int restarter, int restartee) {
       memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
       replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
       sendPipe(i, restarter);
+    }
+  }
+
+  // replace buffers in the new replica
+  for (i = 0; i < replicas[restartee].pipe_count; i++) {
+    if (buff_count[i] > 0) {
+      writeBuffer(replicas[restarter].vot_pipes[i].fd_out, &(buffer[i]), buff_count[i]);
+      free(buffer[i]);
     }
   }
 
@@ -607,6 +658,8 @@ void checkSDC(int pipe_num) {
                      replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
             int restartee = (r_index + 2) % rep_count;
             printf("Voting disagreement: caught SDC Name %s\t Rep %d\t Pipe %d\t pid %d\n", controller_name, restartee, pipe_num, replicas[restartee].pid);
+            //printBuffer(&(replicas[r_index].vot_pipes[pipe_num]));
+            //printBuffer(&(replicas[restartee].vot_pipes[pipe_num]));
             restartReplica(r_index, restartee);
           } else {
             // If all agree, send and be happy. Otherwise the send is done as part of the restart process
