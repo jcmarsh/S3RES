@@ -162,7 +162,7 @@ void command(void) {
     }
 
     if (current == NULL) { // TODO: this shouldn't happen.
-      printf("How the #$*& did that happen?\n");
+      //printf("How the #$*& did that happen?\n");
       solution = false;
       break;
     }
@@ -193,7 +193,7 @@ void command(void) {
   }
 
   if (!solution) {
-    printf("You have failed, as expected.\n");
+    //printf("You have failed, as expected.\n");
     // Not sure what to do in this case
   } else {
     // check if new path is different then old
