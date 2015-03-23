@@ -134,7 +134,7 @@ int TranslatorDriver::MainSetup() {
 
   puts("Translator driver initialising in MainSetup");
 
-  InitTAS(0, 4);
+  InitTAS(0, 51);
   curr_goal[INDEX_X] = curr_goal[INDEX_Y] = curr_goal[INDEX_A] = 0.0;
 
   // Initial starting position

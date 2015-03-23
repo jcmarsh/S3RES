@@ -51,7 +51,7 @@ int main(int argc, const char **argv) {
   playerc_position2d_set_cmd_pose(position2d, 4.5, 4.5, 0.0, 1);
 
   while(1) {
-    // blah
+    sleep(1); // blah
   }
 
   // Shutdown
