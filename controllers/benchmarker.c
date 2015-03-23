@@ -39,7 +39,8 @@ void enterLoop();
 int initBenchMarker() {
   int scheduler;
 
-  InitTAS(DEFAULT_CPU, priority);
+  //InitTAS(DEFAULT_CPU, priority);
+  InitTAS(0, priority);
 
   scheduler = sched_getscheduler(0);
 
@@ -108,14 +109,18 @@ void enterLoop() {
         if (retval == sizeof(struct comm_range_pose_data)) {
           if (waiting_response) {
             printf("ERROR, sending data but still waiting on previous response.\n");
+            #ifdef TIME_FULL_BENCH
+              timestamp_t toss = generate_timestamp();
+              printf("Error time elapsed (%lld)\n", toss - last);
+            #endif
           }
           waiting_response = true;
 
           #ifdef TIME_FULL_BENCH
-            last = generate_timestamp();
+            last = generate_timestamp(); // TODO: Not sure about this
           #endif
 
-          if (TEMP_FAILURE_RETRY(write(replica.vot_pipes[0].fd_out, &range_pose_data_msg, sizeof(struct comm_range_pose_data)) != sizeof(struct comm_range_pose_data))) {
+	  if (TEMP_FAILURE_RETRY(write(replica.vot_pipes[0].fd_out, &range_pose_data_msg, sizeof(struct comm_range_pose_data)) != sizeof(struct comm_range_pose_data))) {
             perror("BenchMarker failed range data write");
           }
         } else if (retval > 0) {
@@ -139,7 +144,7 @@ void enterLoop() {
           #endif
 
           // data was set by read in enterLoop
-          if (TEMP_FAILURE_RETRY(write(trans_pipes[1].fd_out, &mov_cmd_msg, sizeof(struct comm_mov_cmd)) != sizeof(struct comm_mov_cmd))) {
+	  if (TEMP_FAILURE_RETRY(write(trans_pipes[1].fd_out, &mov_cmd_msg, sizeof(struct comm_mov_cmd)) != sizeof(struct comm_mov_cmd))) {
             perror("Bencmarker failed mov_cmd write");
           }
         } else if (retval > 0) {

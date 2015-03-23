@@ -21,7 +21,7 @@
 
 #define REP_MAX 3
 #define PERIOD_NSEC 120000 // Max time for voting in nanoseconds (120 micro seconds)
-#define VOTER_PRIO_OFFSET 30 // Replicas run with a +20 offset (low prio)
+#define VOTER_PRIO_OFFSET 5 // Replicas run with a +20 offset (low prio)
 
 long voting_timeout;
 int timer_start_index;

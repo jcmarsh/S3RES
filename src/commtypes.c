@@ -224,20 +224,32 @@ int commRecvMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg) {
   int index = 0;
 
   int read_ret = TEMP_FAILURE_RETRY(read(pipe.fd_in, &recv_msg_buffer, sizeof(int) * header_ints));
-  if (read_ret > 0) { // TODO: Read may still have been interrupted.
+  if (read_ret == sizeof(int) * header_ints) { // TODO: Read may still have been interrupted.
     msg->pose_x = recv_msg_buffer[0];
     msg->pose_y = recv_msg_buffer[1];
     msg->obs_count = recv_msg_buffer[2];
 
     if (msg->obs_count > 0) { // read obstacles
       read_ret = TEMP_FAILURE_RETRY(read(pipe.fd_in, &recv_msg_buffer[header_ints], sizeof(int) * 2 * msg->obs_count));
-      if (read_ret > 0) {
+      if (read_ret == sizeof(int) * 2 * msg->obs_count) {
         for (index = 0; index < msg->obs_count; index++) {
           msg->obs_x[index] = recv_msg_buffer[header_ints + (index * 2)];
           msg->obs_y[index] = recv_msg_buffer[header_ints + (index * 2 + 1)];
         }
-      }
+      } else if (read_ret > 0) {
+        printf("commRecvMapUpdate read obstacles did not match expected size: %d\n", read_ret); 
+      } else if (read_ret < 0) {
+        perror("commRecvMapUpdate read obstacles problems");
+      } else {
+        perror("commRecvMapUpdate read obstacles == 0");
+      }   
     }
+  } else if (read_ret > 0) {
+    printf("commRecvMapUpdate read header did not match expected size: %d\n", read_ret); 
+  } else if (read_ret < 0) {
+    perror("commRecvMapUpdate read obstacles problems");
+  } else {
+    perror("commRecvMapUpdate read obstacles == 0");
   }
 
   return read_ret;
@@ -261,7 +273,15 @@ int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_d
     msg.pose[index] = pose_data[index];
   }
 
-  return TEMP_FAILURE_RETRY(write(pipe.fd_out, &msg, sizeof(struct comm_range_pose_data)));
+  int write_ret = TEMP_FAILURE_RETRY(write(pipe.fd_out, &msg, sizeof(struct comm_range_pose_data)));
+  if (write_ret < sizeof(struct comm_range_pose_data)) {
+    if (write_ret < 0) {
+      perror("commSendRanger failed");
+    } else {
+      printf("commSendRange did not write expected bytes to fd %d, bytes %d\n", pipe.fd_out, write_ret);
+    }
+  }
+  return write_ret;
 }
 
 int commSendAck(struct typed_pipe pipe) {

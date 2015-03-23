@@ -5,6 +5,10 @@
 /*               */
 struct point_i* gridify(struct point_d* p) {
   struct point_i* new_point = (struct point_i*) malloc(sizeof(struct point_i));
+  if (new_point == NULL) {
+    printf("gridify out of memory.\n");
+    exit(-1);
+  }
   double interval = MAP_SIZE / (double)GRID_NUM;
   new_point->x = (int)((p->x + OFFSET_X) / interval);
   new_point->y = (int)((p->y + OFFSET_Y) / interval);
@@ -22,6 +26,10 @@ struct point_i* gridify(struct point_d* p) {
 
 struct point_d* degridify(int x, int y) {
   struct point_d* new_point = (struct point_d*) malloc(sizeof(struct point_d));
+  if (new_point == NULL) {
+    printf("degridify out of memory.\n");
+    exit(-1);
+  }
   double interval = MAP_SIZE / (double)GRID_NUM;
   new_point->x = x * interval + (interval / 2.0) - OFFSET_X;
   new_point->y = y * interval + (interval / 2.0) - OFFSET_Y;
@@ -56,6 +64,10 @@ void printMap(bool obs_map[][GRID_NUM], struct l_list_t* path) {
 /*              */
 struct l_list_t* newList() {
   struct l_list_t* new_list = (struct l_list_t*) malloc(sizeof(struct l_list_t));
+  if (new_list == NULL) {
+    printf("newList out of memory.\n");
+    exit(-1);
+  }
   new_list->head = NULL;
   new_list->sort_val = 0.0;
   new_list->tail = NULL;
@@ -176,6 +188,10 @@ void eraseList(struct l_list_t** list) {
 
 struct node_t* newNode(int x, int y, double g_score) {
   struct node_t* new_node = (struct node_t*) malloc(sizeof(struct node_t));
+  if (new_node == NULL) {
+    printf("newNode out of memory.\n");
+    exit(-1);
+  }
   new_node->x = x;
   new_node->y = y;
   new_node->g_score = g_score;

@@ -94,7 +94,7 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
-  if (initReplica() < 0) {
+  if (initController() < 0) {
     puts("ERROR: failure in setup function.");
     return -1;
   }

@@ -100,7 +100,7 @@ void enterLoop(void) {
           // Calculates and sends the new command
           command();
         } else if (read_ret > 0) {
-          printf("Filter read data_index did not match expected size.\n");
+          printf("Filter read data_index did not match expected size: %d\n", read_ret);
         } else if (read_ret < 0) {
           perror("Filter - read data_index problems");
         } else {
@@ -117,7 +117,7 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
-  if (initReplica() < 0) {
+  if (initController() < 0) {
     puts("ERROR: failure in setup function.");
     return -1;
   }

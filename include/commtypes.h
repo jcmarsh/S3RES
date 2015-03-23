@@ -15,7 +15,7 @@
 // Why 10? No reason.
 #define PIPE_LIMIT 10
 // Max number of bytes
-#define MAX_PIPE_BUFF 1024
+#define MAX_PIPE_BUFF 4096
 // Number of range sensors
 #define RANGER_COUNT 16
 

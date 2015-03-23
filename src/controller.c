@@ -9,7 +9,7 @@ extern int pipe_count;
 extern struct typed_pipe pipes[];
 extern const char* name;
 
-int initReplica(void) {
+int initController(void) {
   struct sigaction sa;
 
   sa.sa_flags = SA_SIGINFO;
@@ -48,7 +48,7 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
       // child sets new id, recreates connects, loops
-      initReplica();
+      initController();
 
       // clean up pipes
       for (index = 0; index < pipe_count; index++) {

@@ -160,7 +160,7 @@ void enterLoop(void) {
         if (read_ret == sizeof(struct comm_range_pose_data)) {
           updateMap(&recv_msg);
         } else if (read_ret > 0) {
-          printf("Mapper read data_index did not match expected size.\n");
+          printf("Mapper read data_index did not match expected size: %d\n", read_ret);
         } else if (read_ret < 0) {
           perror("Mapper - read data_index problems");
         } else {
@@ -172,7 +172,7 @@ void enterLoop(void) {
         if (read_ret == sizeof(struct comm_ack)) {
           // Do nothing
         } else if (read_ret > 0) {
-          printf("Mapper read ack_index did not match expected size.\n");
+          printf("Mapper read ack_index did not match expected size: %d\n", read_ret);
         } else if (read_ret < 0) {
           perror("Mapper - read ack_index problems");
         } else {
@@ -190,7 +190,7 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
-  if (initReplica() < 0) {
+  if (initController() < 0) {
     puts("ERROR: failure in setup function.");
     return -1;
   }
