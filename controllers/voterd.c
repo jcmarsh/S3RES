@@ -44,10 +44,7 @@ char* controller_name;
 int pipe_count = 0;
 struct typed_pipe ext_pipes[PIPE_LIMIT];
 
-// restart timer fd
-char timeout_byte[1] = {'*'};
-int timeout_fd[2];
-timer_t timerid;
+int timeout_fd;
 struct itimerspec its;
 
 // Functions!
@@ -66,10 +63,6 @@ void processFromRep(int replica_num, int pipe_num);
 void restartReplica(int restarter, int restartee);
 void cleanupReplica(int rep_index);
 void writeBuffer(int fd_out, char* buffer, int buff_count);
-
-void timeout_sighandler(int signo, siginfo_t *si, void *unused) {
-  assert(TEMP_FAILURE_RETRY(write(timeout_fd[1], timeout_byte, 1) == 1));
-}
 
 void startReplicas(void) {
   int i;
@@ -297,8 +290,8 @@ void restartReplica(int restarter, int restartee) {
     its.it_value.tv_sec = 0;
     its.it_value.tv_nsec = 0;
 
-    if (timer_settime(timerid, 0, &its, NULL) == -1) {
-      perror("VoterD timer_settime failed");
+    if (timerfd_settime(timeout_fd, 0, &its, NULL) == -1) {
+      perror("VoterD timerfd_settime reset (restartReplica) failed");
     }
     timer_started = false;
   }
@@ -366,29 +359,9 @@ int initVoterD(void) {
 
   InitTAS(DEFAULT_CPU, voter_priority);
 
-  // timeout_fd
-  if (pipe(timeout_fd) == -1) {
-    perror("VoterD time out pipe fail");
-    return -1;
-  }
-
-  // create timer handler
-  struct sigaction sa;
-
-  sa.sa_flags = SA_SIGINFO;
-  sigemptyset(&sa.sa_mask);
-  sa.sa_sigaction = timeout_sighandler;
-  if (sigaction(TIMEOUT_SIGNAL, &sa, NULL) == -1) {
-    perror("Voter failed to register the watchdog handler");
-    return -1;
-  }
-
   /* Create the timer */
-  memset(&sev, 0, sizeof(sev));
-  sev.sigev_notify = SIGEV_SIGNAL;
-  sev.sigev_signo = TIMEOUT_SIGNAL;
-  sev.sigev_value.sival_ptr = &timerid;
-  if (timer_create(CLOCK_REALTIME, &sev, &timerid) == -1) {
+  timeout_fd = timerfd_create(CLOCK_MONOTONIC, 0);
+  if (timeout_fd == -1) {
     perror("VoterD timer_create failed");
     return -1;
   }
@@ -482,7 +455,7 @@ void doOneUpdate(void) {
 
   FD_ZERO(&select_set);
   // Check for timeouts
-  FD_SET(timeout_fd[0], &select_set);
+  FD_SET(timeout_fd, &select_set);
   // Check external in pipes
   for (p_index = 0; p_index < pipe_count; p_index++) {
     if (ext_pipes[p_index].fd_in != 0) {
@@ -505,10 +478,11 @@ void doOneUpdate(void) {
 
   if (retval > 0) {
     // Check for failed replica (time out)
-    if (FD_ISSET(timeout_fd[0], &select_set)) {
-      retval = TEMP_FAILURE_RETRY(read(timeout_fd[0], timeout_byte, 1));
+    if (FD_ISSET(timeout_fd, &select_set)) {
+      unsigned long result = 0;
+      retval = TEMP_FAILURE_RETRY(read(timeout_fd, &result, sizeof(unsigned long)));
       if (retval > 0) { // Only one byte, so I can't imagine how that could be interrupted.
-        printf("Restarting Rep. due to timeout. Name %s\n", controller_name);
+        printf("Restarting Rep. due to timeout. Name %s, overrun %lu\n", controller_name, result);
         voterRestartHandler();
       } else {
         printf("Voter - Controller %s\n", controller_name);
@@ -625,8 +599,8 @@ void processData(struct typed_pipe *pipe, int pipe_index) {
       its.it_value.tv_sec = 0;
       its.it_value.tv_nsec = voting_timeout;
 
-      if (timer_settime(timerid, 0, &its, NULL) == -1) {
-        perror("VoterD timer_settime failed");
+      if (timerfd_settime(timeout_fd, 0, &its, NULL) == -1) {
+        perror("VoterD timerfd_settime failed");
       }
     }
   }
@@ -681,8 +655,8 @@ void sendPipe(int pipe_num, int replica_num) {
     its.it_value.tv_sec = 0;
     its.it_value.tv_nsec = 0;
 
-    if (timer_settime(timerid, 0, &its, NULL) == -1) {
-      perror("VoterD timer_settime failed");
+    if (timerfd_settime(timeout_fd, 0, &its, NULL) == -1) {
+      perror("VoterD timerfd_settime reset (sendPipe) failed");
     }
     timer_started = false;
   }
@@ -784,7 +758,7 @@ void checkSDC(int pipe_num) {
 
 // New message came in, but already have a message
 void emergencyWrite(int pipe_num, int replica_num) {
- switch (rep_type) {
+  switch (rep_type) {
   case SMR: 
     // Wut? This makes no sense
     printf("Voter emergencyWrite error: SMR.");

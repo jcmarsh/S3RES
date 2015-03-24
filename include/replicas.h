@@ -7,11 +7,11 @@
 #ifndef __REP_GUARD
 #define __REP_GUARD
 
+#include "commtypes.h"
 #include <fcntl.h> // needed to deal with pipes
 #include <sys/user.h> // has pid_t
 #include <signal.h>
 #include <stdio.h>
-#include "commtypes.h"
 
  // Represents one redundant execution, implemented as a thread
 struct replica {
