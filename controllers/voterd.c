@@ -27,6 +27,7 @@ long voting_timeout;
 int timer_start_index;
 int timer_stop_index;
 bool timer_started;
+timestamp_t watchdog;
 
 // Replica related data
 struct replica replicas[REP_MAX];
@@ -43,9 +44,6 @@ char* controller_name;
 // pipes to external components (not replicas)
 int pipe_count = 0;
 struct typed_pipe ext_pipes[PIPE_LIMIT];
-
-int timeout_fd;
-struct itimerspec its;
 
 // Functions!
 int initVoterD(void);
@@ -285,14 +283,6 @@ void restartReplica(int restarter, int restartee) {
   // reset timer
   if (timer_started) {
     // reset the timer
-    its.it_interval.tv_sec = 0;
-    its.it_interval.tv_nsec = 0;
-    its.it_value.tv_sec = 0;
-    its.it_value.tv_nsec = 0;
-
-    if (timerfd_settime(timeout_fd, 0, &its, NULL) == -1) {
-      perror("VoterD timerfd_settime reset (restartReplica) failed");
-    }
     timer_started = false;
   }
 
@@ -358,13 +348,6 @@ int initVoterD(void) {
   sigset_t mask;
 
   InitTAS(DEFAULT_CPU, voter_priority);
-
-  /* Create the timer */
-  timeout_fd = timerfd_create(CLOCK_MONOTONIC, 0);
-  if (timeout_fd == -1) {
-    perror("VoterD timer_create failed");
-    return -1;
-  }
 
   // Setup fd server
   createFDS(&sd, controller_name);
@@ -454,8 +437,6 @@ void doOneUpdate(void) {
   select_timeout.tv_usec = 0;
 
   FD_ZERO(&select_set);
-  // Check for timeouts
-  FD_SET(timeout_fd, &select_set);
   // Check external in pipes
   for (p_index = 0; p_index < pipe_count; p_index++) {
     if (ext_pipes[p_index].fd_in != 0) {
@@ -476,20 +457,7 @@ void doOneUpdate(void) {
   // This will wait at least timeout until return. Returns earlier if something has data.
   retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
 
-  if (retval > 0) {
-    // Check for failed replica (time out)
-    if (FD_ISSET(timeout_fd, &select_set)) {
-      unsigned long result = 0;
-      retval = TEMP_FAILURE_RETRY(read(timeout_fd, &result, sizeof(unsigned long)));
-      if (retval > 0) { // Only one byte, so I can't imagine how that could be interrupted.
-        printf("Restarting Rep. due to timeout. Name %s, overrun %lu\n", controller_name, result);
-        voterRestartHandler();
-      } else {
-        printf("Voter - Controller %s\n", controller_name);
-        perror("Voter - read error on timeout pipe");
-      }
-    }
-    
+  if (retval > 0) {    
     // Check for data from external sources
     for (p_index = 0; p_index < pipe_count; p_index++) {
       int read_fd = ext_pipes[p_index].fd_in;
@@ -593,15 +561,7 @@ void processData(struct typed_pipe *pipe, int pipe_index) {
   if (pipe_index == timer_start_index) {
     if (!timer_started) {
       timer_started = true;
-      // Arm timer
-      its.it_interval.tv_sec = 0;
-      its.it_interval.tv_nsec = 0;
-      its.it_value.tv_sec = 0;
-      its.it_value.tv_nsec = voting_timeout;
-
-      if (timerfd_settime(timeout_fd, 0, &its, NULL) == -1) {
-        perror("VoterD timerfd_settime failed");
-      }
+      watchdog = generate_timestamp();
     }
   }
 
@@ -650,14 +610,6 @@ void sendPipe(int pipe_num, int replica_num) {
   
   if (pipe_num == timer_stop_index) {  
     // reset the timer
-    its.it_interval.tv_sec = 0;
-    its.it_interval.tv_nsec = 0;
-    its.it_value.tv_sec = 0;
-    its.it_value.tv_nsec = 0;
-
-    if (timerfd_settime(timeout_fd, 0, &its, NULL) == -1) {
-      perror("VoterD timerfd_settime reset (sendPipe) failed");
-    }
     timer_started = false;
   }
 
@@ -803,5 +755,13 @@ void processFromRep(int replica_num, int pipe_num) {
   } else {
     printf("Voter - Controller %s, rep %d, pipe %d\n", controller_name, replica_num, pipe_num);
     perror("Voter - read == 0 on internal pipe");
+  }
+
+  if (timer_started) {
+    timestamp_t current = generate_timestamp();
+    if (((current - watchdog) / 3.092) > voting_timeout) {
+      printf("Restarting Rep. due to timeout. Name %s\n", controller_name);
+      voterRestartHandler();
+    }
   }
 }
