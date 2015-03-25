@@ -4,8 +4,34 @@
 #include <sys/resource.h>
 #include <unistd.h>
 
-#include "../include/scheduler.h"
 #include "../include/force.h"
+
+int sched_set_policy(const pid_t pid, const int priority) {
+  struct sched_param param;
+
+  // get the maximum priority allowed by the scheduler
+  if (priority >= sched_get_priority_max(SCHED_RR)) { // <= so that the priority can not be 99 (reserved for kernel)
+    printf("Invalid parameter for priority: %d\n", priority);
+    return -1;
+  }
+
+  if (priority > 0) {
+    param.sched_priority = priority;
+
+    // set the scheduler as with policy of round robin (realtime)
+    if( sched_setscheduler( pid, SCHED_RR, &param ) == -1 ) {
+      return -1;
+    }
+  } else {
+    param.sched_priority = 0;
+
+    if( sched_setscheduler( pid, SCHED_OTHER, &param ) == -1 ) {
+      return -1;
+    }
+  }
+
+  return 0;
+}
 
 // From Gabe's cos_loader.c
 void call_getrlimit(int id) {
@@ -28,9 +54,8 @@ void call_setrlimit(int id, rlim_t c, rlim_t m)
   }
 }
 
-int InitTAS(cpu_id_t cpu, int prio_offset) {
+int InitTAS(cpu_id_t cpu, int priority) {
   pid_t pid;
-  int priority;
   int result;
 
   pid = getpid();
@@ -44,24 +69,13 @@ int InitTAS(cpu_id_t cpu, int prio_offset) {
     printf("InitTAS() failed calling cpu_bind(pid, cpu), with pid %d, cpu %d\n", pid, cpu);
   }
 
-  // Set Realtime Scheduling
-  // set the process to be scheduled with realtime policy and max priority
-  result = sched_set_realtime_policy( pid, &priority, prio_offset);
-  if( result != SCHED_ERROR_NONE ) {
-    printf("InitTAS() failed calling schedule_set_realtime_policy(pid %d, priority %d, offset %d): %d\n", pid, priority, prio_offset + 5, result);
+  // Set Scheduling
+  if( sched_set_policy(pid, priority) != 0 ) {
+    printf("InitTAS() failed calling schedule_set_policy(pid %d, priority %d)\n", pid, priority);
+    perror("\tperror");
   }
 
   return 0;
-}
-
-void OptOutRT(void) {
-  struct sched_param param;
-  param.sched_priority = 0;
-  pid_t pid = getpid();
-
-  if (sched_setscheduler(pid, SCHED_OTHER, &param) < 0) {
-    perror("Failed to opt out of RT");
-  }
 }
 
 void EveryTAS(void) {  

@@ -17,7 +17,6 @@
 
 #include "../include/replicas.h"
 #include "../include/fd_server.h"
-#include "../include/scheduler.h"
 
 #define REP_MAX 3
 #define PERIOD_NSEC 120000 // Max time for voting in nanoseconds (120 micro seconds)
@@ -65,7 +64,7 @@ void writeBuffer(int fd_out, char* buffer, int buff_count);
 
 void startReplicas(void) {
   int i;
-  initReplicas(replicas, rep_count, controller_name, voter_priority + VOTER_PRIO_OFFSET);
+  initReplicas(replicas, rep_count, controller_name, voter_priority - VOTER_PRIO_OFFSET);
   createPipes(replicas, rep_count, ext_pipes, pipe_count);
   forkReplicas(replicas, rep_count);
   for (i = 0; i < rep_count; i++) {
@@ -291,19 +290,15 @@ void restartReplica(int restarter, int restartee) {
 
   // Make the restarter the most special of all the replicas
   for (i = 0; i < rep_count; i++) {    
-    int dontcare = 0;
-    int offset;
+    int priority;
     if (i != restartee) {
       if (i == restarter) {
-        offset = voter_priority - 2 + VOTER_PRIO_OFFSET;
+        priority = voter_priority + 2 - VOTER_PRIO_OFFSET;
       } else {
-        offset = voter_priority + VOTER_PRIO_OFFSET;
+        priority = voter_priority - VOTER_PRIO_OFFSET;
       }
-      retval = sched_set_realtime_policy(replicas[i].pid, &dontcare, offset);
-      if (retval == 0) {
-        // Do nothing, worked fine.
-      } else {
-        printf("Voter error call sched_set_realtime_policy in restartReplica for %s, priority %d, retval: %d\n", controller_name, offset, retval);
+      if (sched_set_policy(replicas[i].pid, priority) < 0) {
+        printf("Voter error call sched_set_policy in restartReplica for %s, priority %d\n", controller_name, priority);
       }
     }
   }
@@ -321,7 +316,7 @@ void restartReplica(int restarter, int restartee) {
   }
 
   // re-init failed rep, create pipes
-  initReplicas(&(replicas[restartee]), 1, controller_name, voter_priority + VOTER_PRIO_OFFSET);
+  initReplicas(&(replicas[restartee]), 1, controller_name, voter_priority - VOTER_PRIO_OFFSET);
   createPipes(&(replicas[restartee]), 1, ext_pipes, pipe_count);
   // send new pipe through fd server (should have a request)
   acceptSendFDS(&sd, &(replicas[restartee].pid), replicas[restartee].rep_pipes, replicas[restartee].pipe_count);
@@ -343,7 +338,6 @@ void restartReplica(int restarter, int restartee) {
   #endif
 }
 
-#define HEAP_SIZE (10 * 1024 * 1024)
 ////////////////////////////////////////////////////////////////////////////////
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
 int initVoterD(void) {
@@ -546,22 +540,17 @@ void balanceReps(void) {
   }
 
   for (index = 0; index < rep_count; index++) {    
-    int dontcare = 0;
-    int offset;
+    int priority;
     if (index == starting) {
-      offset = voter_priority - 2 + VOTER_PRIO_OFFSET;
+      priority = voter_priority + 2 - VOTER_PRIO_OFFSET;
     } else if (index == second) {
-      offset = voter_priority - 1 + VOTER_PRIO_OFFSET;
+      priority = voter_priority + 1 - VOTER_PRIO_OFFSET;
     } else {
-      offset = voter_priority + VOTER_PRIO_OFFSET;
+      priority = voter_priority - VOTER_PRIO_OFFSET;
     }
-    int retval = sched_set_realtime_policy(replicas[index].pid, &dontcare, offset);
-    if (retval == 0) {
-      // Do nothing, worked fine.
-    } else if (retval == SCHED_ERROR_NOEXIST) {
-      // Likely means that the process as died. Will restart through a timeout.
-    } else {
-      printf("Voter error call sched_set_realtime_policy for %s, priority %d, retval: %d\n", controller_name, offset, retval);
+    if (sched_set_policy(replicas[index].pid, priority) < 0) {
+      // Will fail when the replica is already dead.
+      //printf("Voter error call sched_set_policy for %s, priority %d, retval: %d\n", controller_name, priority);
     }
   }
 }

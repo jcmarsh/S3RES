@@ -4,8 +4,8 @@
 #include "../include/cpu.h"
 #include "../include/time.h"
 
-int InitTAS(cpu_id_t cpu, int prio_offset);
+int sched_set_policy(const pid_t pid, const int priority);
+int InitTAS(cpu_id_t cpu, int priority);
 void OptOutRT(void);
-void EveryTAS(void);
 
 #endif // _TAS_LIMITED_H_

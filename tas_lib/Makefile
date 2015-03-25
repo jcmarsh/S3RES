@@ -2,8 +2,8 @@
 %.o: %.c
 	gcc -fpic -c -o $@ $<
 
-libTASLimited.so: taslimited.o cpu.o force.o scheduler.o time.o
-	gcc -shared -o libTASLimited.so taslimited.o cpu.o force.o scheduler.o time.o
+libTASLimited.so: taslimited.o cpu.o force.o time.o
+	gcc -shared -o libTASLimited.so taslimited.o cpu.o force.o time.o
 
 
 install: libTASLimited.so
