@@ -25,7 +25,13 @@ int sched_set_policy(const pid_t pid, const int priority) {
   } else {
     param.sched_priority = 0;
 
-    if( sched_setscheduler( pid, SCHED_OTHER, &param ) == -1 ) {
+    if (sched_setscheduler(pid, SCHED_OTHER, &param) == -1 ) {
+      return -1;
+    }
+
+    // Set niceness
+    int nice = priority + (priority * -2) - 20;
+    if (setpriority(PRIO_PROCESS, pid, nice) < 0) {
       return -1;
     }
   }
