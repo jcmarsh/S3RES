@@ -5,6 +5,7 @@
 #include "../include/time.h"
 
 int InitTAS(cpu_id_t cpu, int prio_offset);
-int EveryTAS();
+void OptOutRT(void);
+void EveryTAS(void);
 
 #endif // _TAS_LIMITED_H_

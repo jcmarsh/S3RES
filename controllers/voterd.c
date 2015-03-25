@@ -47,6 +47,7 @@ struct typed_pipe ext_pipes[PIPE_LIMIT];
 
 // Functions!
 int initVoterD(void);
+void balanceReps(void);
 int parseArgs(int argc, const char **argv);
 int main(int argc, const char **argv);
 void doOneUpdate(void);
@@ -288,13 +289,6 @@ void restartReplica(int restarter, int restartee) {
 
   cleanupReplica(restartee);
 
-  //#ifdef TIME_RESTART_SIGNAL
-  //  timestamp_t curr_time = generate_timestamp();
-  //  union sigval time_value;
-  //  time_value.sival_ptr = (void *)curr_time;
-  //  int retval = sigqueue(replicas[restarter].pid, RESTART_SIGNAL, time_value);
-  //#else
-
   // Make the restarter the most special of all the replicas
   for (i = 0; i < rep_count; i++) {    
     int dontcare = 0;
@@ -314,8 +308,14 @@ void restartReplica(int restarter, int restartee) {
     }
   }
 
-  retval = kill(replicas[restarter].pid, RESTART_SIGNAL);
-  //#endif /* TIME_RESTART_SIGNAL */
+  #ifdef TIME_RESTART_SIGNAL
+    timestamp_t curr_time = generate_timestamp();
+    union sigval time_value;
+    time_value.sival_ptr = (void *)curr_time;
+    retval = sigqueue(replicas[restarter].pid, RESTART_SIGNAL, time_value);
+  #else
+    retval = kill(replicas[restarter].pid, RESTART_SIGNAL);
+  #endif /* TIME_RESTART_SIGNAL */
   if (retval < 0) {
     perror("VoterD Signal Problem");
   }
@@ -335,12 +335,15 @@ void restartReplica(int restarter, int restartee) {
     }
   }
 
+  balanceReps();
+
   #ifdef TIME_RESTART_REPLICA
     timestamp_t current = generate_timestamp();
-    printf("(%lld)\n", current - last);
+    printf("Restart time: (%lld)\n", current - last);
   #endif
 }
 
+#define HEAP_SIZE (10 * 1024 * 1024)
 ////////////////////////////////////////////////////////////////////////////////
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
 int initVoterD(void) {
@@ -348,6 +351,8 @@ int initVoterD(void) {
   sigset_t mask;
 
   InitTAS(DEFAULT_CPU, voter_priority);
+
+  EveryTAS();
 
   // Setup fd server
   createFDS(&sd, controller_name);
@@ -433,8 +438,8 @@ void doOneUpdate(void) {
   waitpid(-1, NULL, WNOHANG); // Seems to take a while for to clean up zombies
 
   // See if any of the read pipes have anything
-  select_timeout.tv_sec = 1;
-  select_timeout.tv_usec = 0;
+  select_timeout.tv_sec = 0;
+  select_timeout.tv_usec = 2000;
 
   FD_ZERO(&select_set);
   // Check external in pipes
@@ -489,6 +494,14 @@ void doOneUpdate(void) {
       }
     }
   }
+
+  if (timer_started) {
+    timestamp_t current = generate_timestamp();
+    if (((current - watchdog) / 3.092) > voting_timeout) {
+      printf("Restarting Rep. due to timeout. Name %s\n", controller_name);
+      voterRestartHandler();
+    }
+  }
 }
 
 void writeBuffer(int fd_out, char* buffer, int buff_count) {
@@ -521,7 +534,6 @@ void balanceReps(void) {
   int starting = 0; // most behind rep gets data first
   int second = 1; // the most behind might be dead, so second to go is up next
   int index = 0;
-
 
   for (index = 0; index < rep_count; index++) {
     if (rep_gap(index) > rep_gap(starting)) {
@@ -755,13 +767,5 @@ void processFromRep(int replica_num, int pipe_num) {
   } else {
     printf("Voter - Controller %s, rep %d, pipe %d\n", controller_name, replica_num, pipe_num);
     perror("Voter - read == 0 on internal pipe");
-  }
-
-  if (timer_started) {
-    timestamp_t current = generate_timestamp();
-    if (((current - watchdog) / 3.092) > voting_timeout) {
-      printf("Restarting Rep. due to timeout. Name %s\n", controller_name);
-      voterRestartHandler();
-    }
   }
 }

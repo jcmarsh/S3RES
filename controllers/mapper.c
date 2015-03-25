@@ -195,6 +195,8 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
+  EveryTAS();
+
   send_msg.pose_x = 0;
   send_msg.pose_y = 0;
   send_msg.obs_count = 0;

@@ -1,5 +1,6 @@
 #include "../include/taslimited.h"
 
+#include <sched.h>
 #include <sys/resource.h>
 #include <unistd.h>
 
@@ -44,18 +45,32 @@ int InitTAS(cpu_id_t cpu, int prio_offset) {
   }
 
   // Set Realtime Scheduling
-  // set the process to be scheduled with realtime policy and max priority              
+  // set the process to be scheduled with realtime policy and max priority
   result = sched_set_realtime_policy( pid, &priority, prio_offset);
   if( result != SCHED_ERROR_NONE ) {
     printf("InitTAS() failed calling schedule_set_realtime_policy(pid %d, priority %d, offset %d): %d\n", pid, priority, prio_offset + 5, result);
   }
+
+  return 0;
 }
 
-int EveryTAS() {  
+void OptOutRT(void) {
+  struct sched_param param;
+  param.sched_priority = 0;
+  pid_t pid = getpid();
+
+  if (sched_setscheduler(pid, SCHED_OTHER, &param) < 0) {
+    perror("Failed to opt out of RT");
+  }
+}
+
+void EveryTAS(void) {  
   // lock current and future memory
+  //timestamp_t last = generate_timestamp();
   if (lockItUp() != 0) {
     printf("(voter_d_driver) InitTAS() failed calling lockItUp()\n" );
   }
+  //printf("lockItUp: (%lld)\n", generate_timestamp() - last);
 
   // Walk current memory to get it paged in
   if (forceMaps() != 0) {
