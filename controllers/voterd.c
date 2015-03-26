@@ -299,6 +299,7 @@ void restartReplica(int restarter, int restartee) {
       }
       if (sched_set_policy(replicas[i].pid, priority) < 0) {
         printf("Voter error call sched_set_policy in restartReplica for %s, priority %d\n", controller_name, priority);
+        perror("\tperror");        
       }
     }
   }
@@ -422,6 +423,21 @@ int main(int argc, const char **argv) {
   return 0;
 }
 
+bool checkSync(void) {
+  int r_index, p_index;
+  bool nsync = true;
+
+  for (r_index = 0; r_index < rep_count; r_index++) {
+    int votes = replicas[r_index].voted[0];
+    for (p_index = 0; p_index < pipe_count; p_index++) {
+      if (votes != replicas[r_index].voted[p_index]) {
+        nsync = false;
+      }
+    }
+  }
+  return nsync;
+}
+
 void doOneUpdate(void) {
   int p_index, r_index;
   int retval = 0;
@@ -437,12 +453,25 @@ void doOneUpdate(void) {
 
   FD_ZERO(&select_set);
   // Check external in pipes
-  for (p_index = 0; p_index < pipe_count; p_index++) {
-    if (ext_pipes[p_index].fd_in != 0) {
-      int e_pipe_fd = ext_pipes[p_index].fd_in;
-      FD_SET(e_pipe_fd, &select_set);
+  // Hmm... only if the controllers are ready for it?
+  bool check_inputs = false;
+  if (voter_priority < 5) {
+    if (checkSync() | !timer_started) {
+      check_inputs = true;
+    }
+  } else {
+    check_inputs = true;
+  }
+
+  if (check_inputs) {
+    for (p_index = 0; p_index < pipe_count; p_index++) {
+      if (ext_pipes[p_index].fd_in != 0) {
+        int e_pipe_fd = ext_pipes[p_index].fd_in;
+        FD_SET(e_pipe_fd, &select_set);
+      }
     }
   }
+
   // Check pipes from replicas
   for (r_index = 0; r_index < rep_count; r_index++) {
     for (p_index = 0; p_index < replicas[r_index].pipe_count; p_index++) {
@@ -462,6 +491,11 @@ void doOneUpdate(void) {
       int read_fd = ext_pipes[p_index].fd_in;
       if (read_fd != 0) {
         if (FD_ISSET(read_fd, &select_set)) {
+          if (voter_priority < 5 && !checkSync()) {
+            // non-RT controller is now lagging behind.
+            timer_started = true;
+            watchdog = generate_timestamp();
+          }
           ext_pipes[p_index].buff_count = TEMP_FAILURE_RETRY(read(read_fd, ext_pipes[p_index].buffer, MAX_PIPE_BUFF));
           if (ext_pipes[p_index].buff_count > 0) { // TODO: read may still have been interrupted
             processData(&(ext_pipes[p_index]), p_index);
