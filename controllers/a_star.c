@@ -30,6 +30,8 @@ struct node_t *n_current_goal;
 
 int priority;
 
+long fake_hash = 42;
+
 const char* name = "AStar";
 
 void enterLoop(void);
@@ -232,10 +234,6 @@ void sendWaypoints(void) {
       // commSendWaypoints(pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
     } else{
       n_goal_p = degridify(n_current_goal->x, n_current_goal->y);
-      if (insertSDC) {
-        insertSDC = false;
-        goal_p->x++;
-      }
       commSendWaypoints(pipes[way_res_index], goal_p->x, goal_p->y, 0.0, n_goal_p->x, n_goal_p->y, 0.0);
       free(n_goal_p);
     }
@@ -274,7 +272,11 @@ void enterLoop(void) {
           for (index = 0; index < recv_map_update.obs_count; index++) {
             obstacle_map[recv_map_update.obs_x[index]][recv_map_update.obs_y[index]] = true;
           }
-          commSendAck(pipes[ack_index]);
+          if (insertSDC) {
+            insertSDC = false;
+            fake_hash++;
+          }
+          commSendAck(pipes[ack_index], fake_hash);
           if (recv_map_update.obs_count > 0) { // New obstacle arrived
             // TODO: Also command if waypoint requested
             command();

@@ -284,7 +284,7 @@ int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_d
   return write_ret;
 }
 
-int commSendAck(struct typed_pipe pipe) {
+int commSendAck(struct typed_pipe pipe, long state_hash) {
   if (pipe.fd_out == 0 || pipe.type != COMM_ACK) {
     printf("commSendAck Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe.type], pipe.fd_out);
     return 0;
@@ -292,6 +292,8 @@ int commSendAck(struct typed_pipe pipe) {
 
   struct comm_ack msg;
   memset(&msg, 0, sizeof(struct comm_ack));
+
+  msg.hash = state_hash;
 
   return TEMP_FAILURE_RETRY(write(pipe.fd_out, &msg, sizeof(struct comm_ack)));
 }

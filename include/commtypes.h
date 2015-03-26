@@ -81,7 +81,7 @@ struct comm_map_update {
 };
 
 struct comm_ack {
-  int padding;
+  long hash;
 };
 
 // Hack to check when parsing
@@ -111,5 +111,5 @@ int commRecvMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg);
 int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_data);
 void commCopyRanger(struct comm_range_pose_data * recv_msg, double * range_data, double * pose_data);
 
-int commSendAck(struct typed_pipe pipe);
+int commSendAck(struct typed_pipe pipe, long state_hash);
 #endif // _COMM_TYPES_H_

@@ -60,7 +60,7 @@ int main(int argc, const char** argv) {
 
     // write the ack
     struct comm_ack sim_ack;
-    sim_ack.padding = 0;
+    sim_ack.hash = 0;
     write(rep.vot_pipes[2].fd_out, &sim_ack, sizeof(struct comm_ack));
 
     sleep(1);
