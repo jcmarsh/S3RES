@@ -38,8 +38,7 @@ void enterLoop();
 int initBenchMarker() {
   int scheduler;
 
-  //InitTAS(DEFAULT_CPU, priority);
-  InitTAS(0, priority);
+  InitTAS(DEFAULT_CPU, priority);
 
   scheduler = sched_getscheduler(0);
 

@@ -155,6 +155,11 @@ void voterRestartHandler(void) {
     }
     case TMR: {// the semicolon is needed becasue C.
       // The failed rep should be the one behind on the timer pipe
+
+      #ifdef TIME_RESTART_REPLICA
+        timestamp_t last = generate_timestamp();
+      #endif
+
       int restartee = behindRep(timer_stop_index);
       int restarter = (restartee + (rep_count - 1)) % rep_count;
       int other_rep = (restarter + (rep_count - 1)) % rep_count;
@@ -198,6 +203,12 @@ void voterRestartHandler(void) {
       }
       free(restarter_buffer);
       free(other_rep_buffer);
+
+      #ifdef TIME_RESTART_REPLICA
+        timestamp_t current = generate_timestamp();
+        printf("(%lld)\n", current - last);
+      #endif
+
       break;
     }
 
@@ -276,10 +287,6 @@ void returnBuffers(int rep_num, char **buffer, int *buff_count) {
 void restartReplica(int restarter, int restartee) {
   int i, retval;
 
-  #ifdef TIME_RESTART_REPLICA
-    timestamp_t last = generate_timestamp();
-  #endif
-
   // reset timer
   if (timer_started) {
     // reset the timer
@@ -332,11 +339,6 @@ void restartReplica(int restarter, int restartee) {
   }
 
   balanceReps();
-
-  #ifdef TIME_RESTART_REPLICA
-    timestamp_t current = generate_timestamp();
-    printf("Restart time: (%lld)\n", current - last);
-  #endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -526,7 +528,7 @@ void doOneUpdate(void) {
   if (timer_started) {
     timestamp_t current = generate_timestamp();
     if (((current - watchdog) / 3.092) > voting_timeout) {
-      printf("Restarting Rep. due to timeout. Name %s\n", controller_name);
+      //printf("Restarting Rep. due to timeout. Name %s\n", controller_name);
       voterRestartHandler();
     }
   }
@@ -690,7 +692,7 @@ void checkSDC(int pipe_num) {
             int restartee = (r_index + 2) % rep_count;
             int other_rep = (r_index + 1) % rep_count;
             int restarter = r_index;
-            printf("Voting disagreement: caught SDC Name %s\t Rep %d\t Pipe %d\t pid %d\n", controller_name, restartee, pipe_num, replicas[restartee].pid);
+            //printf("Voting disagreement: caught SDC Name %s\t Rep %d\t Pipe %d\t pid %d\n", controller_name, restartee, pipe_num, replicas[restartee].pid);
 
             int i;
             char **restarter_buffer = (char **)malloc(sizeof(char *) * PIPE_LIMIT);
