@@ -153,7 +153,7 @@ int TranslatorDriver::MainSetup() {
   }
 
   struct replica* r_p = (struct replica *) &rep;
-  initReplicas(r_p, 1, "BenchMarker", 5);
+  initReplicas(r_p, 1, "BenchMarker", 98);
   // create fake pipes to trick createPipes into create the correct connections
   struct typed_pipe pipes[2];
   pipes[0].type = RANGE_POSE_DATA;

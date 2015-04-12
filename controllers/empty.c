@@ -13,6 +13,8 @@ struct typed_pipe pipes[PIPE_COUNT];
 int pipe_count = PIPE_COUNT;
 int read_in_index, write_out_index;
 
+char *filler;
+
 // TAS related
 int priority;
 
@@ -89,6 +91,7 @@ void enterLoop() {
 }
 
 int main(int argc, const char **argv) {
+  //filler = malloc(sizeof(char) * 3628 * 1024 + (sizeof(char) * 150000 * 1024));
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");
     return -1;
