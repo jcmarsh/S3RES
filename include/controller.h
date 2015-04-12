@@ -1,10 +1,10 @@
-#include "../include/commtypes.h"
+#include "commtypes.h"
 
 #include <signal.h>
 
-#include "../include/bench_config.h"
-#include "../include/taslimited.h"
-#include "../include/fd_client.h"
+#include "bench_config.h"
+#include "taslimited.h"
+#include "fd_client.h"
 
 #define TIMEOUT_SIGNAL SIGRTMIN + 0 // The voter's watchdog timer
 #define RESTART_SIGNAL SIGRTMIN + 1 // Voter to replica signal to fork itself

@@ -2,8 +2,8 @@ RESEARCH=/home/jcmarsh/research
 SRC=../src/commtypes.c ../src/fd_client.c ../src/controller.c
 INC=../include
 LIB=-lrt -lTASLimited
-#FLAGS=-O3
-FLAGS=-g -O0 -Werror
+FLAGS=-O3 -static
+#FLAGS=-g -O0 -Werror
 
 all: ArtPot AStar BenchMarker Empty Filter Logger Mapper VoterD
 

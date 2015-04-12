@@ -1,15 +1,14 @@
 
-%.o: %.c
-	gcc -fpic -c -o $@ $<
+%.o: %.c ../include/*.h
+	gcc -O3 -fPIC -c -o $@ $<
 
-libTASLimited.so: taslimited.o cpu.o force.o time.o
-	gcc -shared -o libTASLimited.so taslimited.o cpu.o force.o time.o
+libTASLimited.a: taslimited.o cpu.o force.o time.o
+	ar -cvq libTASLimited.a *.o
 
-
-install: libTASLimited.so
-	cp libTASLimited.so /usr/local/lib/
+install: libTASLimited.a
+	cp libTASLimited.a /usr/local/lib/
 
 clean:
 	rm -rf *.o
-	rm -rf libTASLimited.so
+	rm -rf libTASLimited.a
 
