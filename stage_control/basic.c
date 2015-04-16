@@ -13,19 +13,19 @@ int main(int argc, const char **argv) {
   playerc_simulation_t *simulation;
 
   if (argc < 2) {
-    puts("Usage: basic <ip_address>");
+    puts("Usage: basic <simulator_ip_address>");
+    puts("Possible simulator ips:\n\tLaptop: 161.253.66.53\n\tScotty's: 192.168.100.1\n");
     return 0;
   }
 
   // Create client and connect
-  client = playerc_client_create(0, argv[1], 6666); // I start at 6666
+  client = playerc_client_create(0, "127.0.0.1", 6666); // I start at 6666
   if (0 != playerc_client_connect(client)) {
     return -1;
   }
 
   // Create client for the sim commands and connect
-  sim_client = playerc_client_create(0, "161.253.66.53", 6665);
-  //sim_client = playerc_client_create(0, "127.0.0.1", 6665);
+  sim_client = playerc_client_create(0, argv[1], 6665);
   if (0 != playerc_client_connect(sim_client)) {
     return -1;
   }

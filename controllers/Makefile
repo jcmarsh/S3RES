@@ -3,7 +3,7 @@ SRC=../src/commtypes.c ../src/fd_client.c ../src/controller.c
 INC=../include
 LIB=-lrt -lTASLimited
 FLAGS=-O3 -static
-#FLAGS=-g -O0 -Werror
+#FLAGS=-g -O0 -Werror -static
 
 all: ArtPot AStar BenchMarker Empty Filter Logger Mapper VoterD
 
