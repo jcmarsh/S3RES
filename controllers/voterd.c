@@ -121,6 +121,8 @@ void voterRestartHandler(void) {
       break;
     }
     case DMR: {
+    }
+    case TMR: {
       // The failed rep should be the one behind on the timer pipe
       int restartee = behindRep(timer_stop_index);
       int restarter = (restartee + (rep_count - 1)) % rep_count;
@@ -151,64 +153,6 @@ void voterRestartHandler(void) {
         free(restarter_buffer[i]);
       }
       free(restarter_buffer);
-      break;
-    }
-    case TMR: {// the semicolon is needed becasue C.
-      // The failed rep should be the one behind on the timer pipe
-
-      #ifdef TIME_RESTART_REPLICA
-        timestamp_t last = generate_timestamp();
-      #endif
-
-      int restartee = behindRep(timer_stop_index);
-      int restarter = (restartee + (rep_count - 1)) % rep_count;
-      int other_rep = (restarter + (rep_count - 1)) % rep_count;
-
-      int i;
-      char **restarter_buffer = (char **)malloc(sizeof(char *) * PIPE_LIMIT);
-      if (restarter_buffer == NULL) {
-        perror("Voter failed to malloc memory");
-      }
-      char **other_rep_buffer = (char **)malloc(sizeof(char *) * PIPE_LIMIT);
-      if (other_rep_buffer == NULL) {
-        perror("Voter failed to malloc memory");
-      }
-      for (i = 0; i < PIPE_LIMIT; i++) {
-        restarter_buffer[i] = (char *)malloc(sizeof(char) * MAX_PIPE_BUFF);
-        if (restarter_buffer[i] == NULL) {
-          perror("Voter failed to allocat memory");
-        }
-        other_rep_buffer[i] = (char *)malloc(sizeof(char) * MAX_PIPE_BUFF);
-        if (other_rep_buffer[i] == NULL) {
-          perror("Voter failed to allocat memory");
-        }
-      }
-      int restarter_buff_count[PIPE_LIMIT] = {0};
-      int other_rep_buff_count[PIPE_LIMIT] = {0};
-
-      // Steal the buffers from healthy reps. This stops them from processing mid restart
-      stealBuffers(restarter, restarter_buffer, restarter_buff_count);
-      stealBuffers(other_rep, other_rep_buffer, other_rep_buff_count);
-
-      restartReplica(restarter, restartee);
-
-      // Give the buffers back
-      returnBuffers(restartee, restarter_buffer, restarter_buff_count);
-      returnBuffers(restarter, restarter_buffer, restarter_buff_count);
-      returnBuffers(other_rep, other_rep_buffer, other_rep_buff_count);
-      // free the buffers
-      for (i = 0; i < PIPE_LIMIT; i++) {
-        free(restarter_buffer[i]);
-        free(other_rep_buffer[i]);
-      }
-      free(restarter_buffer);
-      free(other_rep_buffer);
-
-      #ifdef TIME_RESTART_REPLICA
-        timestamp_t current = generate_timestamp();
-        printf("(%lld)\n", current - last);
-      #endif
-
       break;
     }
 
@@ -288,10 +232,7 @@ void restartReplica(int restarter, int restartee) {
   int i, retval;
 
   // reset timer
-  if (timer_started) {
-    // reset the timer
-    timer_started = false;
-  }
+  timer_started = false;
 
   cleanupReplica(restartee);
 
@@ -447,11 +388,24 @@ void doOneUpdate(void) {
   struct timeval select_timeout;
   fd_set select_set;
 
-  waitpid(-1, NULL, WNOHANG); // Seems to take a while for to clean up zombies
+  //waitpid(-1, NULL, WNOHANG); // Seems to take a while for to clean up zombies
 
-  // See if any of the read pipes have anything
   select_timeout.tv_sec = 0;
-  select_timeout.tv_usec = 2000;
+  select_timeout.tv_usec = 50000;
+
+  if (timer_started) {
+    timestamp_t current = generate_timestamp();
+    long remaining = voting_timeout - ((current - watchdog) / 3.092);
+    if (remaining > 0) {
+      //printf("Setting remaining %ld\n", remaining / 1000);
+      select_timeout.tv_sec = 0;
+      select_timeout.tv_usec = remaining / 1000;
+    } else {
+      //printf("Restart handler called, %ld late\n", remaining);
+      voterRestartHandler();
+    }
+  }
+  // See if any of the read pipes have anything
 
   FD_ZERO(&select_set);
   // Check external in pipes
@@ -522,14 +476,6 @@ void doOneUpdate(void) {
           }
         }
       }
-    }
-  }
-
-  if (timer_started) {
-    timestamp_t current = generate_timestamp();
-    if (((current - watchdog) / 3.092) > voting_timeout) {
-      //printf("Restarting Rep. due to timeout. Name %s\n", controller_name);
-      voterRestartHandler();
     }
   }
 }

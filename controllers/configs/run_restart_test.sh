@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Runs the TMR configuration, and injects errors in a single component at a time.
+# Likely outdated, haven't used in a while.
+
 PLAYER_TIME=320s
 BASIC_TIME=310s
 ANOTHER_TIME=300s
