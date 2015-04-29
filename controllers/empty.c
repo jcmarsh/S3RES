@@ -23,13 +23,7 @@ const char* name = "Empty";
 void enterLoop();
 
 bool insertSDC = false;
-void testSDCHandler(int signo, siginfo_t *si, void *unused) {
-  timestamp_t curr_time = generate_timestamp();
-  timestamp_t parent_time = (timestamp_t)si->si_value.sival_ptr;
-  printf("(%lld)\n", curr_time - parent_time);
-  
-  insertSDC = true;
-}
+bool insertCFE = false;
 
 void setPipeIndexes() {
   read_in_index = 0;
@@ -60,6 +54,10 @@ void enterLoop() {
   fd_set select_set;
  
   while(1) {
+    if (insertCFE) {
+      while (1) { }
+    }
+        
     select_timeout.tv_sec = 1;
     select_timeout.tv_usec = 0;
 

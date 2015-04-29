@@ -2,12 +2,22 @@
 
 extern void setPipeIndexes(void);
 extern void enterLoop(void);
-extern void testSDCHandler(int signo, siginfo_t *si, void *unused);
 
 extern int priority;
 extern int pipe_count;
 extern struct typed_pipe pipes[];
 extern const char* name;
+
+extern bool insertSDC;
+extern bool insertCFE;
+
+void testSDCHandler(int signo, siginfo_t *si, void *unused) {
+  insertSDC = true;
+}
+
+void testCFEHandler(int signo, siginfo_t *si, void *unused) {
+  insertCFE = true;
+}
 
 int initController(void) {
   struct sigaction sa;
@@ -24,6 +34,14 @@ int initController(void) {
   sigemptyset(&sa.sa_mask);
   sa.sa_sigaction = testSDCHandler;
   if (sigaction(SDC_SIM_SIGNAL, &sa, NULL) == -1) {
+    perror("Failed to register the simulate sdc handler");
+    return -1;
+  }
+
+  sa.sa_flags = SA_SIGINFO;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_sigaction = testCFEHandler;
+  if (sigaction(CFE_SIM_SIGNAL, &sa, NULL) == -1) {
     perror("Failed to register the simulate sdc handler");
     return -1;
   }
@@ -60,6 +78,7 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
       sigemptyset(&signal_set);
       sigaddset(&signal_set, RESTART_SIGNAL);
       sigaddset(&signal_set, SDC_SIM_SIGNAL);
+      sigaddset(&signal_set, CFE_SIM_SIGNAL);
       if (sigprocmask(SIG_UNBLOCK, &signal_set, NULL) < 0) {
         perror("Controller signal unblock error");
       }

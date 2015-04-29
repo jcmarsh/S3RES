@@ -66,9 +66,7 @@ void setPipeIndexes(void) {
 }
 
 bool insertSDC = false;
-void testSDCHandler(int signo, siginfo_t *si, void *unused) {
-  insertSDC = true;
-}
+bool insertCFE = false;
 
 int parseArgs(int argc, const char **argv) {
   int i;
@@ -189,6 +187,10 @@ void enterLoop(void) {
   fd_set select_set;
   
   while(1) {
+    if (insertCFE) {
+      while (1) { }
+    }
+
     select_timeout.tv_sec = 1;
     select_timeout.tv_usec = 0;
 
@@ -245,7 +247,6 @@ int main(int argc, const char **argv) {
 
   EveryTAS();
 
-  insertSDC = false;
   if (PIPE_COUNT == pipe_count) {
     commSendWaypointRequest(pipes[way_req_index]);
   } else {

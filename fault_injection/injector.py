@@ -23,8 +23,11 @@ def getPIDs(pids, names, cmd):
 				pass
 
 if len(sys.argv) < 2:
-	print "please supply command to execute on unspecting processes (for example, 'kill -9' or '/bin/kill -s SIGRTMIN+2'"
-	print "Oh yeah, you can also specify the controller you want to attack."
+	print "Usage: python injector.py <command_to_execute> [controller_name_0 ... controller_name_n]"
+	print "\t'kill -9'\tsend SIGTERM"
+	print "\t'/bin/kill -s SIGRTMIN+2'\tSimulate Silent Data Corruption"
+	print "\t'/bin/kill -s SIGRTMIN+3'\tSimulate Control Flow Error"
+	print "If controllers are not specified, assumes: AStar ArtPot Filter Mapper"
 	sys.exit()
 
 # This should be checked before running, but hey we are kill processes here

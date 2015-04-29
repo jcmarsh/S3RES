@@ -34,9 +34,8 @@ FILE *log_file;
 void enterLoop();
 void command();
 
-void testSDCHandler(int signo, siginfo_t *si, void *unused) {
-  printf("Logger has no test SDC code. Should not be injecting faults here.\n");
-}
+bool insertSDC = false;
+bool insertCFE = false;
 
 void setPipeIndexes(void) {
   data_index = 0;
@@ -108,6 +107,10 @@ void enterLoop(void) {
   fd_set select_set;
 
   while(1) {
+    if (insertSDC || insertCFE) {
+      printf("ERROR: no errors should be inserted into the logger component!\n");
+    }
+    
     select_timeout.tv_sec = 1;
     select_timeout.tv_usec = 0;
 

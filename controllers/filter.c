@@ -30,9 +30,7 @@ void enterLoop();
 void command();
 
 bool insertSDC = false;
-void testSDCHandler(int signo, siginfo_t *si, void *unused) {
-  insertSDC = true;
-}
+bool insertCFE = false;
 
 void setPipeIndexes(void) {
   int i;
@@ -85,6 +83,10 @@ void enterLoop(void) {
   fd_set select_set;
 
   while(1) {
+    if (insertCFE) {
+      while (1) { }
+    }
+        
     select_timeout.tv_sec = 1;
     select_timeout.tv_usec = 0;
 
