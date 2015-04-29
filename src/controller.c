@@ -48,7 +48,7 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
       // child sets new id, recreates connects, loops
-      initController();
+      InitTAS(DEFAULT_CPU, priority);
 
       // clean up pipes
       for (index = 0; index < pipe_count; index++) {
