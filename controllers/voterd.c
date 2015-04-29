@@ -101,8 +101,8 @@ int aheadRep(int pipe_num) {
 void voterRestartHandler(void) {
   // Timer went off, so the timer_stop_index is the pipe which is awaiting a rep
   int p_index;
+  printf("Caugth Exec / Control loop error\n");
 
-  // TODO: A lot of replication here, especially with SDC handling.
   switch (rep_type) {
     case SMR: {
       // Need to cold restart the replica
@@ -636,17 +636,13 @@ void checkSDC(int pipe_num) {
                      replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num].buffer,
                      replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
             int restartee = (r_index + 2) % rep_count;
-            int other_rep = (r_index + 1) % rep_count;
             int restarter = r_index;
             //printf("Voting disagreement: caught SDC Name %s\t Rep %d\t Pipe %d\t pid %d\n", controller_name, restartee, pipe_num, replicas[restartee].pid);
+            printf("Caught SDC\n");
 
             int i;
             char **restarter_buffer = (char **)malloc(sizeof(char *) * PIPE_LIMIT);
             if (restarter_buffer == NULL) {
-              perror("Voter failed to malloc memory");
-            }
-            char **other_rep_buffer = (char **)malloc(sizeof(char *) * PIPE_LIMIT);
-            if (other_rep_buffer == NULL) {
               perror("Voter failed to malloc memory");
             }
             for (i = 0; i < PIPE_LIMIT; i++) {
@@ -654,31 +650,23 @@ void checkSDC(int pipe_num) {
               if (restarter_buffer[i] == NULL) {
                 perror("Voter failed to allocat memory");
               }
-              other_rep_buffer[i] = (char *)malloc(sizeof(char) * MAX_PIPE_BUFF);
-              if (other_rep_buffer[i] == NULL) {
-                perror("Voter failed to allocat memory");
-              }
             }
             int restarter_buff_count[PIPE_LIMIT] = {0};
-            int other_rep_buff_count[PIPE_LIMIT] = {0};
 
             // Steal the buffers from healthy reps. This stops them from processing mid restart
             stealBuffers(restarter, restarter_buffer, restarter_buff_count);
-            stealBuffers(other_rep, other_rep_buffer, other_rep_buff_count);
 
             restartReplica(restarter, restartee);
 
             // Give the buffers back
             returnBuffers(restartee, restarter_buffer, restarter_buff_count);
             returnBuffers(restarter, restarter_buffer, restarter_buff_count);
-            returnBuffers(other_rep, other_rep_buffer, other_rep_buff_count);
             // free the buffers
             for (i = 0; i < PIPE_LIMIT; i++) {
               free(restarter_buffer[i]);
-              free(other_rep_buffer[i]);
             }
             free(restarter_buffer);
-            free(other_rep_buffer);
+
           } else {
             // If all agree, send and be happy. Otherwise the send is done as part of the restart process
             sendPipe(pipe_num, r_index);

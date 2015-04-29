@@ -42,10 +42,10 @@ void injectRegError(pid_t pid) //struct user_regs_struct * regs)
     bit_pick = rand() % __WORDSIZE;
   }
 
-  printf("reg_pick: %d\tbit_pick: %d\n", reg_pick, bit_pick);
+  // printf("reg_pick: %d\tbit_pick: %d\n", reg_pick, bit_pick);
 
   //  printf("hmmm: %lu\n", *((unsigned long *)regs + reg_pick));
-  printf("Old value: %lX\tNew value: %lX\n", *((unsigned long *)&copy_regs + reg_pick), *((unsigned long *)&copy_regs + reg_pick) ^ (error_mask << bit_pick));
+  //printf("Old value: %lX\tNew value: %lX\n", *((unsigned long *)&copy_regs + reg_pick), *((unsigned long *)&copy_regs + reg_pick) ^ (error_mask << bit_pick));
   
   *((unsigned long *)&copy_regs + reg_pick) = *((unsigned long *)&copy_regs + reg_pick) ^ (error_mask << bit_pick);
 

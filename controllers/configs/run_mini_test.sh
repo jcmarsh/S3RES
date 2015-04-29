@@ -134,3 +134,21 @@ for index in `seq 0 $ITARS`; do
 done
 
 mv *.txt $OUTPUT/sdc/
+
+sleep 60
+
+# All Tri inject_error tests
+cp $CONFIG_DIR/all_tri.cfg ./config_plumber.cfg
+for index in `seq 0 $ITARS`; do
+	timeout $PLAYER_TIME player baseline.cfg > fault_test_tri_$index.txt &
+	sleep 5
+	timeout $BASIC_TIME $PINT_DIR/stage_control/basic $SIM_IP &
+	sleep 5
+	ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm > fault_test_tri_injector_$index.txt
+	timeout $ANOTHER_TIME python injector.py "./inject_error" >> fault_test_tri_injector_$index.txt &
+	sleep $ANOTHER_TIME
+	ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm >> fault_test_tri_injector_$index.txt
+	sleep 40
+done
+
+mv *.txt $OUTPUT/fault/
