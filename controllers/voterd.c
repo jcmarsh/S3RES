@@ -77,11 +77,15 @@ void startReplicas(void) {
 
 // return the index of the rep that is furthest behind in voting
 int behindRep(int pipe_num) {
-  int r_index = 0;
-  int mostBehind = r_index;
-  for (r_index = 0; r_index < rep_count; r_index++) {
+  int r_index;
+  int mostBehind = 0;
+  for (r_index = 1; r_index < rep_count; r_index++) {
     if (replicas[r_index].voted[pipe_num] < replicas[mostBehind].voted[pipe_num]) {
       mostBehind = r_index;
+    } else if (replicas[r_index].voted[pipe_num] == replicas[mostBehind].voted[pipe_num]) {
+      if (replicas[r_index].priority > replicas[mostBehind].priority) {
+        mostBehind = r_index;
+      }
     }
   }
   return mostBehind;
@@ -126,7 +130,7 @@ void voterRestartHandler(void) {
       // The failed rep should be the one behind on the timer pipe
       int restartee = behindRep(timer_stop_index);
       int restarter = (restartee + (rep_count - 1)) % rep_count;
-      
+
       int i;
       char **restarter_buffer = (char **)malloc(sizeof(char *) * PIPE_LIMIT);
       if (restarter_buffer == NULL) {
@@ -248,6 +252,8 @@ void restartReplica(int restarter, int restartee) {
       if (sched_set_policy(replicas[i].pid, priority) < 0) {
         printf("Voter error call sched_set_policy in restartReplica for %s, priority %d\n", controller_name, priority);
         perror("\tperror");        
+      } else {
+        replicas[i].priority = priority;
       }
     }
   }
@@ -405,8 +411,8 @@ void doOneUpdate(void) {
       voterRestartHandler();
     }
   }
-  // See if any of the read pipes have anything
 
+  // See if any of the read pipes have anything
   FD_ZERO(&select_set);
   // Check external in pipes
   // Hmm... only if the controllers are ready for it?
@@ -533,6 +539,8 @@ void balanceReps(void) {
     if (sched_set_policy(replicas[index].pid, priority) < 0) {
       // Will fail when the replica is already dead.
       //printf("Voter error call sched_set_policy for %s, priority %d, retval: %d\n", controller_name, priority);
+    } else {
+      replicas[index].priority = priority;
     }
   }
 }

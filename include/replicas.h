@@ -16,7 +16,7 @@
  // Represents one redundant execution, implemented as a thread
 struct replica {
   pid_t pid; // The pid of the thread
-  int priority; // Not yet implemented
+  int priority;
   char* name;
 
   // list of connections
