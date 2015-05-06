@@ -12,9 +12,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
  
-struct server_data{
+struct server_data {
   struct sockaddr_un address;
   socklen_t address_length;
   int sock_fd;

@@ -16,11 +16,10 @@
 #include <time.h>
 
 #include "../include/replicas.h"
-#include "../include/fd_server.h"
-
+ 
 #define REP_MAX 3
 #define PERIOD_NSEC 120000 // Max time for voting in nanoseconds (120 micro seconds)
-#define VOTER_PRIO_OFFSET 5 // Replicas run with a +20 offset (low prio)
+#define VOTER_PRIO_OFFSET 5 // Replicas run with a -5 offset
 
 long voting_timeout;
 int timer_start_index;
@@ -46,9 +45,7 @@ struct typed_pipe ext_pipes[PIPE_LIMIT];
 
 // Functions!
 int initVoterD(void);
-void balanceReps(void);
 int parseArgs(int argc, const char **argv);
-int main(int argc, const char **argv);
 void doOneUpdate(void);
 void processData(struct typed_pipe *pipe, int pipe_index);
 void resetVotingState(int pipe_num);
@@ -58,48 +55,47 @@ void stealBuffers(int rep_num, char **buffer, int *buff_count);
 void returnBuffers(int rep_num, char **buffer, int *buff_count);
 void checkSDC(int pipe_num);
 void processFromRep(int replica_num, int pipe_num);
-void restartReplica(int restarter, int restartee);
-void cleanupReplica(int rep_index);
 void writeBuffer(int fd_out, char* buffer, int buff_count);
 
-void startReplicas(void) {
+void restart_prep(int restartee, int restarter) {
   int i;
-  initReplicas(replicas, rep_count, controller_name, voter_priority - VOTER_PRIO_OFFSET);
-  createPipes(replicas, rep_count, ext_pipes, pipe_count);
-  forkReplicas(replicas, rep_count);
-  for (i = 0; i < rep_count; i++) {
-    if (acceptSendFDS(&sd, &(replicas[i].pid), replicas[i].rep_pipes, replicas[i].pipe_count) < 0) {
-      printf("VoterD acceptSendFDS call failed\n");
-      exit(-1);
+  char **restarter_buffer = (char **)malloc(sizeof(char *) * PIPE_LIMIT);
+  if (restarter_buffer == NULL) {
+    perror("Voter failed to malloc memory");
+  }
+  for (i = 0; i < PIPE_LIMIT; i++) {
+    restarter_buffer[i] = (char *)malloc(sizeof(char) * MAX_PIPE_BUFF);
+    if (restarter_buffer[i] == NULL) {
+      perror("Voter failed to allocat memory");
     }
   }
-}
+  int restarter_buff_count[PIPE_LIMIT] = {0};
 
-// return the index of the rep that is furthest behind in voting
-int behindRep(int pipe_num) {
-  int r_index;
-  int mostBehind = 0;
-  for (r_index = 1; r_index < rep_count; r_index++) {
-    if (replicas[r_index].voted[pipe_num] < replicas[mostBehind].voted[pipe_num]) {
-      mostBehind = r_index;
-    } else if (replicas[r_index].voted[pipe_num] == replicas[mostBehind].voted[pipe_num]) {
-      if (replicas[r_index].priority > replicas[mostBehind].priority) {
-        mostBehind = r_index;
-      }
-    }
-  }
-  return mostBehind;
-}
+  // Steal the buffers from healthy reps. This stops them from processing mid restart
+  stealBuffers(restarter, restarter_buffer, restarter_buff_count);
 
-int aheadRep(int pipe_num) {
-  int r_index = 0;
-  int mostAhead = r_index;
-  for (r_index = 0; r_index < rep_count; r_index++) {
-    if (replicas[r_index].voted[pipe_num] > replicas[mostAhead].voted[pipe_num]) {
-      mostAhead= r_index;
+  // reset timer
+  timer_started = false;
+  restartReplica(replicas, rep_count, &sd, ext_pipes, restarter, restartee, voter_priority - VOTER_PRIO_OFFSET);
+
+  for (i = 0; i < replicas[restarter].pipe_count; i++) {
+    if (replicas[restarter].vot_pipes[i].fd_in != 0) { // && reps[restarter].voted[i] > 0) { // was causing problems with the timer
+      replicas[restartee].voted[i] = replicas[restarter].voted[i];
+      memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
+      replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
+      sendPipe(i, restarter);
     }
   }
-  return mostAhead;
+
+  // Give the buffers back
+  returnBuffers(restartee, restarter_buffer, restarter_buff_count);
+  returnBuffers(restarter, restarter_buffer, restarter_buff_count);
+  // free the buffers
+  for (i = 0; i < PIPE_LIMIT; i++) {
+    free(restarter_buffer[i]);
+  }
+  free(restarter_buffer);
+  return;
 }
 
 void voterRestartHandler(void) {
@@ -110,9 +106,9 @@ void voterRestartHandler(void) {
   switch (rep_type) {
     case SMR: {
       // Need to cold restart the replica
-      cleanupReplica(0);
+      cleanupReplica(replicas, 0);
 
-      startReplicas();
+      startReplicas(replicas, rep_count, &sd, controller_name, ext_pipes, pipe_count, voter_priority - VOTER_PRIO_OFFSET);
       
       // Resend last data
       for (p_index = 0; p_index < pipe_count; p_index++) {
@@ -130,66 +126,12 @@ void voterRestartHandler(void) {
       // The failed rep should be the one behind on the timer pipe
       int restartee = behindRep(timer_stop_index);
       int restarter = (restartee + (rep_count - 1)) % rep_count;
-
-      int i;
-      char **restarter_buffer = (char **)malloc(sizeof(char *) * PIPE_LIMIT);
-      if (restarter_buffer == NULL) {
-        perror("Voter failed to malloc memory");
-      }
-      for (i = 0; i < PIPE_LIMIT; i++) {
-        restarter_buffer[i] = (char *)malloc(sizeof(char) * MAX_PIPE_BUFF);
-        if (restarter_buffer[i] == NULL) {
-          perror("Voter failed to allocat memory");
-        }
-      }
-      int restarter_buff_count[PIPE_LIMIT] = {0};
-
-      // Steal the buffers from healthy reps. This stops them from processing mid restart
-      stealBuffers(restarter, restarter_buffer, restarter_buff_count);
-
-      restartReplica(restarter, restartee);
-
-      // Give the buffers back
-      returnBuffers(restartee, restarter_buffer, restarter_buff_count);
-      returnBuffers(restarter, restarter_buffer, restarter_buff_count);
-      // free the buffers
-      for (i = 0; i < PIPE_LIMIT; i++) {
-        free(restarter_buffer[i]);
-      }
-      free(restarter_buffer);
+      restart_prep(restartee, restarter);
       break;
     }
 
     return;
   }
-}
-
-void cleanupReplica(int rep_index) {
-  int i;
-  // Kill old replica
-  kill(replicas[rep_index].pid, SIGKILL); // Make sure it is dead.
-  //waitpid(-1, NULL, WNOHANG); // cleans up the zombie // Actually doesn't // Well, now it does.
-  
-  // cleanup replica data structure
-  for (i = 0; i < replicas[rep_index].pipe_count; i++) {
-    if (replicas[rep_index].vot_pipes[i].fd_in > 0) {
-      close(replicas[rep_index].vot_pipes[i].fd_in);
-    }
-    if (replicas[rep_index].vot_pipes[i].fd_out > 0) {
-      close(replicas[rep_index].vot_pipes[i].fd_out);
-    }
-    if (replicas[rep_index].rep_pipes[i].fd_in > 0) {
-      close(replicas[rep_index].rep_pipes[i].fd_in);
-    }
-    if (replicas[rep_index].rep_pipes[i].fd_out > 0) {
-      close(replicas[rep_index].rep_pipes[i].fd_out);
-    }
-    if (replicas[rep_index].voter_rep_in_copy[i] > 0) {
-      close(replicas[rep_index].voter_rep_in_copy[i]);
-    }
-  }
-
-  return;
 }
 
 // Steal the buffers from a single replica
@@ -230,146 +172,6 @@ void returnBuffers(int rep_num, char **buffer, int *buff_count) {
       writeBuffer(replicas[rep_num].vot_pipes[i].fd_out, buffer[i], buff_count[i]);
     }
   }
-}
-
-void restartReplica(int restarter, int restartee) {
-  int i, retval;
-
-  // reset timer
-  timer_started = false;
-
-  cleanupReplica(restartee);
-
-  // Make the restarter the most special of all the replicas
-  for (i = 0; i < rep_count; i++) {    
-    int priority;
-    if (i != restartee) {
-      if (i == restarter) {
-        priority = voter_priority + 2 - VOTER_PRIO_OFFSET;
-      } else {
-        priority = voter_priority - VOTER_PRIO_OFFSET;
-      }
-      if (sched_set_policy(replicas[i].pid, priority) < 0) {
-        printf("Voter error call sched_set_policy in restartReplica for %s, priority %d\n", controller_name, priority);
-        perror("\tperror");        
-      } else {
-        replicas[i].priority = priority;
-      }
-    }
-  }
-
-  #ifdef TIME_RESTART_SIGNAL
-    timestamp_t curr_time = generate_timestamp();
-    union sigval time_value;
-    time_value.sival_ptr = (void *)curr_time;
-    retval = sigqueue(replicas[restarter].pid, RESTART_SIGNAL, time_value);
-  #else
-    retval = kill(replicas[restarter].pid, RESTART_SIGNAL);
-  #endif /* TIME_RESTART_SIGNAL */
-  if (retval < 0) {
-    perror("VoterD Signal Problem");
-  }
-
-  // re-init failed rep, create pipes
-  initReplicas(&(replicas[restartee]), 1, controller_name, voter_priority - VOTER_PRIO_OFFSET);
-  createPipes(&(replicas[restartee]), 1, ext_pipes, pipe_count);
-  // send new pipe through fd server (should have a request)
-  acceptSendFDS(&sd, &(replicas[restartee].pid), replicas[restartee].rep_pipes, replicas[restartee].pipe_count);
-
-  for (i = 0; i < replicas[restarter].pipe_count; i++) {
-    if (replicas[restarter].vot_pipes[i].fd_in != 0) { // && replicas[restarter].voted[i] > 0) { // was causing problems with the timer
-      replicas[restartee].voted[i] = replicas[restarter].voted[i];
-      memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
-      replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
-      sendPipe(i, restarter);
-    }
-  }
-
-  balanceReps();
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Set up the device.  Return 0 if things go well, and -1 otherwise.
-int initVoterD(void) {
-  struct sigevent sev;
-  sigset_t mask;
-
-  InitTAS(DEFAULT_CPU, voter_priority);
-
-  EveryTAS();
-
-  // Setup fd server
-  createFDS(&sd, controller_name);
-
-  initVotingState();
- 
-  startReplicas();
-  
-  return 0;
-}
-
-int parseArgs(int argc, const char **argv) {
-  int i;
-  int required_args = 5; // voter name, controller name, rep_type, timeout and priority
-  controller_name = (char*) (argv[1]);
-  rep_type = reptypeToEnum((char*)(argv[2]));
-  rep_count = rep_type;
-  voting_timeout = atoi(argv[3]);
-  voter_priority = atoi(argv[4]);
-  if (voting_timeout == 0) {
-    voting_timeout = PERIOD_NSEC;
-  }
-
-  if (argc <= required_args) { // In testing mode // TODO: clear out after testing
-    pid_t currentPID = getpid();
-    //pipe_count = 4;  // 4 is the only controller specific bit here... and ArtPotTest
-    //connectRecvFDS(currentPID, ext_pipes, pipe_count, "ArtPotTest");
-    pipe_count = 2;  // 4 is the only controller specific bit here... and ArtPotTest
-    connectRecvFDS(currentPID, ext_pipes, pipe_count, "EmptyTest");
-    timer_start_index = 0;
-    timer_stop_index = 1;
-        // puts("Usage: VoterD <controller_name> <rep_type> <timeout> <priority> <message_type:fd_in:fd_out> <...>");
-    // return -1;
-  } else {
-    for (i = 0; (i < argc - required_args && i < PIPE_LIMIT); i++) {
-      deserializePipe(argv[i + required_args], &ext_pipes[pipe_count]);
-      pipe_count++;
-    }
-    if (pipe_count >= PIPE_LIMIT) {
-      printf("VoterD: Raise pipe limit.\n");
-    }
-  
-    // Need to have a similar setup to associate vote pipe with input?
-    for (i = 0; i < pipe_count; i++) {
-      if (ext_pipes[i].timed) {
-        if (ext_pipes[i].fd_in != 0) {
-          timer_start_index = i;
-        } else {
-          timer_stop_index = i;
-        }
-      }
-    }
-  }
-
-  return 0;
-}
-
-int main(int argc, const char **argv) {
-  if (parseArgs(argc, argv) < 0) {
-    puts("ERROR: failure parsing args.");
-    return -1;
-  }
-
-  if (initVoterD() < 0) {
-    puts("ERROR: failure in setup function.");
-    return -1;
-  }
-
-  while(1) {
-    doOneUpdate();
-  }
-
-  return 0;
 }
 
 bool checkSync(void) {
@@ -501,50 +303,6 @@ void writeBuffer(int fd_out, char* buffer, int buff_count) {
   }
 }
 
-int rep_gap(int rep_num) {
-  int p_index = 0;
-  int gap = 0;
-  for (p_index = 0; p_index < pipe_count; p_index++) {
-    if (replicas[0].vot_pipes[p_index].fd_in != 0) { // out from the rep, in to the voter
-      gap += replicas[aheadRep(p_index)].voted[p_index] - replicas[rep_num].voted[p_index];
-    }
-  }
-  return gap;
-}
-
-void balanceReps(void) {
-  int starting = 0; // most behind rep gets data first
-  int second = 1; // the most behind might be dead, so second to go is up next
-  int index = 0;
-
-  for (index = 0; index < rep_count; index++) {
-    if (rep_gap(index) > rep_gap(starting)) {
-      starting = index;
-    } else if (rep_gap(index) > rep_gap(second)) {
-      if (index != starting) {
-        second = index;
-      }
-    }
-  }
-
-  for (index = 0; index < rep_count; index++) {    
-    int priority;
-    if (index == starting) {
-      priority = voter_priority + 2 - VOTER_PRIO_OFFSET;
-    } else if (index == second) {
-      priority = voter_priority + 1 - VOTER_PRIO_OFFSET;
-    } else {
-      priority = voter_priority - VOTER_PRIO_OFFSET;
-    }
-    if (sched_set_policy(replicas[index].pid, priority) < 0) {
-      // Will fail when the replica is already dead.
-      //printf("Voter error call sched_set_policy for %s, priority %d, retval: %d\n", controller_name, priority);
-    } else {
-      replicas[index].priority = priority;
-    }
-  }
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // Process data
 void processData(struct typed_pipe *pipe, int pipe_index) {
@@ -556,7 +314,7 @@ void processData(struct typed_pipe *pipe, int pipe_index) {
     }
   }
 
-  balanceReps();
+  balanceReps(replicas, rep_count, voter_priority - VOTER_PRIO_OFFSET);
 
   for (r_index = 0; r_index < rep_count; r_index++) {
     writeBuffer(replicas[r_index].vot_pipes[pipe_index].fd_out, pipe->buffer, pipe->buff_count);
@@ -643,38 +401,11 @@ void checkSDC(int pipe_num) {
           if (memcmp(replicas[r_index].vot_pipes[pipe_num].buffer,
                      replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num].buffer,
                      replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
-            int restartee = (r_index + 2) % rep_count;
-            int restarter = r_index;
-            //printf("Voting disagreement: caught SDC Name %s\t Rep %d\t Pipe %d\t pid %d\n", controller_name, restartee, pipe_num, replicas[restartee].pid);
+            
             printf("Caught SDC\n");
 
-            int i;
-            char **restarter_buffer = (char **)malloc(sizeof(char *) * PIPE_LIMIT);
-            if (restarter_buffer == NULL) {
-              perror("Voter failed to malloc memory");
-            }
-            for (i = 0; i < PIPE_LIMIT; i++) {
-              restarter_buffer[i] = (char *)malloc(sizeof(char) * MAX_PIPE_BUFF);
-              if (restarter_buffer[i] == NULL) {
-                perror("Voter failed to allocat memory");
-              }
-            }
-            int restarter_buff_count[PIPE_LIMIT] = {0};
-
-            // Steal the buffers from healthy reps. This stops them from processing mid restart
-            stealBuffers(restarter, restarter_buffer, restarter_buff_count);
-
-            restartReplica(restarter, restartee);
-
-            // Give the buffers back
-            returnBuffers(restartee, restarter_buffer, restarter_buff_count);
-            returnBuffers(restarter, restarter_buffer, restarter_buff_count);
-            // free the buffers
-            for (i = 0; i < PIPE_LIMIT; i++) {
-              free(restarter_buffer[i]);
-            }
-            free(restarter_buffer);
-
+            int restartee = (r_index + 2) % rep_count;
+            restart_prep(restartee, r_index);
           } else {
             // If all agree, send and be happy. Otherwise the send is done as part of the restart process
             sendPipe(pipe_num, r_index);
@@ -720,7 +451,7 @@ void processFromRep(int replica_num, int pipe_num) {
   if (curr_pipe->buff_count > 0) {
     replicas[replica_num].voted[pipe_num]++;
 
-    balanceReps();
+    balanceReps(replicas, rep_count, voter_priority - VOTER_PRIO_OFFSET);
     
     if (replicas[replica_num].voted[pipe_num] > 1) {
       // Happens when a process has died.
@@ -735,4 +466,88 @@ void processFromRep(int replica_num, int pipe_num) {
     printf("Voter - Controller %s, rep %d, pipe %d\n", controller_name, replica_num, pipe_num);
     perror("Voter - read == 0 on internal pipe");
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Set up the device.  Return 0 if things go well, and -1 otherwise.
+int initVoterD(void) {
+  struct sigevent sev;
+  sigset_t mask;
+
+  InitTAS(DEFAULT_CPU, voter_priority);
+
+  EveryTAS();
+
+  // Setup fd server
+  createFDS(&sd, controller_name);
+
+  initVotingState();
+
+  startReplicas(replicas, rep_count, &sd, controller_name, ext_pipes, pipe_count, voter_priority - VOTER_PRIO_OFFSET);
+  
+  return 0;
+}
+
+int parseArgs(int argc, const char **argv) {
+  int i;
+  int required_args = 5; // voter name, controller name, rep_type, timeout and priority
+  controller_name = (char*) (argv[1]);
+  rep_type = reptypeToEnum((char*)(argv[2]));
+  rep_count = rep_type;
+  voting_timeout = atoi(argv[3]);
+  voter_priority = atoi(argv[4]);
+  if (voting_timeout == 0) {
+    voting_timeout = PERIOD_NSEC;
+  }
+
+  if (argc <= required_args) { // In testing mode // TODO: clear out after testing
+    pid_t currentPID = getpid();
+    //pipe_count = 4;  // 4 is the only controller specific bit here... and ArtPotTest
+    //connectRecvFDS(currentPID, ext_pipes, pipe_count, "ArtPotTest");
+    pipe_count = 2;  // 4 is the only controller specific bit here... and ArtPotTest
+    connectRecvFDS(currentPID, ext_pipes, pipe_count, "EmptyTest");
+    timer_start_index = 0;
+    timer_stop_index = 1;
+        // puts("Usage: VoterD <controller_name> <rep_type> <timeout> <priority> <message_type:fd_in:fd_out> <...>");
+    // return -1;
+  } else {
+    for (i = 0; (i < argc - required_args && i < PIPE_LIMIT); i++) {
+      deserializePipe(argv[i + required_args], &ext_pipes[pipe_count]);
+      pipe_count++;
+    }
+    if (pipe_count >= PIPE_LIMIT) {
+      printf("VoterD: Raise pipe limit.\n");
+    }
+  
+    // Need to have a similar setup to associate vote pipe with input?
+    for (i = 0; i < pipe_count; i++) {
+      if (ext_pipes[i].timed) {
+        if (ext_pipes[i].fd_in != 0) {
+          timer_start_index = i;
+        } else {
+          timer_stop_index = i;
+        }
+      }
+    }
+  }
+
+  return 0;
+}
+
+int main(int argc, const char **argv) {
+  if (parseArgs(argc, argv) < 0) {
+    puts("ERROR: failure parsing args.");
+    return -1;
+  }
+
+  if (initVoterD() < 0) {
+    puts("ERROR: failure in setup function.");
+    return -1;
+  }
+
+  while(1) {
+    doOneUpdate();
+  }
+
+  return 0;
 }
