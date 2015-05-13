@@ -1,6 +1,20 @@
-#include "register_util.h"
+/*
+ * Operations dealing with system registers.
+ * Should be able to handle x86 and x86_64 for now.
+ *
+ * March 17th, 2014 James Marshall
+ */
+
+#include <sys/user.h>
+#include <sys/ptrace.h>
+
+// For the printfs...
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "print_registers.h"
 
+// Modify the register structure to have one (not quite? uniformily distributed) bit flip.
 void injectRegError(pid_t pid) //struct user_regs_struct * regs)
 {
   struct user_regs_struct copy_regs;
@@ -55,5 +69,31 @@ void injectRegError(pid_t pid) //struct user_regs_struct * regs)
   if(ptrace(PTRACE_SETREGS, pid, NULL, &copy_regs) < 0) {
     printf("SETREGS error for reg %d, bit %d\n", reg_pick, bit_pick);
     perror("SETREGS error:");
+  }
+}
+
+void main(int argc, char** argv) {
+  // Should be simple: inject a bit flip into the process specified by argument
+  pid_t attack_pid = 0;
+  time_t t;
+  srand((unsigned) time(&t));
+	
+  if (argc < 2) {
+    printf("Usage: inject_error <pid>\n");
+    return;
+  } else {
+    attack_pid = atoi(argv[1]);
+  }
+  
+  // Attach stops the process
+  if (ptrace(PTRACE_ATTACH, attack_pid, NULL, NULL) < 0) {
+    perror("Failed to attach");
+  }
+  waitpid(attack_pid);
+  
+  injectRegError(attack_pid);
+  
+  if (ptrace(PTRACE_CONT, attack_pid, NULL, NULL) < 0) {
+    perror("Failed to resume");
   }
 }

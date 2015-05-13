@@ -1,8 +1,8 @@
 %.o: %.c
 	gcc -c -o $@ $<
 
-main: main.o register_util.o
-	gcc -o inject_error main.o register_util.o
+inject_error: register_util.o print_registers.h
+	gcc -o inject_error register_util.o
 
 copy:
 	cp inject_error ../../stage/experiments
