@@ -1,5 +1,5 @@
 LIB=-lrt -lTASLimited
-FLAGS=-O3 -static
+FLAGS=-O3 -Werror -static
 
 all: VoterD
 

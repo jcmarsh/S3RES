@@ -32,6 +32,7 @@ struct replica {
 void initReplicas(struct replica reps[], int rep_num, const char* name, int priority);
 void cleanupReplica(struct replica reps[], int rep_index);
 void startReplicas(struct replica reps[], int num, struct server_data *sd, const char* name, struct typed_pipe ext_pipes[], int pipe_count, int default_priority);
+int behindRep(struct replica reps[], int num, int pipe_num);
 void balanceReps(struct replica reps[], int num, int default_priority);
 void restartReplica(struct replica reps[], int num, struct server_data *sd, struct typed_pipe ext_pipes[], int restarter, int restartee, int default_priority);
 

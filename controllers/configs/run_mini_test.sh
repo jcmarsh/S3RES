@@ -8,9 +8,9 @@ SIM_IP=192.168.100.1
 
 PINT_DIR=/home/jcmarsh/research/PINT
 CONFIG_DIR=$PINT_DIR/controllers/configs
-OUTPUT=/home/jcmarsh/Dropbox/research/MyPaperAttempts/OSPERT15/mini_test/latest_run
+OUTPUT=/home/jcmarsh/Dropbox/research/MyPaperAttempts/Journal/mini_test/latest_run
 
-ITARS=99
+ITARS=10
 
 # All baseline
 cp $CONFIG_DIR/all.cfg ./config_plumber.cfg
@@ -118,7 +118,7 @@ mv *.txt $OUTPUT/kill/
 
 sleep 60
 
-# All Tri /bin/kill -s SIGRTMIN+2 tests
+# All Tri /bin/kill -s SIGRTMIN+2 tests (simulated sdc)
 cp $CONFIG_DIR/all_tri.cfg ./config_plumber.cfg
 for index in `seq 0 $ITARS`; do
 	timeout $PLAYER_TIME player baseline.cfg > sdc_test_tri_$index.txt &
@@ -134,6 +134,24 @@ for index in `seq 0 $ITARS`; do
 done
 
 mv *.txt $OUTPUT/sdc/
+
+sleep 60
+
+# All Tri /bin/kill -s SIGRTMIN+3 tests (simulated control flow error)
+cp $CONFIG_DIR/all_tri.cfg ./config_plumber.cfg
+for index in `seq 0 $ITARS`; do
+	timeout $PLAYER_TIME player baseline.cfg > freeze_test_tri_$index.txt &
+	sleep 5
+	timeout $BASIC_TIME $PINT_DIR/stage_control/basic $SIM_IP &
+	sleep 5
+	ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm > freeze_test_tri_injector_$index.txt
+	timeout $ANOTHER_TIME python injector.py "/bin/kill -s SIGRTMIN+3" >> freeze_test_tri_injector_$index.txt &
+	sleep $ANOTHER_TIME
+	ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm >> freeze_test_tri_injector_$index.txt
+	sleep 40
+done
+
+mv *.txt $OUTPUT/freeze/
 
 sleep 60
 

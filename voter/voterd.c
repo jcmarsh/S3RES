@@ -124,7 +124,7 @@ void voterRestartHandler(void) {
     }
     case TMR: {
       // The failed rep should be the one behind on the timer pipe
-      int restartee = behindRep(timer_stop_index);
+      int restartee = behindRep(replicas, rep_count, timer_stop_index);
       int restarter = (restartee + (rep_count - 1)) % rep_count;
       restart_prep(restartee, restarter);
       break;
