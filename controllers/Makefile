@@ -12,10 +12,10 @@ all: ArtPot AStar BenchMarker Empty Filter Logger Mapper
 ArtPot: art_pot.o $(SRC) $(INC)
 	gcc $(FLAGS) -o ArtPot art_pot.o $(SRC) $(LIB) -lm
 
-AStar: a_star.o ../src/mapping.c $(SRC) $(INC)
-	gcc $(FLAGS) -o AStar a_star.o ../src/mapping.c $(SRC) $(LIB) -lm
+AStar: a_star.o mapping.c $(SRC) $(INC) ./inc/*.h
+	gcc $(FLAGS) -o AStar a_star.o mapping.c $(SRC) $(LIB) -lm
 
-BenchMarker: benchmarker.o ../src/commtypes.c ../src/fd_server.c ../src/replicas.c $(INC)
+BenchMarker: benchmarker.o ../src/commtypes.c ../src/replicas.c $(INC)
 	gcc $(FLAGS) -o BenchMarker benchmarker.o ../src/commtypes.c ../src/fd_server.c ../src/replicas.c $(LIB)
 
 Empty: empty.o $(SRC) $(INC)
@@ -27,8 +27,8 @@ Filter: filter.o $(SRC) $(INC)
 Logger: logger.o $(SRC) $(INC)
 	gcc $(FLAGS) -o Logger logger.o $(SRC) $(LIB) -lm
 
-Mapper: mapper.o ../src/mapping.c $(SRC) $(INC)
-	gcc $(FLAGS) -o Mapper mapper.o ../src/mapping.c $(SRC) $(LIB) -lm
+Mapper: mapper.o mapping.c $(SRC) $(INC) ./inc/*.h
+	gcc $(FLAGS) -o Mapper mapper.o mapping.c $(SRC) $(LIB) -lm
 
 copy:
 	cp ArtPot ../../stage/experiments/

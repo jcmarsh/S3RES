@@ -8,7 +8,7 @@
 
 #include <math.h>
 
-#include "../include/mapping.h"
+#include "./inc/mapping.h"
 
 #define PIPE_COUNT 4
 

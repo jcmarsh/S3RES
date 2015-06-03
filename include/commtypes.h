@@ -45,11 +45,12 @@ static const char* REP_TYPE_T[] = {"NONE", "SMR", "DMR", "TMR", "REP_TYPE_ERROR"
 struct typed_pipe {
   comm_message_t type;
 
-  bool timed; // timers start on input timed pipe reads, reset on output timed pipe writes
   // Only one of these will be set at a time
   int fd_in;
   int fd_out;
 
+  // Only used by voter / replicas. Should be elsewhere.
+  bool timed; // timers start on input timed pipe reads, reset on output timed pipe writes
   int buff_count;
   char buffer[MAX_PIPE_BUFF];
 };

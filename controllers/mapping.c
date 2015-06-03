@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "../include/mapping.h"
+#include "./inc/mapping.h"
 
 /*               */
 struct point_i* gridify(struct point_d* p) {
