@@ -58,6 +58,10 @@ void processFromRep(int replica_num, int pipe_num);
 void writeBuffer(int fd_out, char* buffer, int buff_count);
 
 void restart_prep(int restartee, int restarter) {
+  #ifdef TIME_RESTART_REPLICA
+    timestamp_t start_restart = generate_timestamp();
+  #endif // TIME_RESTART_REPLICA
+  
   int i;
   char **restarter_buffer = (char **)malloc(sizeof(char *) * PIPE_LIMIT);
   if (restarter_buffer == NULL) {
@@ -95,13 +99,19 @@ void restart_prep(int restartee, int restarter) {
     free(restarter_buffer[i]);
   }
   free(restarter_buffer);
+
+  #ifdef TIME_RESTART_REPLICA
+    timestamp_t end_restart = generate_timestamp();
+    printf("Restart time elapsed (%lld)\n", end_restart - start_restart);
+  #endif // TIME_RESTART_REPLICA
+
   return;
 }
 
 void voterRestartHandler(void) {
   // Timer went off, so the timer_stop_index is the pipe which is awaiting a rep
   int p_index;
-  printf("Caugth Exec / Control loop error\n");
+  debug_print("Caught Exec / Control loop error\n");
 
   switch (rep_type) {
     case SMR: {
@@ -205,11 +215,10 @@ void doOneUpdate(void) {
     timestamp_t current = generate_timestamp();
     long remaining = voting_timeout - ((current - watchdog) / 3.092);
     if (remaining > 0) {
-      //printf("Setting remaining %ld\n", remaining / 1000);
       select_timeout.tv_sec = 0;
       select_timeout.tv_usec = remaining / 1000;
     } else {
-      //printf("Restart handler called, %ld late\n", remaining);
+      // printf("Restart handler called, %ld late\n", remaining);
       voterRestartHandler();
     }
   }
@@ -402,7 +411,7 @@ void checkSDC(int pipe_num) {
                      replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num].buffer,
                      replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
             
-            printf("Caught SDC\n");
+            debug_print("Caught SDC\n");
 
             int restartee = (r_index + 2) % rep_count;
             restart_prep(restartee, r_index);

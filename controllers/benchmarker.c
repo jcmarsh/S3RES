@@ -106,7 +106,7 @@ void enterLoop() {
         retval = TEMP_FAILURE_RETRY(read(trans_pipes[0].fd_in, &range_pose_data_msg, sizeof(struct comm_range_pose_data)));
         if (retval == sizeof(struct comm_range_pose_data)) {
           if (waiting_response) {
-            printf("ERROR, sending data but still waiting on previous response.\n");
+            debug_print("ERROR, sending data but still waiting on previous response.\n");
             #ifdef TIME_FULL_BENCH
               timestamp_t toss = generate_timestamp();
               printf("Error time elapsed (%lld)\n", toss - last);
