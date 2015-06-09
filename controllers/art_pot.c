@@ -245,8 +245,6 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
-  EveryTAS();
-
   if (PIPE_COUNT == pipe_count) {
     commSendWaypointRequest(pipes[way_req_index]);
   } else {

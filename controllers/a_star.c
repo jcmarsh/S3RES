@@ -320,8 +320,6 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
-  EveryTAS();
-
   pose = (struct point_i*) malloc(sizeof(struct point_i));
   struct point_d* goal_d = (struct point_d*) malloc(sizeof(struct point_d));
   goal_d->x = 7.0;

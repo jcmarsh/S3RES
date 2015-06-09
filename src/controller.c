@@ -47,7 +47,8 @@ int initController(void) {
   }
 
   InitTAS(DEFAULT_CPU, priority);
-  
+  EveryTAS();
+
   return 0;
 }
 
@@ -66,7 +67,7 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
       // child sets new id, recreates connects, loops
-      InitTAS(DEFAULT_CPU, priority);
+      InitTAS(DEFAULT_CPU, priority); // TODO: Consider combining InitTAS and EveryTAS.
 
       // clean up pipes
       for (index = 0; index < pipe_count; index++) {
