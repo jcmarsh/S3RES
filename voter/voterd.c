@@ -5,7 +5,8 @@
  * Author - James Marshall
  */
 
-#include "../include/controller.h"
+#include "controller.h"
+#include "tas_time.h"
 
 #include <assert.h>
 #include <signal.h>
@@ -15,7 +16,7 @@
 #include <linux/prctl.h>
 #include <time.h>
 
-#include "../include/replicas.h"
+#include "replicas.h"
  
 #define REP_MAX 3
 #define PERIOD_NSEC 120000 // Max time for voting in nanoseconds (120 micro seconds)
@@ -484,8 +485,6 @@ int initVoterD(void) {
   sigset_t mask;
 
   InitTAS(DEFAULT_CPU, voter_priority);
-
-  EveryTAS();
 
   // Setup fd server
   createFDS(&sd, controller_name);

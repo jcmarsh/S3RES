@@ -4,11 +4,9 @@
  * James Marshall
  */
 
-#include "../include/controller.h"
-
+#include "controller.h"
 #include <math.h>
-
-#include "./inc/mapping.h"
+#include "./inc/mapping.h" // TODO: fix
 
 #define PIPE_COUNT 4
 

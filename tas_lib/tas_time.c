@@ -1,4 +1,4 @@
-#include "../include/time.h"
+#include "inc/tas_time.h"
 
 //-----------------------------------------------------------------------------
 /// Wraps the rdtsc assembly call and macro into a C/C++ function.

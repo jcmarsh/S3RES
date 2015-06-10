@@ -2,7 +2,7 @@
 #define _TAS_LIMITED_H_
 
 #include "cpu.h"
-#include "time.h"
+#include "tas_time.h"
 
 int sched_set_policy(const pid_t pid, const int priority);
 int InitTAS(cpu_id_t cpu, int priority);

@@ -1,4 +1,3 @@
-
 #define _GNU_SOURCE
 
 #include <sched.h>
@@ -6,8 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../include/cpu.h"
-#include "../include/time.h"
+#include "inc/cpu.h"
+#include "inc/tas_time.h"
 
 //-----------------------------------------------------------------------------
 /// Restrict the specified process to run only in the prescribed cpu. 

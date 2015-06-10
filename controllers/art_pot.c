@@ -5,7 +5,7 @@
  * James Marshall
  */
 
-#include "../include/controller.h"
+#include "controller.h"
 #include <math.h>
 
 // Configuration parameters

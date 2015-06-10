@@ -9,7 +9,7 @@
  * author: James Marshall jcmarsh@gwmail.gwu.edu April 27, 2014
  */
 
-#include "../include/force.h"
+#include "inc/force.h"
 
 int parseLine(char* line, ssize_t length) {
   char start_s[17]; // I don't think that the address can be longer than 16 (64 bits in hex). One for \0

@@ -1,10 +1,10 @@
-#include "../include/taslimited.h"
+#include "inc/taslimited.h"
 
 #include <sched.h>
 #include <sys/resource.h>
 #include <unistd.h>
 
-#include "../include/force.h"
+#include "inc/force.h"
 
 int sched_set_policy(const pid_t pid, const int priority) {
   struct sched_param param;
@@ -81,19 +81,16 @@ int InitTAS(cpu_id_t cpu, int priority) {
     perror("\tperror");
   }
 
-  return 0;
-}
-
-void EveryTAS(void) {  
+  // Used to be a separate function. Lock memory may not always be desired with above functions.
   // lock current and future memory
-  //timestamp_t last = generate_timestamp();
   if (lockItUp() != 0) {
     printf("(voter_d_driver) InitTAS() failed calling lockItUp()\n" );
   }
-  //printf("lockItUp: (%lld)\n", generate_timestamp() - last);
 
   // Walk current memory to get it paged in
   if (forceMaps() != 0) {
     printf("(voter_d_driver) InitTAS() failed calling forceMaps()\n" );
   }
+
+  return 0;
 }

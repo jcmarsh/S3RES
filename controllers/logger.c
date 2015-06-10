@@ -4,9 +4,8 @@
  * James Marshall
  */
 
- // TODO: Select file name, open, and write out to it.
-
-#include "../include/controller.h"
+#include "controller.h"
+#include "tas_time.h"
 #include <math.h>
 #include <time.h>
 

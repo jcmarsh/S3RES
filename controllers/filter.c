@@ -5,7 +5,7 @@
  * James Marshall
  */
 
-#include "../include/controller.h"
+#include "controller.h"
 
 // Configuration parameters
 #define WINDOW_SIZE 3

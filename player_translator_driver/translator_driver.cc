@@ -11,7 +11,7 @@
 
 extern "C"
 {
-  #include "../include/taslimited.h"
+  #include "../tas_lib/inc/taslimited.h"
   #include "../include/replicas.h"
 }
 

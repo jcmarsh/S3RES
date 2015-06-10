@@ -4,7 +4,7 @@
  * James Marshall
  */
 
-#include "../include/commtypes.h"
+#include "commtypes.h"
 
 #include <assert.h>
 #include <math.h>
@@ -14,9 +14,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../include/bench_config.h"
-#include "../include/taslimited.h"
-#include "../include/replicas.h"
+#include "bench_config.h"
+#include "taslimited.h"
+#include "replicas.h"
 
 // Replica related data
 struct replica replica;
