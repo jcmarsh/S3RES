@@ -125,7 +125,7 @@ int forceMaps( ){
 
 int lockItUp() {
   // Must be super user.
-  if (mlockall(MCL_CURRENT || MCL_FUTURE) == -1) { // Lock current pages and future ones.
+  if (mlockall(MCL_CURRENT | MCL_FUTURE) == -1) { // Lock current pages and future ones.
     perror("mlockall failed");
     return -1;
   }
