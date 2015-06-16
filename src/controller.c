@@ -20,6 +20,7 @@ void testCFEHandler(int signo, siginfo_t *si, void *unused) {
   insertCFE = true;
 }
 
+// Pipes should already be initialized by parseArgs or connectRecvFDS
 int initController(void) {
   struct sigaction sa;
 
@@ -49,6 +50,7 @@ int initController(void) {
 
   InitTAS(DEFAULT_CPU, priority);
 
+  debug_print("Initializing controller %s\n", name);
   return 0;
 }
 

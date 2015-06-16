@@ -5,6 +5,7 @@
  */
 
 #include "controller.h"
+#include <malloc.h>
 #include <math.h>
 #include "./inc/mapping.h" // TODO: fix
 
@@ -331,6 +332,21 @@ int main(int argc, const char **argv) {
       obstacle_map[i][j] = false;
     }
   }
+
+  if (mallopt(M_TRIM_THRESHOLD, -1) != 1) {
+    printf("AStar mallopt error, M_TRIM_THRESHOLD\n");
+  }
+  if (mallopt(M_MMAP_MAX, 0) != 1) {
+    printf("AStar mallopt error, M_MMAP_MAX\n");
+  }
+
+  char *heap_reserve = malloc(sizeof(char) * 1024 * 300); // page in 300K to heap
+  free(heap_reserve); // give it back (but reserved for process thanks to mallopt calls)
+
+  //struct rusage usage_stats;
+  //getrusage(RUSAGE_SELF, &usage_stats);
+  //debug_print("AStar Page Faults: %ld - %ld\n", usage_stats.ru_majflt,
+	// usage_stats.ru_minflt);
 
   enterLoop();
 
