@@ -9,18 +9,24 @@
 #include "tas_time.h"
 
 #include <assert.h>
+#include <malloc.h>
 #include <signal.h>
 #include <string.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
 #include <linux/prctl.h>
-#include <time.h>
+// For rusage:
+#include <sys/time.h>
+#include <sys/resource.h>
 
 #include "replicas.h"
  
 #define REP_MAX 3
 #define PERIOD_NSEC 120000 // Max time for voting in nanoseconds (120 micro seconds)
 #define VOTER_PRIO_OFFSET 5 // Replicas run with a -5 offset
+
+// remove rusage
+struct rusage usage_stats;
 
 long voting_timeout;
 int timer_start_index;
@@ -62,7 +68,7 @@ void restart_prep(int restartee, int restarter) {
   #ifdef TIME_RESTART_REPLICA
     timestamp_t start_restart = generate_timestamp();
   #endif // TIME_RESTART_REPLICA
-  
+
   int i;
   char **restarter_buffer = (char **)malloc(sizeof(char *) * PIPE_LIMIT);
   if (restarter_buffer == NULL) {
@@ -200,6 +206,7 @@ bool checkSync(void) {
   return nsync;
 }
 
+bool first_time = true;
 void doOneUpdate(void) {
   int p_index, r_index;
   int retval = 0;
@@ -208,6 +215,13 @@ void doOneUpdate(void) {
   fd_set select_set;
 
   //waitpid(-1, NULL, WNOHANG); // Seems to take a while for to clean up zombies
+
+  if (first_time) {
+    getrusage(RUSAGE_SELF, &usage_stats);
+    debug_print("Page Fault (%s) check oneUpdate.1: %ld - %ld\n", controller_name,
+          usage_stats.ru_majflt,
+          usage_stats.ru_minflt);
+  }
 
   select_timeout.tv_sec = 0;
   select_timeout.tv_usec = 50000;
@@ -256,6 +270,13 @@ void doOneUpdate(void) {
     }
   }
 
+  if (first_time) {
+    getrusage(RUSAGE_SELF, &usage_stats);
+    debug_print("Page Fault (%s) check oneUpdate.1: %ld - %ld\n", controller_name,
+          usage_stats.ru_majflt,
+          usage_stats.ru_minflt);
+  }
+
   // This will wait at least timeout until return. Returns earlier if something has data.
   retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
 
@@ -296,6 +317,8 @@ void doOneUpdate(void) {
       }
     }
   }
+
+  first_time = false;
 }
 
 void writeBuffer(int fd_out, char* buffer, int buff_count) {
@@ -488,11 +511,29 @@ int initVoterD(void) {
 
   // Setup fd server
   createFDS(&sd, controller_name);
-
   initVotingState();
-
   startReplicas(replicas, rep_count, &sd, controller_name, ext_pipes, pipe_count, voter_priority - VOTER_PRIO_OFFSET);
   
+  int p_index, r_index;
+  for (p_index = 0; p_index < pipe_count; p_index++) {
+    int read_fd = ext_pipes[p_index].fd_in;
+    if (read_fd != 0) {  // Causes page faults
+      ext_pipes[p_index].buff_count = read(read_fd, ext_pipes[p_index].buffer, 0);
+    }
+  }
+
+  // Check all replicas for data
+  for (r_index = 0; r_index < rep_count; r_index++) {
+    for (p_index = 0; p_index < replicas[r_index].pipe_count; p_index++) {
+      struct typed_pipe* curr_pipe = &(replicas[r_index].vot_pipes[p_index]);
+      if (curr_pipe->fd_in !=0) {
+        curr_pipe->buff_count = read(curr_pipe->fd_in, curr_pipe->buffer, 0);
+      }
+    }
+  }
+
+  debug_print("Initializing VoterD(%s)\n", controller_name);
+
   return 0;
 }
 
@@ -552,6 +593,13 @@ int main(int argc, const char **argv) {
     puts("ERROR: failure in setup function.");
     return -1;
   }
+
+  // TODO: remove
+  getrusage(RUSAGE_SELF, &usage_stats);
+  debug_print("Page Fault (%s) check restart.0: %ld - %ld\n", controller_name,
+    usage_stats.ru_majflt,
+    usage_stats.ru_minflt);
+
 
   while(1) {
     doOneUpdate();

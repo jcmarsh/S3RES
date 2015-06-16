@@ -89,7 +89,7 @@ void enterLoop() {
 }
 
 int main(int argc, const char **argv) {
-  filler = malloc(sizeof(char) * 8896 * 1024 + (sizeof(char) * 150000 * 1024)); // for 160,000 kB
+  //filler = malloc(sizeof(char) * 8896 * 1024 + (sizeof(char) * 150000 * 1024)); // for 160,000 kB
   
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");

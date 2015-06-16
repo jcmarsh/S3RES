@@ -9,6 +9,10 @@
 #include <math.h>
 #include "./inc/mapping.h" // TODO: fix
 
+// For rusage
+//#include <sys/time.h>
+//#include <sys/resource.h>
+
 #define PIPE_COUNT 4
 
 bool obstacle_map[GRID_NUM][GRID_NUM];
