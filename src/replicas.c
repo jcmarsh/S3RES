@@ -20,8 +20,9 @@ void initReplicas(struct replica reps[], int rep_num, const char* name, int prio
     new_rep->priority = priority;
 
     // clean up pipes if this replica is not fresh
-    if (new_rep->pipe_count != 0) {
-      for (jndex = 0; jndex < new_rep->pipe_count; jndex++) {
+    for (jndex = 0; jndex < new_rep->pipe_count; jndex++) {
+      new_rep->voted[jndex] = 0;
+      if (new_rep->pipe_count != 0) {
         resetPipe(&(new_rep->vot_pipes[jndex]));
         resetPipe(&(new_rep->rep_pipes[jndex]));
       }

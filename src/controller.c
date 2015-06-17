@@ -96,7 +96,8 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
       setPipeIndexes();
       
       return;
-    } else {   // Parent just returns
+    } else {   // Parent needs to re-lock / walk own pages
+      InitTAS(DEFAULT_CPU, priority);
       return;
     }
   } else {

@@ -64,6 +64,18 @@ void checkSDC(int pipe_num);
 void processFromRep(int replica_num, int pipe_num);
 void writeBuffer(int fd_out, char* buffer, int buff_count);
 
+// TODO: Remove
+int old_faults = 0;
+int checkFaults(int n) {
+  getrusage(RUSAGE_SELF, &usage_stats);
+  if (usage_stats.ru_minflt > old_faults) {
+    debug_print("Page fault here! VoterD(%s) - %d\tFaults: %ld - %ld\n", controller_name, n, usage_stats.ru_majflt, usage_stats.ru_minflt);
+    old_faults = usage_stats.ru_minflt;
+    return 1;
+  }
+  return 0;
+}
+
 void restart_prep(int restartee, int restarter) {
   #ifdef TIME_RESTART_REPLICA
     timestamp_t start_restart = generate_timestamp();
@@ -109,7 +121,7 @@ void restart_prep(int restartee, int restarter) {
 
   #ifdef TIME_RESTART_REPLICA
     timestamp_t end_restart = generate_timestamp();
-    printf("Restart time elapsed (%lld)\n", end_restart - start_restart);
+    debug_print("Restart time elapsed (%lld)\n", end_restart - start_restart);
   #endif // TIME_RESTART_REPLICA
 
   return;
@@ -206,7 +218,6 @@ bool checkSync(void) {
   return nsync;
 }
 
-bool first_time = true;
 void doOneUpdate(void) {
   int p_index, r_index;
   int retval = 0;
@@ -215,13 +226,6 @@ void doOneUpdate(void) {
   fd_set select_set;
 
   //waitpid(-1, NULL, WNOHANG); // Seems to take a while for to clean up zombies
-
-  if (first_time) {
-    getrusage(RUSAGE_SELF, &usage_stats);
-    debug_print("Page Fault (%s) check oneUpdate.1: %ld - %ld\n", controller_name,
-          usage_stats.ru_majflt,
-          usage_stats.ru_minflt);
-  }
 
   select_timeout.tv_sec = 0;
   select_timeout.tv_usec = 50000;
@@ -270,13 +274,6 @@ void doOneUpdate(void) {
     }
   }
 
-  if (first_time) {
-    getrusage(RUSAGE_SELF, &usage_stats);
-    debug_print("Page Fault (%s) check oneUpdate.1: %ld - %ld\n", controller_name,
-          usage_stats.ru_majflt,
-          usage_stats.ru_minflt);
-  }
-
   // This will wait at least timeout until return. Returns earlier if something has data.
   retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
 
@@ -318,7 +315,7 @@ void doOneUpdate(void) {
     }
   }
 
-  first_time = false;
+  old_faults = usage_stats.ru_minflt;
 }
 
 void writeBuffer(int fd_out, char* buffer, int buff_count) {
@@ -483,9 +480,7 @@ void processFromRep(int replica_num, int pipe_num) {
   // TODO: Read may have been interrupted
   if (curr_pipe->buff_count > 0) {
     replicas[replica_num].voted[pipe_num]++;
-
     balanceReps(replicas, rep_count, voter_priority - VOTER_PRIO_OFFSET);
-    
     if (replicas[replica_num].voted[pipe_num] > 1) {
       // Happens when a process has died.
       // printf("Run-away lag detected: %s pipe - %d - rep 0, 1, 2: %d, %d, %d\n", controller_name, pipe_num, replicas[0].voted[pipe_num], replicas[1].voted[pipe_num], replicas[2].voted[pipe_num]);
@@ -507,12 +502,12 @@ int initVoterD(void) {
   struct sigevent sev;
   sigset_t mask;
 
-  InitTAS(DEFAULT_CPU, voter_priority);
-
   // Setup fd server
   createFDS(&sd, controller_name);
   initVotingState();
   startReplicas(replicas, rep_count, &sd, controller_name, ext_pipes, pipe_count, voter_priority - VOTER_PRIO_OFFSET);
+  
+  InitTAS(DEFAULT_CPU, voter_priority); // IMPORTANT: Should be after forking replicas to subvert CoW
   
   int p_index, r_index;
   for (p_index = 0; p_index < pipe_count; p_index++) {
@@ -596,10 +591,9 @@ int main(int argc, const char **argv) {
 
   // TODO: remove
   getrusage(RUSAGE_SELF, &usage_stats);
-  debug_print("Page Fault (%s) check restart.0: %ld - %ld\n", controller_name,
+  debug_print("Page Fault (%s) sanity check: %ld - %ld\n", controller_name,
     usage_stats.ru_majflt,
     usage_stats.ru_minflt);
-
 
   while(1) {
     doOneUpdate();

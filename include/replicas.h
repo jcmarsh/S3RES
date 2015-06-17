@@ -14,9 +14,9 @@
 #include <signal.h>
 #include <stdio.h>
 
- // Represents one redundant execution, implemented as a thread
+ // Represents one redundant execution, implemented as a process
 struct replica {
-  pid_t pid; // The pid of the thread
+  pid_t pid; // The pid of the process
   int priority;
   char* name;
 
