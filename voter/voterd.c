@@ -15,18 +15,12 @@
 #include <sys/wait.h>
 #include <sys/prctl.h>
 #include <linux/prctl.h>
-// For rusage:
-#include <sys/time.h>
-#include <sys/resource.h>
 
 #include "replicas.h"
  
 #define REP_MAX 3
 #define PERIOD_NSEC 120000 // Max time for voting in nanoseconds (120 micro seconds)
 #define VOTER_PRIO_OFFSET 5 // Replicas run with a -5 offset
-
-// remove rusage
-struct rusage usage_stats;
 
 long voting_timeout;
 int timer_start_index;
@@ -63,18 +57,6 @@ void returnBuffers(int rep_num, char **buffer, int *buff_count);
 void checkSDC(int pipe_num);
 void processFromRep(int replica_num, int pipe_num);
 void writeBuffer(int fd_out, char* buffer, int buff_count);
-
-// TODO: Remove
-int old_faults = 0;
-int checkFaults(int n) {
-  getrusage(RUSAGE_SELF, &usage_stats);
-  if (usage_stats.ru_minflt > old_faults) {
-    debug_print("Page fault here! VoterD(%s) - %d\tFaults: %ld - %ld\n", controller_name, n, usage_stats.ru_majflt, usage_stats.ru_minflt);
-    old_faults = usage_stats.ru_minflt;
-    return 1;
-  }
-  return 0;
-}
 
 void restart_prep(int restartee, int restarter) {
   #ifdef TIME_RESTART_REPLICA
@@ -314,8 +296,6 @@ void doOneUpdate(void) {
       }
     }
   }
-
-  old_faults = usage_stats.ru_minflt;
 }
 
 void writeBuffer(int fd_out, char* buffer, int buff_count) {
@@ -588,12 +568,6 @@ int main(int argc, const char **argv) {
     puts("ERROR: failure in setup function.");
     return -1;
   }
-
-  // TODO: remove
-  getrusage(RUSAGE_SELF, &usage_stats);
-  debug_print("Page Fault (%s) sanity check: %ld - %ld\n", controller_name,
-    usage_stats.ru_majflt,
-    usage_stats.ru_minflt);
 
   while(1) {
     doOneUpdate();
