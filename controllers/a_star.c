@@ -9,10 +9,6 @@
 #include <math.h>
 #include "./inc/mapping.h" // TODO: fix
 
-// For rusage
-//#include <sys/time.h>
-//#include <sys/resource.h>
-
 #define PIPE_COUNT 4
 
 bool obstacle_map[GRID_NUM][GRID_NUM];
@@ -226,7 +222,7 @@ void sendWaypoints(void) {
   //free(pop(&goal_path)); // trash closest
   current_goal = pop(&goal_path);
   if (current_goal == NULL) { // TODO: these contingences never happen.
-    commSendWaypoints(pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
+    commSendWaypoints(&pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
   } else {
     goal_p = degridify(current_goal->x, current_goal->y);
     n_current_goal = pop(&goal_path);
@@ -235,7 +231,7 @@ void sendWaypoints(void) {
       // commSendWaypoints(pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
     } else{
       n_goal_p = degridify(n_current_goal->x, n_current_goal->y);
-      commSendWaypoints(pipes[way_res_index], goal_p->x, goal_p->y, 0.0, n_goal_p->x, n_goal_p->y, 0.0);
+      commSendWaypoints(&pipes[way_res_index], goal_p->x, goal_p->y, 0.0, n_goal_p->x, n_goal_p->y, 0.0);
       free(n_goal_p);
     }
     free(goal_p);
@@ -270,7 +266,7 @@ void enterLoop(void) {
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
       if (FD_ISSET(pipes[updates_index].fd_in, &select_set)) {
-        read_ret = commRecvMapUpdate(pipes[updates_index], &recv_map_update);
+        read_ret = commRecvMapUpdate(&pipes[updates_index], &recv_map_update);
         if (read_ret > 0) {
           pose->x = recv_map_update.pose_x;
           pose->y = recv_map_update.pose_y;
@@ -281,7 +277,7 @@ void enterLoop(void) {
             insertSDC = false;
             fake_hash++;
           }
-          commSendAck(pipes[ack_index], fake_hash);
+          commSendAck(&pipes[ack_index], fake_hash);
           if (recv_map_update.obs_count > 0) { // New obstacle arrived
             // TODO: Also command if waypoint requested
             command();
@@ -296,7 +292,7 @@ void enterLoop(void) {
         read_ret = TEMP_FAILURE_RETRY(read(pipes[way_req_index].fd_in, &recv_msg_req, sizeof(struct comm_way_req)));
         if (read_ret > 0) { // TODO: Do these calls stack up?
           if (goal_path->head == NULL) {
-            commSendWaypoints(pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
+            commSendWaypoints(&pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
           } else {
             sendWaypoints();
           }
@@ -346,11 +342,6 @@ int main(int argc, const char **argv) {
 
   char *heap_reserve = malloc(sizeof(char) * 1024 * 300); // page in 300K to heap
   free(heap_reserve); // give it back (but reserved for process thanks to mallopt calls)
-
-  //struct rusage usage_stats;
-  //getrusage(RUSAGE_SELF, &usage_stats);
-  //debug_print("AStar Page Faults: %ld - %ld\n", usage_stats.ru_majflt,
-	// usage_stats.ru_minflt);
 
   enterLoop();
 

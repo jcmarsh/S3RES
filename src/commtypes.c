@@ -49,7 +49,7 @@ char* serializePipe(struct typed_pipe pipe) {
   return serial;  
 }
 
-void deserializePipe(const char* serial, struct typed_pipe *pipe) {
+void deserializePipe(const char* serial, struct typed_pipe* pipe) {
   char* type;
   int in = 0;
   int out = 0;
@@ -69,8 +69,11 @@ void deserializePipe(const char* serial, struct typed_pipe *pipe) {
   free(type);
 }
 
-void printBuffer(struct typed_pipe *pipe) {
+void printBuffer(struct typed_pipe* pipe) {
   printf("Print Buffer type %s, buff_count %d\n", MESSAGE_T[pipe->type], pipe->buff_count);
+  #ifdef DEBUG_MESSAGING
+    printf("\tSend count: %d\tRecv count: %d\n", pipe->count_send, pipe->count_recv);
+  #endif //DEBUG_MESSAGING
   int i;
   switch (pipe->type) {
     case COMM_ERROR:
@@ -96,10 +99,11 @@ void printBuffer(struct typed_pipe *pipe) {
       printf("\tpose (%f, %f) - %f\n", rp_data->pose[0], rp_data->pose[1], rp_data->pose[2]);
       break;
     case MAP_UPDATE: ;
+      int header_ints = 3; // pose x, pose y, and obstacle count
       struct comm_map_update *map_update = (struct comm_map_update *) pipe->buffer;
       printf("\tpose: (%d, %d)\t Obs count: %d\n", map_update->pose_x, map_update->pose_y, map_update->obs_count);
       for (i = 0; i < map_update->obs_count; i++) {
-        printf("\tObs: (%d, %d)\n", map_update->obs_x[i], map_update->obs_y[i]);
+        printf("\tObs: (%d, %d)\n", pipe->buffer[header_ints + (i *2)], pipe->buffer[header_ints + (i *2 + 1)]);//map_update->obs_x[i], map_update->obs_y[i]);
       }
       break;
     case COMM_ACK:
@@ -118,13 +122,18 @@ void resetPipe(struct typed_pipe* pipe) {
     close(pipe->fd_out);
     pipe->fd_out = 0;
   }
+
+  #ifdef DEBUG_MESSAGING // TODO: is this the desired behavior?
+    //pipe->count_send = 0;
+    //pipe->count_recv = 0;
+  #endif //DEBUG_MESSAGING
 }
 
-int commSendWaypoints(struct typed_pipe pipe, 
+int commSendWaypoints(struct typed_pipe* pipe, 
                       double way_x, double way_y, double way_a,
                       double n_way_x, double n_way_y, double n_way_a) {
-  if (pipe.fd_out == 0 || pipe.type != WAY_RES) {
-    printf("commSendWaypoints Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe.type], pipe.fd_out);
+  if (pipe->fd_out == 0 || pipe->type != WAY_RES) {
+    printf("commSendWaypoints Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
     return 0;
   }
 
@@ -139,10 +148,14 @@ int commSendWaypoints(struct typed_pipe pipe,
   msg.n_point[INDEX_Y] = n_way_y;
   msg.n_point[INDEX_A] = n_way_a;
 
-  return TEMP_FAILURE_RETRY(write(pipe.fd_out, &msg, sizeof(struct comm_way_res)));
+  #ifdef DEBUG_MESSAGING
+    pipe->count_send++;
+  #endif //DEBUG_MESSAGING
+
+  return TEMP_FAILURE_RETRY(write(pipe->fd_out, &msg, sizeof(struct comm_way_res)));
 }
 
-void commCopyWaypoints(struct comm_way_res * recv_msg, double * waypoints, double * n_waypoints) {
+void commCopyWaypoints(struct comm_way_res* recv_msg, double* waypoints, double* n_waypoints) {
   int index = 0;
   for (index = 0; index < 3; index++) {
     waypoints[index] = recv_msg->point[index];
@@ -150,25 +163,30 @@ void commCopyWaypoints(struct comm_way_res * recv_msg, double * waypoints, doubl
   for (index = 0; index < 3; index++) {
     n_waypoints[index] = recv_msg->n_point[index];
   }
+
   return;
 }
 
-int commSendWaypointRequest(struct typed_pipe pipe) {
-  if (pipe.fd_out == 0 || pipe.type != WAY_REQ) {
-    printf("commSendWaypointsRequest Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe.type], pipe.fd_out);
+int commSendWaypointRequest(struct typed_pipe* pipe) {
+  if (pipe->fd_out == 0 || pipe->type != WAY_REQ) {
+    printf("commSendWaypointsRequest Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
     return 0;
   }
 
   struct comm_way_req send_msg;
   memset(&send_msg, 0, sizeof(struct comm_way_req));
 
-  return TEMP_FAILURE_RETRY(write(pipe.fd_out, &send_msg, sizeof(struct comm_way_req)));
+  #ifdef DEBUG_MESSAGING
+    pipe->count_send++;
+  #endif //DEBUG_MESSAGING
+
+  return TEMP_FAILURE_RETRY(write(pipe->fd_out, &send_msg, sizeof(struct comm_way_req)));
 }
 
 
-int commSendMoveCommand(struct typed_pipe pipe, double vel_0, double vel_1) {
-  if (pipe.fd_out == 0 || pipe.type != MOV_CMD) {
-    printf("commSendMoveCommand Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe.type], pipe.fd_out);
+int commSendMoveCommand(struct typed_pipe* pipe, double vel_0, double vel_1) {
+  if (pipe->fd_out == 0 || pipe->type != MOV_CMD) {
+    printf("commSendMoveCommand Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
     return 0;
   }
 
@@ -178,12 +196,16 @@ int commSendMoveCommand(struct typed_pipe pipe, double vel_0, double vel_1) {
   msg.vel_cmd[0] = vel_0;
   msg.vel_cmd[1] = vel_1;
 
-  return TEMP_FAILURE_RETRY(write(pipe.fd_out, &msg, sizeof(struct comm_mov_cmd)));
+  #ifdef DEBUG_MESSAGING
+    pipe->count_send++;
+  #endif //DEBUG_MESSAGING
+
+  return TEMP_FAILURE_RETRY(write(pipe->fd_out, &msg, sizeof(struct comm_mov_cmd)));
 }
 
-int commSendMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg) {
-  if (pipe.fd_out == 0 || pipe.type != MAP_UPDATE) {
-    printf("commSendMapUpdate Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe.type], pipe.fd_out);
+int commSendMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg) {
+  if (pipe->fd_out == 0 || pipe->type != MAP_UPDATE) {
+    printf("commSendMapUpdate Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
     return 0;
   }
 
@@ -205,32 +227,36 @@ int commSendMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg) {
     }
   }
   
-  int written = TEMP_FAILURE_RETRY(write(pipe.fd_out, buffer, sizeof(int) * buff_count));
+  int written = TEMP_FAILURE_RETRY(write(pipe->fd_out, buffer, sizeof(int) * buff_count));
   if (written != buff_count * sizeof(int)) { // TODO: more should check this
     perror("Write for commSendMapUpdate did not complete.\n");
   }
+
+  #ifdef DEBUG_MESSAGING
+    pipe->count_send++;
+  #endif //DEBUG_MESSAGING
 
   return written;
 }
 
 // Needs to read messages one at a time, no compacting
-int commRecvMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg) {
-  if (pipe.fd_in == 0 || pipe.type != MAP_UPDATE) {
-    printf("commRecvMapUpdate Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe.type], pipe.fd_in);
+int commRecvMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg) {
+  if (pipe->fd_in == 0 || pipe->type != MAP_UPDATE) {
+    printf("commRecvMapUpdate Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_in);
     return 0;
   }
   int recv_msg_buffer[MAX_PIPE_BUFF / sizeof(int)] = {0};
   int header_ints = 3; // pose x, pose y, and obstacle count
   int index = 0;
 
-  int read_ret = TEMP_FAILURE_RETRY(read(pipe.fd_in, &recv_msg_buffer, sizeof(int) * header_ints));
+  int read_ret = TEMP_FAILURE_RETRY(read(pipe->fd_in, &recv_msg_buffer, sizeof(int) * header_ints));
   if (read_ret == sizeof(int) * header_ints) { // TODO: Read may still have been interrupted.
     msg->pose_x = recv_msg_buffer[0];
     msg->pose_y = recv_msg_buffer[1];
     msg->obs_count = recv_msg_buffer[2];
 
     if (msg->obs_count > 0) { // read obstacles
-      read_ret = TEMP_FAILURE_RETRY(read(pipe.fd_in, &recv_msg_buffer[header_ints], sizeof(int) * 2 * msg->obs_count));
+      read_ret = TEMP_FAILURE_RETRY(read(pipe->fd_in, &recv_msg_buffer[header_ints], sizeof(int) * 2 * msg->obs_count));
       if (read_ret == sizeof(int) * 2 * msg->obs_count) {
         for (index = 0; index < msg->obs_count; index++) {
           msg->obs_x[index] = recv_msg_buffer[header_ints + (index * 2)];
@@ -241,7 +267,7 @@ int commRecvMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg) {
       } else if (read_ret < 0) {
         perror("commRecvMapUpdate read obstacles problems");
       } else {
-        perror("commRecvMapUpdate read obstacles == 0");
+        perror("commRecvMapUpdate inner read obstacles == 0");
       }   
     }
   } else if (read_ret > 0) {
@@ -249,15 +275,19 @@ int commRecvMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg) {
   } else if (read_ret < 0) {
     perror("commRecvMapUpdate read obstacles problems");
   } else {
-    perror("commRecvMapUpdate read obstacles == 0");
+    perror("commRecvMapUpdate outer read obstacles == 0");
   }
+
+  #ifdef DEBUG_MESSAGING
+    pipe->count_recv++;
+  #endif //DEBUG_MESSAGING
 
   return read_ret;
 }
 
-int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_data) {
-  if (pipe.fd_out == 0 || pipe.type != RANGE_POSE_DATA) {
-    printf("commSendRanger Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe.type], pipe.fd_out);
+int commSendRanger(struct typed_pipe* pipe, double* ranger_data, double* pose_data) {
+  if (pipe->fd_out == 0 || pipe->type != RANGE_POSE_DATA) {
+    printf("commSendRanger Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
     return 0;
   }
 
@@ -273,20 +303,25 @@ int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_d
     msg.pose[index] = pose_data[index];
   }
 
-  int write_ret = TEMP_FAILURE_RETRY(write(pipe.fd_out, &msg, sizeof(struct comm_range_pose_data)));
+  int write_ret = TEMP_FAILURE_RETRY(write(pipe->fd_out, &msg, sizeof(struct comm_range_pose_data)));
   if (write_ret < sizeof(struct comm_range_pose_data)) {
     if (write_ret < 0) {
       perror("commSendRanger failed");
     } else {
-      printf("commSendRange did not write expected bytes to fd %d, bytes %d\n", pipe.fd_out, write_ret);
+      printf("commSendRange did not write expected bytes to fd %d, bytes %d\n", pipe->fd_out, write_ret);
     }
   }
+
+  #ifdef DEBUG_MESSAGING
+    pipe->count_send++;
+  #endif //DEBUG_MESSAGING
+
   return write_ret;
 }
 
-int commSendAck(struct typed_pipe pipe, long state_hash) {
-  if (pipe.fd_out == 0 || pipe.type != COMM_ACK) {
-    printf("commSendAck Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe.type], pipe.fd_out);
+int commSendAck(struct typed_pipe* pipe, long state_hash) {
+  if (pipe->fd_out == 0 || pipe->type != COMM_ACK) {
+    printf("commSendAck Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
     return 0;
   }
 
@@ -295,10 +330,14 @@ int commSendAck(struct typed_pipe pipe, long state_hash) {
 
   msg.hash = state_hash;
 
-  return TEMP_FAILURE_RETRY(write(pipe.fd_out, &msg, sizeof(struct comm_ack)));
+  #ifdef DEBUG_MESSAGING
+    pipe->count_send++;
+  #endif //DEBUG_MESSAGING
+
+  return TEMP_FAILURE_RETRY(write(pipe->fd_out, &msg, sizeof(struct comm_ack)));
 }
 
-void commCopyRanger(struct comm_range_pose_data * recv_msg, double * range_data, double * pose_data) {
+void commCopyRanger(struct comm_range_pose_data* recv_msg, double* range_data, double* pose_data) {
   int index = 0;
 
   for (index = 0; index < RANGER_COUNT; index++) {
@@ -307,5 +346,6 @@ void commCopyRanger(struct comm_range_pose_data * recv_msg, double * range_data,
   for (index = 0; index < 3; index++) {
     pose_data[index] = recv_msg->pose[index];
   }
+
   return;
 }

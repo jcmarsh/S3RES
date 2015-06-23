@@ -189,9 +189,10 @@ bool checkSync(void) {
   int r_index, p_index;
   bool nsync = true;
 
-  for (r_index = 0; r_index < rep_count; r_index++) {
-    int votes = replicas[r_index].voted[0];
-    for (p_index = 0; p_index < pipe_count; p_index++) {
+  // check each that for each pipe, each replica has the same number of votes
+  for (p_index = 0; p_index < pipe_count; p_index++) {
+    int votes = replicas[0].voted[p_index];
+    for (r_index = 1; r_index < rep_count; r_index++) {
       if (votes != replicas[r_index].voted[p_index]) {
         nsync = false;
       }
@@ -230,7 +231,7 @@ void doOneUpdate(void) {
   // Hmm... only if the controllers are ready for it?
   bool check_inputs = false;
   if (voter_priority < 5) {
-    if (checkSync() | !timer_started) {
+    if (checkSync() || !timer_started) {
       check_inputs = true;
     }
   } else {
@@ -328,6 +329,9 @@ void processData(struct typed_pipe *pipe, int pipe_index) {
 
   for (r_index = 0; r_index < rep_count; r_index++) {
     writeBuffer(replicas[r_index].vot_pipes[pipe_index].fd_out, pipe->buffer, pipe->buff_count);
+    #ifdef DEBUG_MESSAGING
+      pipe->count_send++;
+    #endif
   }
 }
 
@@ -412,9 +416,22 @@ void checkSDC(int pipe_num) {
                      replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num].buffer,
                      replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
             
-            debug_print("Caught SDC\n");
-
             int restartee = (r_index + 2) % rep_count;
+            
+            debug_print("Caught SDC: %s\n", controller_name);
+            #ifdef DEBUG_MESSAGING
+              char *pipe_serial = serializePipe(replicas[restartee].vot_pipes[pipe_num]);
+              debug_print("Rep num %d, pipe: %s\n", restartee, pipe_serial);
+              int i, j;
+              for (i = 0; i < rep_count; i++) {
+                for (j = 0; j < pipe_count; j ++) {
+                  debug_print("Rep %d vote count: %d\n", i, replicas[i].voted[j]);
+                  printBuffer(&replicas[i].vot_pipes[j]);
+                }
+              }
+              free(pipe_serial);
+            #endif // DEBUG_MESSAGING
+
             restart_prep(restartee, r_index);
           } else {
             // If all agree, send and be happy. Otherwise the send is done as part of the restart process
@@ -456,6 +473,10 @@ void processFromRep(int replica_num, int pipe_num) {
   }
   struct typed_pipe* curr_pipe = &(replicas[replica_num].vot_pipes[pipe_num]);
   curr_pipe->buff_count = TEMP_FAILURE_RETRY(read(curr_pipe->fd_in, curr_pipe->buffer, MAX_PIPE_BUFF));
+
+  #ifdef DEBUG_MESSAGING
+    curr_pipe->count_recv++;
+  #endif //DEBUG_MESSAGING
 
   // TODO: Read may have been interrupted
   if (curr_pipe->buff_count > 0) {

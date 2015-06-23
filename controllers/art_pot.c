@@ -171,11 +171,11 @@ void command(void) {
   }
 
   if (request_way) {
-    commSendWaypointRequest(pipes[way_req_index]);
+    commSendWaypointRequest(&pipes[way_req_index]);
   }
 
   // Write move command
-  commSendMoveCommand(pipes[out_index], vel_cmd[0], vel_cmd[1]);
+  commSendMoveCommand(&pipes[out_index], vel_cmd[0], vel_cmd[1]);
 }
 
 void enterLoop(void) {
@@ -246,7 +246,7 @@ int main(int argc, const char **argv) {
   }
 
   if (PIPE_COUNT == pipe_count) {
-    commSendWaypointRequest(pipes[way_req_index]);
+    commSendWaypointRequest(&pipes[way_req_index]);
   } else {
     goal[0] = 7.0;
     goal[1] = 7.0;

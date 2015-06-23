@@ -61,7 +61,7 @@ int aheadRep(struct replica reps[], int num, int pipe_num) {
   int mostAhead = r_index;
   for (r_index = 0; r_index < num; r_index++) {
     if (reps[r_index].voted[pipe_num] > reps[mostAhead].voted[pipe_num]) {
-      mostAhead= r_index;
+      mostAhead = r_index;
     }
   }
   return mostAhead;

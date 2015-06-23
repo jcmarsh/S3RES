@@ -12,6 +12,8 @@
 #include <stdbool.h>
 #include <unistd.h>
 
+#include "bench_config.h"
+
 // Why 10? No reason.
 #define PIPE_LIMIT 10
 // Max number of bytes
@@ -53,6 +55,11 @@ struct typed_pipe {
   bool timed; // timers start on input timed pipe reads, reset on output timed pipe writes
   int buff_count;
   char buffer[MAX_PIPE_BUFF];
+
+  #ifdef DEBUG_MESSAGING
+    int count_send;
+    int count_recv;
+  #endif //DEBUG_MESSAGING
 };
 
 struct comm_way_req {
@@ -90,27 +97,27 @@ struct comm_ack {
 comm_message_t commToEnum(char* name);
 replication_t reptypeToEnum(char* type);
 
-void printBuffer(struct typed_pipe *pipe);
+void printBuffer(struct typed_pipe* pipe);
 
 // Typed pipes
 char* serializePipe(struct typed_pipe pipe);
 void deserializePipe(const char* serial, struct typed_pipe* pipe);
 void resetPipe(struct typed_pipe* pipe);
 
-int commSendWaypoints(struct typed_pipe pipe,
+int commSendWaypoints(struct typed_pipe* pipe,
                       double way_x, double way_y, double way_a,
                       double n_way_x, double n_way_y, double n_way_a);
-void commCopyWaypoints(struct comm_way_res * recv_msg, double * waypoints, double * n_waypoints);
+void commCopyWaypoints(struct comm_way_res* recv_msg, double* waypoints, double* n_waypoints);
 
-int commSendWaypointRequest(struct typed_pipe pipe);
+int commSendWaypointRequest(struct typed_pipe* pipe);
 
-int commSendMoveCommand(struct typed_pipe pipe, double vel_0, double vel_1);
+int commSendMoveCommand(struct typed_pipe* pipe, double vel_0, double vel_1);
 
-int commSendMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg);
-int commRecvMapUpdate(struct typed_pipe pipe, struct comm_map_update* msg);
+int commSendMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg);
+int commRecvMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg);
 
-int commSendRanger(struct typed_pipe pipe, double * ranger_data, double * pose_data);
-void commCopyRanger(struct comm_range_pose_data * recv_msg, double * range_data, double * pose_data);
+int commSendRanger(struct typed_pipe* pipe, double* ranger_data, double* pose_data);
+void commCopyRanger(struct comm_range_pose_data* recv_msg, double* range_data, double* pose_data);
 
-int commSendAck(struct typed_pipe pipe, long state_hash);
+int commSendAck(struct typed_pipe* pipe, long state_hash);
 #endif // _COMM_TYPES_H_

@@ -130,7 +130,7 @@ void updateMap(struct comm_range_pose_data * data) {
   send_msg.pose_x = current_pose->x;
   send_msg.pose_y = current_pose->y;
 
-  commSendMapUpdate(pipes[update_index], &send_msg);
+  commSendMapUpdate(&pipes[update_index], &send_msg);
 }
 
 void enterLoop(void) {
