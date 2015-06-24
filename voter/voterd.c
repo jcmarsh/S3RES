@@ -229,14 +229,7 @@ void doOneUpdate(void) {
   FD_ZERO(&select_set);
   // Check external in pipes
   // Hmm... only if the controllers are ready for it?
-  bool check_inputs = false;
-  if (voter_priority < 5) {
-    if (checkSync() || !timer_started) {
-      check_inputs = true;
-    }
-  } else {
-    check_inputs = true;
-  }
+  bool check_inputs = checkSync(); //if (voter_priority < 5) { //  if (checkSync() || !timer_started) {
 
   if (check_inputs) {
     for (p_index = 0; p_index < pipe_count; p_index++) {
@@ -248,11 +241,15 @@ void doOneUpdate(void) {
   }
 
   // Check pipes from replicas
-  for (r_index = 0; r_index < rep_count; r_index++) {
-    for (p_index = 0; p_index < replicas[r_index].pipe_count; p_index++) {
-      int rep_pipe_fd = replicas[r_index].vot_pipes[p_index].fd_in;
-      if (rep_pipe_fd != 0) {
-        FD_SET(rep_pipe_fd, &select_set);      
+  for (p_index = 0; p_index < pipe_count; p_index++) {
+    for (r_index = 0; r_index < rep_count; r_index++) {
+      if (replicas[r_index].voted[p_index] > 0) {
+        // causes ahead replicas to buffer output in their pipes. TODO: reconsider
+      } else {
+        int rep_pipe_fd = replicas[r_index].vot_pipes[p_index].fd_in;
+        if (rep_pipe_fd != 0) {
+          FD_SET(rep_pipe_fd, &select_set);      
+        }
       }
     }
   }
@@ -286,8 +283,8 @@ void doOneUpdate(void) {
     }
 
     // Check all replicas for data
-    for (r_index = 0; r_index < rep_count; r_index++) {
-      for (p_index = 0; p_index < replicas[r_index].pipe_count; p_index++) {
+    for (p_index = 0; p_index < pipe_count; p_index++) {
+      for (r_index = 0; r_index < rep_count; r_index++) {
         struct typed_pipe* curr_pipe = &(replicas[r_index].vot_pipes[p_index]);
         if (curr_pipe->fd_in !=0) {
           if (FD_ISSET(curr_pipe->fd_in, &select_set)) {
