@@ -1,47 +1,80 @@
 /*
- * An empty controller for debugging
- * This variation uses file descriptors for I/O (for now just ranger and command out).
+ * Meant to stress the cpu and record it's resource usage.
+ * Supposed to be based off of sensor data... so it will have range / pose updates.
  *
  * James Marshall
  */
 
 #include "controller.h"
 
-#define PIPE_COUNT 2
+#include <sys/time.h>
+#include <sys/resource.h>
+
+#define PIPE_COUNT 1
 
 struct typed_pipe pipes[PIPE_COUNT];
 int pipe_count = PIPE_COUNT;
-int read_in_index, write_out_index;
-
-char *filler;
+int read_in_index;
 
 // TAS related
 int priority;
 
-const char* name = "Empty";
+const char* name = "Load";
 
-bool insertSDC = false;
 bool insertCFE = false;
+bool insertSDC = false; // Not used
 
 void setPipeIndexes(void) {
   read_in_index = 0;
-  write_out_index = 1;
 }
 
 int parseArgs(int argc, const char **argv) {
   setPipeIndexes();
   // TODO: error checking
   priority = atoi(argv[1]);
-  pipe_count = 2; // For now always 2
-  if (argc < 5) { // Must request fds
+  pipe_count = 1;
+  if (argc < 4) { // Must request fds
     pid_t pid = getpid();
-    connectRecvFDS(pid, pipes, pipe_count, "Empty");
+    connectRecvFDS(pid, pipes, pipe_count, "Load");
   } else {
     deserializePipe(argv[3], &pipes[read_in_index]);
-    deserializePipe(argv[4], &pipes[write_out_index]);
   }
 
   return 0;
+}
+
+// TODO: Need to make more easily tunable.
+// TODO: How to best report performance? Printf? Print to file?
+void perCycleLoad(void) {
+  struct rusage usage_stats;
+  struct timeval prev_utime;
+
+  int prime_count = 0;
+  int n = 5000; // calculate primes up to n;
+
+  // Get rusage
+  getrusage(RUSAGE_SELF, &usage_stats);
+  prev_utime.tv_sec = usage_stats.ru_utime.tv_sec;
+  prev_utime.tv_usec = usage_stats.ru_utime.tv_usec;
+  
+  // do calculations
+  int i, j;
+  for (i = 3; i < n; i++) {
+    bool prime = true;
+    for (j = 2; j <= (i / 2); j++) { // Should be sqrt
+      if ((i / (double)j) == (i / j)) {
+        prime = false;
+      }
+    }
+    if (prime) {
+      prime_count++;
+      // printf("Prime: %d\n", i);
+    }
+  }
+
+  // Get rusage / output it
+  getrusage(RUSAGE_SELF, &usage_stats);
+  printf("Load found %d primes in: %ld - %ld\n", prime_count, usage_stats.ru_utime.tv_sec - prev_utime.tv_sec, usage_stats.ru_utime.tv_usec - prev_utime.tv_usec);
 }
 
 void enterLoop(void) {
@@ -68,12 +101,7 @@ void enterLoop(void) {
       if (FD_ISSET(pipes[read_in_index].fd_in, &select_set)) {
         read_ret = TEMP_FAILURE_RETRY(read(pipes[read_in_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data)));
         if (read_ret == sizeof(struct comm_range_pose_data)) {
-          if (insertSDC) {
-            insertSDC = false;
-            commSendMoveCommand(&pipes[write_out_index], 0.1, 1.0);
-          } else {
-            commSendMoveCommand(&pipes[write_out_index], 0.1, 0.0);
-          }
+          perCycleLoad();
         } else if (read_ret > 0) {
           printf("Empty read read_in_index did not match expected size.\n");
         } else if (read_ret < 0) {
@@ -87,8 +115,6 @@ void enterLoop(void) {
 }
 
 int main(int argc, const char **argv) {
-  //filler = malloc(sizeof(char) * 8896 * 1024 + (sizeof(char) * 150000 * 1024)); // for 160,000 kB
-  
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");
     return -1;
