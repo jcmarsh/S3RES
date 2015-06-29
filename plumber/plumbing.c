@@ -65,7 +65,7 @@ void link_bench(struct node* n, comm_message_t type, int fd_in, int fd_out, bool
 	n->pipes[n->pipe_count].type = type;
 	n->pipes[n->pipe_count].fd_in = fd_in;
 	n->pipes[n->pipe_count].fd_out = fd_out;
-	n->pipes[n->pipe_count].timed = timed;
+	n->timed = timed;
 	n->pipe_count++;
 }
 
@@ -79,13 +79,13 @@ void link_node(comm_message_t type, struct node* fromNode, bool fromTimed, struc
 		fromNode->pipes[fromNode->pipe_count].type = type;
 		fromNode->pipes[fromNode->pipe_count].fd_in = 0;
 		fromNode->pipes[fromNode->pipe_count].fd_out = pipe_fds[1];
-		fromNode->pipes[fromNode->pipe_count].timed = fromTimed;
+		fromNode->timed = fromTimed;
 		fromNode->pipe_count++;
 		// other half to toNode
 		toNode->pipes[toNode->pipe_count].type = type;
 		toNode->pipes[toNode->pipe_count].fd_in = pipe_fds[0];
 		toNode->pipes[toNode->pipe_count].fd_out = 0;
-		toNode->pipes[toNode->pipe_count].timed = toTimed;
+		toNode->timed = toTimed;
 		toNode->pipe_count++;
 	}
 }
@@ -135,6 +135,9 @@ int launch_node(struct nodelist* nodes) {
 			}
 			other_arg = 3;
 			rep_argv[rep_count - 1] = NULL;
+			for (i = other_arg; i < curr->pipe_count + other_arg; i++) {
+				rep_argv[i] = serializePipe(curr->pipes[i - other_arg]);
+			}
 		} else {
 			// launch with voter // TODO: Add pipe count?
 			rep_count = 6 + curr->pipe_count;
@@ -146,11 +149,9 @@ int launch_node(struct nodelist* nodes) {
 			rep_argv[4] = curr->priority;
 			other_arg = 5;
 			rep_argv[rep_count - 1] = NULL;
-		}
-
-
-		for (i = other_arg; i < curr->pipe_count + other_arg; i++) {
-			rep_argv[i] = serializePipe(curr->pipes[i - other_arg]);
+			for (i = other_arg; i < curr->pipe_count + other_arg; i++) {
+				asprintf(&rep_argv[i], "%s:%d", serializePipe(curr->pipes[i - other_arg]), curr->timed);
+			}
 		}
 
 		currentPID = fork();

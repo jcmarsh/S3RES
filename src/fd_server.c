@@ -6,7 +6,7 @@
 
 #include "../include/fd_server.h"
 
-int sendFDS(int connection_fd, struct typed_pipe* pipes, int pipe_count) { // pipes are the rep side
+int sendFDS(int connection_fd, struct vote_pipe* pipes, int pipe_count) { // pipes are the rep side
   int i;
   struct msghdr hdr;
   struct iovec data;
@@ -16,7 +16,8 @@ int sendFDS(int connection_fd, struct typed_pipe* pipes, int pipe_count) { // pi
   int types_msg[pipe_count * 2];
   // Need to specify whether each pipe is meant to be an fd_in or fd_out
   for (i = 0; i < pipe_count * 2; i = i + 2) {
-    types_msg[i] = (int) pipes[i/2].type;
+    //types_msg[i] = (int) pipes[i/2].type;
+    types_msg[i] = 0;
     if (pipes[i/2].fd_in != 0) {
       types_msg[i + 1] = 0; // 0 is the read side
     } else {
@@ -108,7 +109,7 @@ int createFDS(struct server_data * sd, const char* name) {
  * Blocks on accept: You better know a client is about to connect!
  * Returns 0 upon success, <0 otherwise.
  */
-int acceptSendFDS(struct server_data * sd, pid_t *pid, struct typed_pipe* pipes, int pipe_count) {
+int acceptSendFDS(struct server_data * sd, pid_t *pid, struct vote_pipe* pipes, int pipe_count) {
   int connection_fd;
   int retval = 0;
 

@@ -14,10 +14,6 @@
 
 #include "bench_config.h"
 
-// Why 10? No reason.
-#define PIPE_LIMIT 10
-// Max number of bytes
-#define MAX_PIPE_BUFF 4096
 // Number of range sensors
 #define RANGER_COUNT 16
 
@@ -35,10 +31,6 @@ typedef enum {
 // Used to serialize / deserialize the pipe type
 static const char* MESSAGE_T[] = {"COMM_ERROR", "WAY_REQ", "WAY_RES", "MOV_CMD", "RANGE_POSE_DATA", "MAP_UPDATE", "COMM_ACK"};
 
-// Here more for convenience
-typedef enum {NONE, SMR, DMR, TMR, REP_TYPE_ERROR} replication_t;
-static const char* REP_TYPE_T[] = {"NONE", "SMR", "DMR", "TMR", "REP_TYPE_ERROR"};
-
 #define INDEX_X 0
 #define INDEX_Y 1
 #define INDEX_A 2
@@ -50,11 +42,6 @@ struct typed_pipe {
   // Only one of these will be set at a time
   int fd_in;
   int fd_out;
-
-  // Only used by voter / replicas. Should be elsewhere.
-  bool timed; // timers start on input timed pipe reads, reset on output timed pipe writes
-  int buff_count;
-  char buffer[MAX_PIPE_BUFF];
 
   #ifdef DEBUG_MESSAGING
     int count_send;
@@ -95,9 +82,8 @@ struct comm_ack {
 // Hack to check when parsing
 // Also need for deserialization
 comm_message_t commToEnum(char* name);
-replication_t reptypeToEnum(char* type);
 
-void printBuffer(struct typed_pipe* pipe);
+// void printBuffer(struct typed_pipe* pipe);
 
 // Typed pipes
 char* serializePipe(struct typed_pipe pipe);

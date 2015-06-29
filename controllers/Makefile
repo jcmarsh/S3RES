@@ -16,8 +16,8 @@ ArtPot: art_pot.o $(SRC) $(DEP)
 AStar: a_star.o mapping.c $(SRC) $(DEP) ./inc/*.h
 	gcc $(FLAGS) -o AStar a_star.o mapping.c $(SRC) $(INC) $(LIB) -lm
 
-BenchMarker: benchmarker.o ../src/commtypes.c ../src/replicas.c $(DEP)
-	gcc $(FLAGS) -o BenchMarker benchmarker.o ../src/commtypes.c ../src/fd_server.c ../src/replicas.c $(INC) $(LIB)
+BenchMarker: benchmarker.o ../src/commtypes.c ../src/replicas.c ../voter/vote_buff.c $(DEP)
+	gcc $(FLAGS) -o BenchMarker benchmarker.o ../src/commtypes.c ../src/fd_server.c ../src/replicas.c ../voter/vote_buff.c $(INC) $(LIB)
 
 Empty: empty.o $(SRC) $(DEP)
 	gcc $(FLAGS) -o Empty empty.o $(SRC) $(INC) $(LIB) 

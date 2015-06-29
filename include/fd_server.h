@@ -4,7 +4,7 @@
  * James Marshall May 3 2014
  */
 
-#include "commtypes.h"
+#include "vote_buff.h"
 
 #include <fcntl.h>
 #include <linux/un.h>
@@ -21,4 +21,4 @@ struct server_data {
 
 int createFDS(struct server_data * sd, const char* name);
 
-int acceptSendFDS(struct server_data * sd, pid_t *pid, struct typed_pipe* pipes, int pipe_count);
+int acceptSendFDS(struct server_data * sd, pid_t *pid, struct vote_pipe* pipes, int pipe_count);

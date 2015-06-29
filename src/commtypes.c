@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MAX_PIPE_BUFF 4096
+
 comm_message_t commToEnum(char* name) {
   if (strcmp(name, "WAY_REQ") == 0) {
     return WAY_REQ;
@@ -21,28 +23,14 @@ comm_message_t commToEnum(char* name) {
   }
 }
 
-replication_t reptypeToEnum(char* type) {
-  if (strcmp(type, "NONE") == 0) {
-    return NONE;
-  } else if (strcmp(type, "SMR") == 0) {
-    return SMR;
-  } else if (strcmp(type, "DMR") == 0) {
-    return DMR;
-  } else if (strcmp(type, "TMR") == 0) {
-    return TMR;
-  } else {
-    return REP_TYPE_ERROR;
-  }
-}
-
 char* serializePipe(struct typed_pipe pipe) {
   char* serial;
   if (pipe.fd_in == 0) {
-    if (asprintf(&serial, "%s:%d:%d:%d", MESSAGE_T[pipe.type], 0, pipe.fd_out, pipe.timed) < 0) {
+    if (asprintf(&serial, "%s:%d:%d", MESSAGE_T[pipe.type], 0, pipe.fd_out) < 0) {
       perror("serializePipe failed");
     }
   } else {
-    if (asprintf(&serial, "%s:%d:%d:%d", MESSAGE_T[pipe.type], pipe.fd_in, 0, pipe.timed) < 0) {
+    if (asprintf(&serial, "%s:%d:%d", MESSAGE_T[pipe.type], pipe.fd_in, 0) < 0) {
       perror("serializePipe failed");
     }
   }
@@ -50,25 +38,31 @@ char* serializePipe(struct typed_pipe pipe) {
 }
 
 void deserializePipe(const char* serial, struct typed_pipe* pipe) {
-  char* type;
-  int in = 0;
-  int out = 0;
-  int timed = 0;
+  char *type;
+  int in = 0, out = 0;
 
   // TODO: check allocation and scan for errors
-  sscanf(serial, "%m[^:]:%d:%d:%d", &type, &in, &out, &timed);
+  sscanf(serial, "%m[^:]:%d:%d", &type, &in, &out);
   pipe->fd_in = in;
   pipe->fd_out = out;
-  pipe->timed = timed;
 
   pipe->type = commToEnum(type);
-
-  memset(pipe->buffer, 0, MAX_PIPE_BUFF);
-  pipe->buff_count = 0;
-
   free(type);
 }
 
+void resetPipe(struct typed_pipe* pipe) {
+  pipe->type = COMM_ERROR;
+  if (pipe->fd_in != 0) {
+    close(pipe->fd_in);
+    pipe->fd_in = 0;
+  }
+  if (pipe->fd_out != 0) {
+    close(pipe->fd_out);
+    pipe->fd_out = 0;
+  }
+}
+
+/*
 void printBuffer(struct typed_pipe* pipe) {
   printf("Print Buffer type %s, buff_count %d\n", MESSAGE_T[pipe->type], pipe->buff_count);
   #ifdef DEBUG_MESSAGING
@@ -110,24 +104,7 @@ void printBuffer(struct typed_pipe* pipe) {
       printf("\tNo data.\n");
       break;
   }
-}
-
-void resetPipe(struct typed_pipe* pipe) {
-  pipe->type = COMM_ERROR;
-  if (pipe->fd_in != 0) {
-    close(pipe->fd_in);
-    pipe->fd_in = 0;
-  }
-  if (pipe->fd_out != 0) {
-    close(pipe->fd_out);
-    pipe->fd_out = 0;
-  }
-
-  #ifdef DEBUG_MESSAGING // TODO: is this the desired behavior?
-    //pipe->count_send = 0;
-    //pipe->count_recv = 0;
-  #endif //DEBUG_MESSAGING
-}
+} */
 
 int commSendWaypoints(struct typed_pipe* pipe, 
                       double way_x, double way_y, double way_a,

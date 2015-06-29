@@ -42,13 +42,13 @@ int rep_count;
 char* controller_name;
 // pipes to external components (not replicas)
 int pipe_count = 0;
-struct typed_pipe ext_pipes[PIPE_LIMIT];
+struct vote_pipe ext_pipes[PIPE_LIMIT];
 
 // Functions!
 int initVoterD(void);
 int parseArgs(int argc, const char **argv);
 void doOneUpdate(void);
-void processData(struct typed_pipe *pipe, int pipe_index);
+void processData(struct vote_pipe *pipe, int pipe_index);
 void resetVotingState(int pipe_num);
 void initVotingState(void);
 void sendPipe(int pipe_num, int replica_num);
@@ -285,7 +285,7 @@ void doOneUpdate(void) {
     // Check all replicas for data
     for (p_index = 0; p_index < pipe_count; p_index++) {
       for (r_index = 0; r_index < rep_count; r_index++) {
-        struct typed_pipe* curr_pipe = &(replicas[r_index].vot_pipes[p_index]);
+        struct vote_pipe* curr_pipe = &(replicas[r_index].vot_pipes[p_index]);
         if (curr_pipe->fd_in !=0) {
           if (FD_ISSET(curr_pipe->fd_in, &select_set)) {
             processFromRep(r_index, p_index);
@@ -313,7 +313,7 @@ void writeBuffer(int fd_out, char* buffer, int buff_count) {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process data
-void processData(struct typed_pipe *pipe, int pipe_index) {
+void processData(struct vote_pipe *pipe, int pipe_index) {
   int r_index;
   if (pipe_index == timer_start_index) {
     if (!timer_started) {
@@ -326,9 +326,6 @@ void processData(struct typed_pipe *pipe, int pipe_index) {
 
   for (r_index = 0; r_index < rep_count; r_index++) {
     writeBuffer(replicas[r_index].vot_pipes[pipe_index].fd_out, pipe->buffer, pipe->buff_count);
-    #ifdef DEBUG_MESSAGING
-      pipe->count_send++;
-    #endif
   }
 }
 
@@ -417,16 +414,15 @@ void checkSDC(int pipe_num) {
             
             debug_print("Caught SDC: %s\n", controller_name);
             #ifdef DEBUG_MESSAGING
-              char *pipe_serial = serializePipe(replicas[restartee].vot_pipes[pipe_num]);
-              debug_print("Rep num %d, pipe: %s\n", restartee, pipe_serial);
+              debug_print("Rep num %d\n", restartee);
               int i, j;
               for (i = 0; i < rep_count; i++) {
                 for (j = 0; j < pipe_count; j ++) {
                   debug_print("Rep %d vote count: %d\n", i, replicas[i].voted[j]);
-                  printBuffer(&replicas[i].vot_pipes[j]);
+                  // printBuffer(&replicas[i].vot_pipes[j]);
                 }
               }
-              free(pipe_serial);
+
             #endif // DEBUG_MESSAGING
 
             restart_prep(restartee, r_index);
@@ -468,12 +464,8 @@ void processFromRep(int replica_num, int pipe_num) {
   if (replicas[replica_num].voted[pipe_num] >= 1) { // Already have a pending message... will lose data if read is done
     emergencyWrite(pipe_num, replica_num);
   }
-  struct typed_pipe* curr_pipe = &(replicas[replica_num].vot_pipes[pipe_num]);
+  struct vote_pipe* curr_pipe = &(replicas[replica_num].vot_pipes[pipe_num]);
   curr_pipe->buff_count = TEMP_FAILURE_RETRY(read(curr_pipe->fd_in, curr_pipe->buffer, MAX_PIPE_BUFF));
-
-  #ifdef DEBUG_MESSAGING
-    curr_pipe->count_recv++;
-  #endif //DEBUG_MESSAGING
 
   // TODO: Read may have been interrupted
   if (curr_pipe->buff_count > 0) {
@@ -518,7 +510,7 @@ int initVoterD(void) {
   // Check all replicas for data
   for (r_index = 0; r_index < rep_count; r_index++) {
     for (p_index = 0; p_index < replicas[r_index].pipe_count; p_index++) {
-      struct typed_pipe* curr_pipe = &(replicas[r_index].vot_pipes[p_index]);
+      struct vote_pipe* curr_pipe = &(replicas[r_index].vot_pipes[p_index]);
       if (curr_pipe->fd_in !=0) {
         curr_pipe->buff_count = read(curr_pipe->fd_in, curr_pipe->buffer, 0);
       }
@@ -528,6 +520,17 @@ int initVoterD(void) {
   debug_print("Initializing VoterD(%s)\n", controller_name);
 
   return 0;
+}
+
+void parsePipe(const char* serial, struct vote_pipe* pipe) {
+  char *ignore;
+  int in, out, timed;
+
+  sscanf(serial, "%m[^:]:%d:%d:%d", &ignore, &in, &out, &timed);
+  free(ignore);
+  pipe->fd_in = in;
+  pipe->fd_out = out;
+  pipe->timed = timed;
 }
 
 int parseArgs(int argc, const char **argv) {
@@ -542,19 +545,12 @@ int parseArgs(int argc, const char **argv) {
     voting_timeout = PERIOD_NSEC;
   }
 
-  if (argc <= required_args) { // In testing mode // TODO: clear out after testing
-    pid_t currentPID = getpid();
-    //pipe_count = 4;  // 4 is the only controller specific bit here... and ArtPotTest
-    //connectRecvFDS(currentPID, ext_pipes, pipe_count, "ArtPotTest");
-    pipe_count = 2;  // 4 is the only controller specific bit here... and ArtPotTest
-    connectRecvFDS(currentPID, ext_pipes, pipe_count, "EmptyTest");
-    timer_start_index = 0;
-    timer_stop_index = 1;
-        // puts("Usage: VoterD <controller_name> <rep_type> <timeout> <priority> <message_type:fd_in:fd_out> <...>");
-    // return -1;
+  if (argc <= required_args) { 
+    puts("Usage: VoterD <controller_name> <rep_type> <timeout> <priority> <fd_in:fd_out:time> <...>");
+    return -1;
   } else {
     for (i = 0; (i < argc - required_args && i < PIPE_LIMIT); i++) {
-      deserializePipe(argv[i + required_args], &ext_pipes[pipe_count]);
+      parsePipe(argv[i + required_args], &ext_pipes[pipe_count]); // TODO: WRONG! Maybe. Should ignore non-numbers to deserialize?
       pipe_count++;
     }
     if (pipe_count >= PIPE_LIMIT) {

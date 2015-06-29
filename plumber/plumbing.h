@@ -6,6 +6,7 @@
 
 #include <stdbool.h>
 #include "../include/commtypes.h"
+#include "../include/vote_buff.h"
 
 // Data structure for components that need to be initialized by the plumber
 struct node {
@@ -20,6 +21,7 @@ struct node {
 	char* voter_timer; // easier to keep as a char* - needs to be to pass as an arg anyways
 
 	int pipe_count;
+	int timed; // Used only for Voters.
 	struct typed_pipe pipes[PIPE_LIMIT];
 };
 

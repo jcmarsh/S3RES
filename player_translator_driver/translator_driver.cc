@@ -13,6 +13,7 @@ extern "C"
 {
   #include "../tas_lib/inc/taslimited.h"
   #include "../include/replicas.h"
+  #include "../include/commtypes.h"
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -154,17 +155,24 @@ int TranslatorDriver::MainSetup() {
 
   struct replica* r_p = (struct replica *) &rep;
   initReplicas(r_p, 1, "BenchMarker", 98);
-  // create fake pipes to trick createPipes into create the correct connections
-  struct typed_pipe pipes[2];
-  pipes[0].type = RANGE_POSE_DATA;
-  pipes[0].fd_in = 1; // Not used, but indicates that RANGE_POSE_DATA goes to the benchmarker
-  pipes[0].fd_out = 0;
-  pipes[1].type = MOV_CMD;
-  pipes[1].fd_in = 0; 
-  pipes[1].fd_out = 1; // Not used, but indicates that MOV_CMD comes from the benchmarker
-  createPipesSpecial(r_p, 1, pipes, 2);
+
+  createPipes(r_p, 1, 1, 1);
+  
   // fork
-  forkReplicasSpecial(r_p, 1);
+  char **argv = (char **) malloc(sizeof(char *) * 2);
+  struct typed_pipe data_in;
+  data_in.type = RANGE_POSE_DATA;
+  data_in.fd_in = rep.rep_pipes[0].fd_in;
+  data_in.fd_out = rep.rep_pipes[0].fd_out;
+  argv[0] = serializePipe(data_in);
+
+  struct typed_pipe cmd_out;
+  cmd_out.type = MOV_CMD;
+  cmd_out.fd_in = rep.rep_pipes[1].fd_in;
+  cmd_out.fd_out = rep.rep_pipes[1].fd_out;
+  argv[1] = serializePipe(cmd_out);
+  forkReplicas(r_p, 1, 2, argv);
+  free(argv);
 
   // Need this pipe not to block so that player and the outside world play nice
   flags = fcntl(rep.vot_pipes[1].fd_in, F_GETFL, 0);

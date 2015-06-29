@@ -4,7 +4,7 @@
  * James Marshall May 3 2014
  */
 
-#include "../include/commtypes.h"
+#include "commtypes.h"
 
 #include <fcntl.h>
 #include <linux/un.h>

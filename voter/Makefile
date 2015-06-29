@@ -7,8 +7,8 @@ all: VoterD
 %.o: %.c ../include/*.h ../tas_lib/inc/*.h
 	gcc -c $(FLAGS) -o $@ $< $(INC)
 
-VoterD: voterd.o ../src/commtypes.c ../src/replicas.c ../src/fd_server.c ../src/fd_client.c
-	gcc $(FLAGS) -o VoterD voterd.o ../src/commtypes.c ../src/replicas.c ../src/fd_server.c ../src/fd_client.c $(INC) $(LIB)
+VoterD: voterd.o vote_buff.c ../src/commtypes.c ../src/replicas.c ../src/fd_server.c ../src/fd_client.c 
+	gcc $(FLAGS) -o VoterD voterd.o vote_buff.c ../src/commtypes.c ../src/replicas.c ../src/fd_server.c ../src/fd_client.c $(INC) $(LIB)
 
 copy:
 	cp VoterD ../../stage/experiments/

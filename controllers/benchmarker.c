@@ -45,8 +45,13 @@ int initBenchMarker() {
   // Should only be a single replica
   struct replica* r_p = (struct replica *) &replica;
   initReplicas(r_p, 1, "plumber", 10);
-  createPipesSpecial(r_p, 1, trans_pipes, 2);
-  forkReplicasSpecial(r_p, 1);
+  createPipes(r_p, 1, 1, 1); // One replica, one in fd, one out fd
+  
+  char **argv = (char **) malloc(sizeof(char *) * 2);
+  argv[0] = serializePipe(trans_pipes[0]);
+  argv[1] = serializePipe(trans_pipes[1]);
+  forkReplicas(r_p, 1, 2, argv);
+  free(argv);
   
   return 0;
 }
