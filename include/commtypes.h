@@ -13,7 +13,8 @@
 #include <unistd.h>
 
 #include "bench_config.h"
-
+#include "vote_buff.h"
+ 
 // Number of range sensors
 #define RANGER_COUNT 16
 
@@ -42,11 +43,6 @@ struct typed_pipe {
   // Only one of these will be set at a time
   int fd_in;
   int fd_out;
-
-  #ifdef DEBUG_MESSAGING
-    int count_send;
-    int count_recv;
-  #endif //DEBUG_MESSAGING
 };
 
 struct comm_way_req {
@@ -89,6 +85,9 @@ comm_message_t commToEnum(char* name);
 char* serializePipe(struct typed_pipe pipe);
 void deserializePipe(const char* serial, struct typed_pipe* pipe);
 void resetPipe(struct typed_pipe* pipe);
+
+void convertTypedToVote(struct typed_pipe ext_pipes[], int pipe_count, struct vote_pipe *new_pipes);
+void convertVoteToTyped(struct vote_pipe ext_pipes[], int pipe_count, struct typed_pipe *new_pipes);
 
 int commSendWaypoints(struct typed_pipe* pipe,
                       double way_x, double way_y, double way_a,

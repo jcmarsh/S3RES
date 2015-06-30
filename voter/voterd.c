@@ -523,11 +523,11 @@ int initVoterD(void) {
 }
 
 void parsePipe(const char* serial, struct vote_pipe* pipe) {
-  char *ignore;
+  char *rep_info;
   int in, out, timed;
 
-  sscanf(serial, "%m[^:]:%d:%d:%d", &ignore, &in, &out, &timed);
-  free(ignore);
+  sscanf(serial, "%m[^:]:%d:%d:%d", &rep_info, &in, &out, &timed);
+  pipe->rep_info = rep_info;
   pipe->fd_in = in;
   pipe->fd_out = out;
   pipe->timed = timed;

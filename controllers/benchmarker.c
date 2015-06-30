@@ -45,24 +45,37 @@ int initBenchMarker() {
   // Should only be a single replica
   struct replica* r_p = (struct replica *) &replica;
   initReplicas(r_p, 1, "plumber", 10);
-  createPipes(r_p, 1, 1, 1); // One replica, one in fd, one out fd
+
+  struct vote_pipe new_pipes[2];
+  convertTypedToVote(trans_pipes, 2, new_pipes);
+  createPipes(r_p, 1, new_pipes, 2);
   
-  char **argv = (char **) malloc(sizeof(char *) * 2);
-  argv[0] = serializePipe(trans_pipes[0]);
-  argv[1] = serializePipe(trans_pipes[1]);
+  struct typed_pipe pipes[2];
+  convertVoteToTyped(r_p->rep_pipes, 2, pipes);
+
+  char *argv[2];
+  argv[0] = serializePipe(pipes[0]);
+  argv[1] = serializePipe(pipes[1]);
+  debug_print("Args from bench: %s: %s %d %d\n", argv[0], MESSAGE_T[pipes[0].type], pipes[0].fd_in, pipes[0].fd_out);
+  debug_print("Args from bench: %s: %s %d %d\n", argv[1], MESSAGE_T[pipes[1].type], pipes[1].fd_in, pipes[1].fd_out);
+
   forkReplicas(r_p, 1, 2, argv);
-  free(argv);
   
   return 0;
 }
 
 int parseArgs(int argc, const char **argv) {
-  priority = atoi(argv[1]);
   // pipe_count should always be 2
   if (argc < 5) {
     puts("Usage: BenchMarker <priority> <pipe_num> <read_in_fd> <write_out_fd>");
+    int i;
+    for (i = 0; i < argc; i++) {
+      printf("\t Arg %d: %s\n", i, argv[i]);
+    }
     return -1;
   }
+
+  priority = atoi(argv[1]);
 
   deserializePipe(argv[3], &trans_pipes[0]);
   deserializePipe(argv[4], &trans_pipes[1]);

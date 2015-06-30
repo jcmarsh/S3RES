@@ -5,6 +5,7 @@
  */
 
 #include "vote_buff.h"
+#include "commtypes.h"
 
 #include <fcntl.h>
 #include <linux/un.h>

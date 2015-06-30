@@ -23,6 +23,8 @@ typedef enum {NONE,	SMR, DMR, TMR, REP_TYPE_ERROR} replication_t;
 static const char* REP_TYPE_T[] = {"NONE", "SMR", "DMR", "TMR", "REP_TYPE_ERROR"};
 
 struct vote_pipe {
+	char *rep_info; // extra string passed on to the replica. For example, the pipe's type
+	
 	// Only one of these will be set at a time
 	int fd_in;
 	int fd_out;

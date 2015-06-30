@@ -62,6 +62,24 @@ void resetPipe(struct typed_pipe* pipe) {
   }
 }
 
+void convertTypedToVote(struct typed_pipe ext_pipes[], int pipe_count, struct vote_pipe *new_pipes) {
+  int i;
+  for (i = 0; i < pipe_count; i++) {
+    new_pipes[i].fd_in = ext_pipes[i].fd_in;
+    new_pipes[i].fd_out = ext_pipes[i].fd_out;
+    new_pipes[i].rep_info = (char *)MESSAGE_T[ext_pipes[i].type];
+  }
+}
+
+void convertVoteToTyped(struct vote_pipe ext_pipes[], int pipe_count, struct typed_pipe *new_pipes) {
+  int i;
+  for (i = 0; i < pipe_count; i++) {
+    new_pipes[i].fd_in = ext_pipes[i].fd_in;
+    new_pipes[i].fd_out = ext_pipes[i].fd_out;
+    new_pipes[i].type = commToEnum(ext_pipes[i].rep_info);
+  }
+}
+
 /*
 void printBuffer(struct typed_pipe* pipe) {
   printf("Print Buffer type %s, buff_count %d\n", MESSAGE_T[pipe->type], pipe->buff_count);
@@ -125,10 +143,6 @@ int commSendWaypoints(struct typed_pipe* pipe,
   msg.n_point[INDEX_Y] = n_way_y;
   msg.n_point[INDEX_A] = n_way_a;
 
-  #ifdef DEBUG_MESSAGING
-    pipe->count_send++;
-  #endif //DEBUG_MESSAGING
-
   return TEMP_FAILURE_RETRY(write(pipe->fd_out, &msg, sizeof(struct comm_way_res)));
 }
 
@@ -153,10 +167,6 @@ int commSendWaypointRequest(struct typed_pipe* pipe) {
   struct comm_way_req send_msg;
   memset(&send_msg, 0, sizeof(struct comm_way_req));
 
-  #ifdef DEBUG_MESSAGING
-    pipe->count_send++;
-  #endif //DEBUG_MESSAGING
-
   return TEMP_FAILURE_RETRY(write(pipe->fd_out, &send_msg, sizeof(struct comm_way_req)));
 }
 
@@ -172,10 +182,6 @@ int commSendMoveCommand(struct typed_pipe* pipe, double vel_0, double vel_1) {
 
   msg.vel_cmd[0] = vel_0;
   msg.vel_cmd[1] = vel_1;
-
-  #ifdef DEBUG_MESSAGING
-    pipe->count_send++;
-  #endif //DEBUG_MESSAGING
 
   return TEMP_FAILURE_RETRY(write(pipe->fd_out, &msg, sizeof(struct comm_mov_cmd)));
 }
@@ -208,10 +214,6 @@ int commSendMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg) {
   if (written != buff_count * sizeof(int)) { // TODO: more should check this
     perror("Write for commSendMapUpdate did not complete.\n");
   }
-
-  #ifdef DEBUG_MESSAGING
-    pipe->count_send++;
-  #endif //DEBUG_MESSAGING
 
   return written;
 }
@@ -255,10 +257,6 @@ int commRecvMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg) {
     perror("commRecvMapUpdate outer read obstacles == 0");
   }
 
-  #ifdef DEBUG_MESSAGING
-    pipe->count_recv++;
-  #endif //DEBUG_MESSAGING
-
   return read_ret;
 }
 
@@ -289,10 +287,6 @@ int commSendRanger(struct typed_pipe* pipe, double* ranger_data, double* pose_da
     }
   }
 
-  #ifdef DEBUG_MESSAGING
-    pipe->count_send++;
-  #endif //DEBUG_MESSAGING
-
   return write_ret;
 }
 
@@ -306,10 +300,6 @@ int commSendAck(struct typed_pipe* pipe, long state_hash) {
   memset(&msg, 0, sizeof(struct comm_ack));
 
   msg.hash = state_hash;
-
-  #ifdef DEBUG_MESSAGING
-    pipe->count_send++;
-  #endif //DEBUG_MESSAGING
 
   return TEMP_FAILURE_RETRY(write(pipe->fd_out, &msg, sizeof(struct comm_ack)));
 }

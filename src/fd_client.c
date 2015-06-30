@@ -14,9 +14,8 @@ int requestFDS(int sock_fd, struct typed_pipe* pipes, int pipe_count) {
   struct cmsghdr *cmsg;
   int retval;
   
-  int types_msg[pipe_count * 2];
-  data.iov_base = types_msg;
-  data.iov_len = sizeof(types_msg);
+  data.iov_base = pipes;
+  data.iov_len = sizeof(struct typed_pipe) * pipe_count;
 
   memset(&hdr, 0, sizeof(hdr));
   hdr.msg_name = NULL;
@@ -33,18 +32,6 @@ int requestFDS(int sock_fd, struct typed_pipe* pipes, int pipe_count) {
   if (retval < 0) {
     perror("FD_client: RECVMSG error");
     return -1;
-  }
-
-  // recover types_msg
-  for (i = 0; i < pipe_count * 2; i = i + 2) {
-    pipes[i/2].type = (comm_message_t) types_msg[i];
-    if (types_msg[i + 1] == 0) { // the pipe is a read side
-      pipes[i/2].fd_in = 1; // Set to actual fd in a hot minute
-      pipes[i/2].fd_out = 0;
-    } else {
-      pipes[i/2].fd_in = 0;
-      pipes[i/2].fd_out = 1;
-    }
   }
 
   // recover pipe fds

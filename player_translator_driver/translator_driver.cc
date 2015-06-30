@@ -156,23 +156,26 @@ int TranslatorDriver::MainSetup() {
   struct replica* r_p = (struct replica *) &rep;
   initReplicas(r_p, 1, "BenchMarker", 98);
 
-  createPipes(r_p, 1, 1, 1);
+  struct vote_pipe fake_pipes[2];
+  fake_pipes[0].rep_info = (char *) MESSAGE_T[RANGE_POSE_DATA];
+  fake_pipes[0].fd_in = 1; // Not used, but indicates that RANGE_POSE_DATA goes to the benchmarker
+  fake_pipes[0].fd_out = 0;
+  fake_pipes[1].rep_info = (char *) MESSAGE_T[MOV_CMD];
+  fake_pipes[1].fd_in = 0; 
+  fake_pipes[1].fd_out = 1; // Not used, but indicates that MOV_CMD comes from the benchmarker  
+  createPipes(r_p, 1, fake_pipes, 2);
   
-  // fork
-  char **argv = (char **) malloc(sizeof(char *) * 2);
-  struct typed_pipe data_in;
-  data_in.type = RANGE_POSE_DATA;
-  data_in.fd_in = rep.rep_pipes[0].fd_in;
-  data_in.fd_out = rep.rep_pipes[0].fd_out;
-  argv[0] = serializePipe(data_in);
+  //struct vote_pipe *new_pipes = malloc(sizeof(struct vote_pipe) * 2);
+  struct typed_pipe pipes[2];
+  convertVoteToTyped(r_p->rep_pipes, 2, pipes);
 
-  struct typed_pipe cmd_out;
-  cmd_out.type = MOV_CMD;
-  cmd_out.fd_in = rep.rep_pipes[1].fd_in;
-  cmd_out.fd_out = rep.rep_pipes[1].fd_out;
-  argv[1] = serializePipe(cmd_out);
+  char *argv[2];
+  argv[0] = serializePipe(pipes[0]);
+  argv[1] = serializePipe(pipes[1]);
+  debug_print("Args from trans: %s: %s %d %d\n", argv[0], MESSAGE_T[pipes[0].type], pipes[0].fd_in, pipes[0].fd_out);
+  debug_print("Args from trans: %s: %s %d %d\n", argv[1], MESSAGE_T[pipes[1].type], pipes[1].fd_in, pipes[1].fd_out);
+
   forkReplicas(r_p, 1, 2, argv);
-  free(argv);
 
   // Need this pipe not to block so that player and the outside world play nice
   flags = fcntl(rep.vot_pipes[1].fd_in, F_GETFL, 0);

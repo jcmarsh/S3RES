@@ -37,7 +37,7 @@ void startReplicas(struct replica reps[], int num, struct server_data *sd, const
 int behindRep(struct replica reps[], int num, int pipe_num);
 void balanceReps(struct replica reps[], int num, int default_priority);
 void restartReplica(struct replica reps[], int num, struct server_data *sd, struct vote_pipe ext_pipes[], int restarter, int restartee, int default_priority);
-void createPipes(struct replica reps[], int num, int in_count, int out_count);
+void createPipes(struct replica reps[], int num, struct vote_pipe ext_pipes[], int pipe_count);
 
 void forkReplicas(struct replica reps[], int num, int additional_argc, char **additional_argv);
 

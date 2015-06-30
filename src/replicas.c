@@ -164,55 +164,45 @@ void restartReplica(struct replica reps[], int num, struct server_data *sd, stru
 
   // re-init failed rep, create pipes
   initReplicas(&(reps[restartee]), 1, reps[restarter].name, default_priority);
-  for (i = 0; i < reps[restartee].pipe_count; i++) {
-    if (ext_pipes[0].fd_in != 0) {
-      fd_in_c++;
-    } else {
-      fd_out_c++;
-    }
-  }
-  createPipes(&(reps[restartee]), 1, fd_in_c, fd_out_c);
+
+  createPipes(&(reps[restartee]), 1, ext_pipes, reps[restartee].pipe_count);
   // send new pipe through fd server (should have a request)
   acceptSendFDS(sd, &(reps[restartee].pid), reps[restartee].rep_pipes, reps[restartee].pipe_count);
 
   balanceReps(reps, num, default_priority);
 }
 
-void createPipes(struct replica reps[], int num, int in_count, int out_count){
+void createPipes(struct replica reps[], int num, struct vote_pipe ext_pipes[], int pipe_count){
   int index, p_index;
 
   // external pipes are the pipes for the voter (normally the reps pipes)
   for (index = 0; index < num; index++) {
-    for (p_index = 0; p_index < in_count; p_index++) {
+    for (p_index = 0; p_index < pipe_count; p_index++) {
       int pipe_fds[2];
-      // if (pipe(pipe_fds) == -1)
-      if (pipe2(pipe_fds, O_CLOEXEC) == -1) { // Need to check on the number of open file descriptors if this line is removed.
+      if (pipe(pipe_fds) == -1) {
+      //if (pipe2(pipe_fds, O_CLOEXEC) == -1) { // Need to check on the number of open file descriptors if this line is removed.
         printf("Replica pipe error\n");
       } else {
         struct replica* rep = &reps[index];
+        struct vote_pipe ext_pipe = ext_pipes[p_index];
 
-        // This pipe is incoming
-        rep->vot_pipes[rep->pipe_count].fd_in = 0;
-        rep->vot_pipes[rep->pipe_count].fd_out = pipe_fds[1];
-        rep->rep_pipes[rep->pipe_count].fd_in = pipe_fds[0];
-        rep->voter_rep_in_copy[rep->pipe_count] = pipe_fds[0];
-        rep->rep_pipes[rep->pipe_count].fd_out = 0;
-        rep->pipe_count++;
-      }
-    }
-    for (p_index = 0; p_index < out_count; p_index++) {
-      int pipe_fds[2];
-      if (pipe2(pipe_fds, O_CLOEXEC) == -1) { // Need to check on the number of open file descriptors if this line is removed.
-        printf("Replica pipe error\n");
-      } else {
-        struct replica* rep = &reps[index];
-
-        // This pipe is outgoing (not friendly)
-        rep->vot_pipes[rep->pipe_count].fd_in = pipe_fds[0];
-        rep->vot_pipes[rep->pipe_count].fd_out = 0;
-        rep->rep_pipes[rep->pipe_count].fd_in = 0;
-        rep->voter_rep_in_copy[rep->pipe_count] = 0;
-        rep->rep_pipes[rep->pipe_count].fd_out = pipe_fds[1];
+        rep->vot_pipes[rep->pipe_count].rep_info = ext_pipe.rep_info;
+        rep->rep_pipes[rep->pipe_count].rep_info = ext_pipe.rep_info;
+        
+        if (ext_pipe.fd_in != 0) { // This pipe is incoming
+          rep->vot_pipes[rep->pipe_count].fd_in = 0;
+          rep->vot_pipes[rep->pipe_count].fd_out = pipe_fds[1];
+          rep->rep_pipes[rep->pipe_count].fd_in = pipe_fds[0];
+          rep->voter_rep_in_copy[rep->pipe_count] = pipe_fds[0];
+          rep->rep_pipes[rep->pipe_count].fd_out = 0;
+        } else { // This pipe is outgoing (not friendly)
+          rep->vot_pipes[rep->pipe_count].fd_in = pipe_fds[0];
+          rep->vot_pipes[rep->pipe_count].fd_out = 0;
+          rep->rep_pipes[rep->pipe_count].fd_in = 0;
+          rep->voter_rep_in_copy[rep->pipe_count] = 0;
+          rep->rep_pipes[rep->pipe_count].fd_out = pipe_fds[1];
+        }
+        
         rep->pipe_count++;
       }
     }
@@ -223,14 +213,7 @@ void startReplicas(struct replica reps[], int num, struct server_data *sd, const
   int i, fd_in_c = 0, fd_out_c = 0;
 
   initReplicas(reps, num, name, default_priority);
-  for (i = 0; i < pipe_count; i++) {
-    if (ext_pipes[0].fd_in != 0) {
-      fd_in_c++;
-    } else {
-      fd_out_c++;
-    }
-  }
-  createPipes(reps, num, fd_in_c, fd_out_c);
+  createPipes(reps, num, ext_pipes, pipe_count);
   forkReplicas(reps, num, 0, NULL);
   for (i = 0; i < num; i++) {
     if (acceptSendFDS(sd, &(reps[i].pid), reps[i].rep_pipes, reps[i].pipe_count) < 0) {
@@ -284,10 +267,17 @@ void forkReplicas(struct replica reps[], int num, int additional_argc, char **ad
     }
 
     for (a_index = ARGV_REQ; a_index < additional_argc + ARGV_REQ; a_index++) {
-      rep_argv[a_index] = additional_argv[a_index];
+      rep_argv[a_index] = additional_argv[a_index - ARGV_REQ];
     }
 
     rep_argv[rep_argc - 1] = NULL;
+
+    int i;
+    debug_print("Args for new replica:\n");
+    for (i = 0; i < rep_argc; i++) {
+      debug_print("Arg %d: %s\n", i, rep_argv[i]);
+    }
+
     curr->pid = forkSingle(rep_argv);
     for (a_index = 1; a_index < rep_argc; a_index++) {
       free(rep_argv[a_index]);

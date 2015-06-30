@@ -13,19 +13,11 @@ int sendFDS(int connection_fd, struct vote_pipe* pipes, int pipe_count) { // pip
   // cmsg is the out-of-band data (fds)
   char cmsgbuf[CMSG_SPACE(sizeof(int) * pipe_count)];
 
-  int types_msg[pipe_count * 2];
-  // Need to specify whether each pipe is meant to be an fd_in or fd_out
-  for (i = 0; i < pipe_count * 2; i = i + 2) {
-    //types_msg[i] = (int) pipes[i/2].type;
-    types_msg[i] = 0;
-    if (pipes[i/2].fd_in != 0) {
-      types_msg[i + 1] = 0; // 0 is the read side
-    } else {
-      types_msg[i + 1] = 1;
-    }
-  }
-  data.iov_base = types_msg;
-  data.iov_len = sizeof(types_msg);
+  struct typed_pipe send_pipes[pipe_count];
+  convertVoteToTyped(pipes, pipe_count, send_pipes);
+
+  data.iov_base = send_pipes;
+  data.iov_len = sizeof(send_pipes);
 
   memset(&hdr, 0, sizeof(hdr));
   hdr.msg_name = NULL;
