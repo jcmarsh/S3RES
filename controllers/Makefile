@@ -32,7 +32,7 @@ Mapper: mapper.o mapping.c $(SRC) $(DEP) ./inc/*.h
 	gcc $(FLAGS) -o Mapper mapper.o mapping.c $(SRC) $(INC) $(LIB) -lm
 
 Load: load.o $(SRC) $(DEP)
-	gcc $(FLAGS) -o Load load.o $(SRC) $(INC) $(LIB) -lm
+	gcc -O3 -Werror -L"~/research/ccv/lib" -I"~/research/ccv/lib" -o Load load.o $(SRC) $(INC) $(LIB) -lccv `cat ~/research/ccv/lib/.deps`
 
 copy:
 	cp ArtPot ../../stage/experiments/

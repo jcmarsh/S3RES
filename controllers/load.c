@@ -7,6 +7,9 @@
 
 #include "controller.h"
 
+#include <png.h>
+#include <ccv.h>
+
 #include <sys/time.h>
 #include <sys/resource.h>
 
@@ -78,39 +81,8 @@ void perCycleLoad(void) {
 }
 
 void enterLoop(void) {
-  int read_ret;
-  struct comm_range_pose_data recv_msg;
-
-  struct timeval select_timeout;
-  fd_set select_set;
- 
   while(1) {
-    if (insertCFE) {
-      while (1) { }
-    }
-        
-    select_timeout.tv_sec = 1;
-    select_timeout.tv_usec = 0;
-
-    FD_ZERO(&select_set);
-    FD_SET(pipes[read_in_index].fd_in, &select_set);
-
-    // Blocking, but that's okay with me
-    int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
-    if (retval > 0) {
-      if (FD_ISSET(pipes[read_in_index].fd_in, &select_set)) {
-        read_ret = TEMP_FAILURE_RETRY(read(pipes[read_in_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data)));
-        if (read_ret == sizeof(struct comm_range_pose_data)) {
-          perCycleLoad();
-        } else if (read_ret > 0) {
-          printf("Empty read read_in_index did not match expected size.\n");
-        } else if (read_ret < 0) {
-          perror("Empty - read read_in_index problems");
-        } else {
-          perror("Empty read_ret == 0 on read_in_index");
-        } 
-      }
-    }
+    perCycleLoad();
   }
 }
 
@@ -124,6 +96,11 @@ int main(int argc, const char **argv) {
     puts("ERROR: failure in setup function.");
     return -1;
   }
+
+  ccv_dense_matrix_t* image = 0;
+  ccv_read("test_stream.png", &image, CCV_IO_GRAY | CCV_IO_ANY_FILE);
+  ccv_write(image, "artsy_stream.png", 0, CCV_IO_PNG_FILE, 0);
+  return 0;
 
   enterLoop();
 
