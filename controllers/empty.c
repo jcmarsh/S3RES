@@ -20,12 +20,10 @@ int priority;
 
 const char* name = "Empty";
 
-void enterLoop();
-
 bool insertSDC = false;
 bool insertCFE = false;
 
-void setPipeIndexes() {
+void setPipeIndexes(void) {
   read_in_index = 0;
   write_out_index = 1;
 }
@@ -46,7 +44,7 @@ int parseArgs(int argc, const char **argv) {
   return 0;
 }
 
-void enterLoop() {
+void enterLoop(void) {
   int read_ret;
   struct comm_range_pose_data recv_msg;
 

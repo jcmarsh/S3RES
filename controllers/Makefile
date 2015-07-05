@@ -5,7 +5,7 @@ LIB=-lrt -lTASLimited
 FLAGS=-O3 -Werror -static
 #FLAGS=-g -O0 -Werror -static
 
-all: ArtPot AStar BenchMarker Empty Filter Logger Mapper
+all: ArtPot AStar BenchMarker Empty Filter Logger Mapper Load
 
 %.o: %.c
 	gcc -c $(FLAGS) -o $@ $< -I../include/ -I../tas_lib/inc/
@@ -31,6 +31,9 @@ Logger: logger.o $(SRC) $(DEP)
 Mapper: mapper.o mapping.c $(SRC) $(DEP) ./inc/*.h
 	gcc $(FLAGS) -o Mapper mapper.o mapping.c $(SRC) $(INC) $(LIB) -lm
 
+Load: load.o $(SRC) $(DEP)
+	gcc -O3 -Werror -L"~/research/ccv/lib" -I"~/research/ccv/lib" -o Load load.o $(SRC) $(INC) $(LIB) -lccv `cat ~/research/ccv/lib/.deps`
+
 copy:
 	cp ArtPot ../../stage/experiments/
 	cp AStar ../../stage/experiments/
@@ -39,6 +42,7 @@ copy:
 	cp Filter ../../stage/experiments/
 	cp Logger ../../stage/experiments/
 	cp Mapper ../../stage/experiments/
+	cp Load ../../stage/experiments/
 
 clean:
 	rm -f *.o
@@ -49,3 +53,4 @@ clean:
 	rm -f Filter
 	rm -f Logger
 	rm -f Mapper
+	rm -f Load
