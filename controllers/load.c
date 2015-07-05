@@ -46,9 +46,7 @@ int parseArgs(int argc, const char **argv) {
   return 0;
 }
 
-// TODO: Need to make more easily tunable.
-// TODO: How to best report performance? Printf? Print to file?
-void perCycleLoad(void) {
+void perCyclePrime(void) {
   struct rusage usage_stats;
   struct timeval prev_utime;
 
@@ -80,9 +78,45 @@ void perCycleLoad(void) {
   printf("Load found %d primes in: %ld - %ld\n", prime_count, usage_stats.ru_utime.tv_sec - prev_utime.tv_sec, usage_stats.ru_utime.tv_usec - prev_utime.tv_usec);
 }
 
+// Copied from icfdetect.c from libccv
+static unsigned int get_current_time(void)
+{
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}
+
+// Modified from icfdetect.c from libccv
+void perCyclePedestrian(void) {
+  int i;
+  ccv_enable_default_cache();
+  ccv_dense_matrix_t* image = 0;
+  ccv_icf_classifier_cascade_t* cascade = ccv_icf_read_classifier_cascade("ccv_related/pedestrian.icf");
+  ccv_read("ccv_related/126.jpg", &image, CCV_IO_ANY_FILE | CCV_IO_RGB_COLOR);
+  if (image != 0)
+  {
+    unsigned int elapsed_time = get_current_time();
+    ccv_array_t* seq = ccv_icf_detect_objects(image, &cascade, 1, ccv_icf_default_params);
+    elapsed_time = get_current_time() - elapsed_time;
+    for (i = 0; i < seq->rnum; i++)
+    {
+      ccv_comp_t* comp = (ccv_comp_t*)ccv_array_get(seq, i);
+      // This would be intersting output for checking for errors / voting
+      //printf("%d %d %d %d %f\n", comp->rect.x, comp->rect.y, comp->rect.width, comp->rect.height, comp->classification.confidence);
+    }
+    // This should be a message to the logger.
+    printf("total : %d in time %dms\n", seq->rnum, elapsed_time);
+    ccv_array_free(seq);
+    ccv_matrix_free(image);
+  }
+  ccv_icf_classifier_cascade_free(cascade);
+  ccv_disable_cache();
+  return;
+}
+
 void enterLoop(void) {
   while(1) {
-    perCycleLoad();
+    perCyclePedestrian();
   }
 }
 
@@ -96,11 +130,6 @@ int main(int argc, const char **argv) {
     puts("ERROR: failure in setup function.");
     return -1;
   }
-
-  ccv_dense_matrix_t* image = 0;
-  ccv_read("test_stream.png", &image, CCV_IO_GRAY | CCV_IO_ANY_FILE);
-  ccv_write(image, "artsy_stream.png", 0, CCV_IO_PNG_FILE, 0);
-  return 0;
 
   enterLoop();
 
