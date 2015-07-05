@@ -164,8 +164,7 @@ void restartReplica(struct replica reps[], int num, struct server_data *sd, stru
 
   // re-init failed rep, create pipes
   initReplicas(&(reps[restartee]), 1, reps[restarter].name, default_priority);
-
-  createPipes(&(reps[restartee]), 1, ext_pipes, reps[restartee].pipe_count);
+  createPipes(&(reps[restartee]), 1, ext_pipes, reps[restarter].pipe_count);
   // send new pipe through fd server (should have a request)
   acceptSendFDS(sd, &(reps[restartee].pid), reps[restartee].rep_pipes, reps[restartee].pipe_count);
 
@@ -186,31 +185,31 @@ void createPipes(struct replica reps[], int num, struct vote_pipe ext_pipes[], i
         struct replica* rep = &reps[index];
         struct vote_pipe ext_pipe = ext_pipes[p_index];
 
-        rep->vot_pipes[rep->pipe_count].rep_info = ext_pipe.rep_info;
-        rep->rep_pipes[rep->pipe_count].rep_info = ext_pipe.rep_info;
+        rep->vot_pipes[p_index].rep_info = ext_pipe.rep_info;
+        rep->rep_pipes[p_index].rep_info = ext_pipe.rep_info;
         
         if (ext_pipe.fd_in != 0) { // This pipe is incoming
-          rep->vot_pipes[rep->pipe_count].fd_in = 0;
-          rep->vot_pipes[rep->pipe_count].fd_out = pipe_fds[1];
-          rep->rep_pipes[rep->pipe_count].fd_in = pipe_fds[0];
-          rep->voter_rep_in_copy[rep->pipe_count] = pipe_fds[0];
-          rep->rep_pipes[rep->pipe_count].fd_out = 0;
+          rep->vot_pipes[p_index].fd_in = 0;
+          rep->vot_pipes[p_index].fd_out = pipe_fds[1];
+          rep->rep_pipes[p_index].fd_in = pipe_fds[0];
+          rep->voter_rep_in_copy[p_index] = pipe_fds[0];
+          rep->rep_pipes[p_index].fd_out = 0;
         } else { // This pipe is outgoing (not friendly)
-          rep->vot_pipes[rep->pipe_count].fd_in = pipe_fds[0];
-          rep->vot_pipes[rep->pipe_count].fd_out = 0;
-          rep->rep_pipes[rep->pipe_count].fd_in = 0;
-          rep->voter_rep_in_copy[rep->pipe_count] = 0;
-          rep->rep_pipes[rep->pipe_count].fd_out = pipe_fds[1];
+          rep->vot_pipes[p_index].fd_in = pipe_fds[0];
+          rep->vot_pipes[p_index].fd_out = 0;
+          rep->rep_pipes[p_index].fd_in = 0;
+          rep->voter_rep_in_copy[p_index] = 0;
+          rep->rep_pipes[p_index].fd_out = pipe_fds[1];
         }
         
-        rep->pipe_count++;
+        rep->pipe_count = p_index + 1;
       }
     }
   }
 }
 
 void startReplicas(struct replica reps[], int num, struct server_data *sd, const char* name, struct vote_pipe ext_pipes[], int pipe_count, int default_priority) {
-  int i, fd_in_c = 0, fd_out_c = 0;
+  int i;
 
   initReplicas(reps, num, name, default_priority);
   createPipes(reps, num, ext_pipes, pipe_count);

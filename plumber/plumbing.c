@@ -65,7 +65,7 @@ void link_bench(struct node* n, comm_message_t type, int fd_in, int fd_out, bool
 	n->pipes[n->pipe_count].type = type;
 	n->pipes[n->pipe_count].fd_in = fd_in;
 	n->pipes[n->pipe_count].fd_out = fd_out;
-	n->timed = timed;
+	n->timed[n->pipe_count] = timed;
 	n->pipe_count++;
 }
 
@@ -79,13 +79,13 @@ void link_node(comm_message_t type, struct node* fromNode, bool fromTimed, struc
 		fromNode->pipes[fromNode->pipe_count].type = type;
 		fromNode->pipes[fromNode->pipe_count].fd_in = 0;
 		fromNode->pipes[fromNode->pipe_count].fd_out = pipe_fds[1];
-		fromNode->timed = fromTimed;
+		fromNode->timed[fromNode->pipe_count] = fromTimed;
 		fromNode->pipe_count++;
 		// other half to toNode
 		toNode->pipes[toNode->pipe_count].type = type;
 		toNode->pipes[toNode->pipe_count].fd_in = pipe_fds[0];
 		toNode->pipes[toNode->pipe_count].fd_out = 0;
-		toNode->timed = toTimed;
+		toNode->timed[toNode->pipe_count] = toTimed;
 		toNode->pipe_count++;
 	}
 }
@@ -111,7 +111,6 @@ char* serializeRep(replication_t rep_type) {
 	return serial;
 }
 
-// TODO: compare to "forkSingleReplica" in replicas.cpp
 int launch_node(struct nodelist* nodes) {
 	pid_t currentPID = 0;
 
@@ -150,7 +149,7 @@ int launch_node(struct nodelist* nodes) {
 			other_arg = 5;
 			rep_argv[rep_count - 1] = NULL;
 			for (i = other_arg; i < curr->pipe_count + other_arg; i++) {
-				asprintf(&rep_argv[i], "%s:%d", serializePipe(curr->pipes[i - other_arg]), curr->timed);
+				asprintf(&rep_argv[i], "%s:%d", serializePipe(curr->pipes[i - other_arg]), curr->timed[i-other_arg]);
 			}
 		}
 

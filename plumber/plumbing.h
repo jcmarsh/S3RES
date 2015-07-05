@@ -21,7 +21,7 @@ struct node {
 	char* voter_timer; // easier to keep as a char* - needs to be to pass as an arg anyways
 
 	int pipe_count;
-	int timed; // Used only for Voters.
+	int timed[PIPE_LIMIT]; // Used only for Voters.
 	struct typed_pipe pipes[PIPE_LIMIT];
 };
 
