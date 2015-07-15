@@ -50,7 +50,6 @@ int parseArgs(int argc, const char **argv);
 void doOneUpdate(void);
 void processData(struct vote_pipe *pipe, int pipe_index);
 void resetVotingState(int pipe_num);
-void initVotingState(void);
 void sendPipe(int pipe_num, int replica_num);
 void stealBuffers(int rep_num, char **buffer, int *buff_count);
 void returnBuffers(int rep_num, char **buffer, int *buff_count);
@@ -84,11 +83,11 @@ void restart_prep(int restartee, int restarter) {
   restartReplica(replicas, rep_count, &sd, ext_pipes, restarter, restartee, voter_priority - VOTER_PRIO_OFFSET);
 
   for (i = 0; i < replicas[restarter].pipe_count; i++) {
-    if (replicas[restarter].vot_pipes[i].fd_in != 0) { // && reps[restarter].voted[i] > 0) { // was causing problems with the timer
-      replicas[restartee].voted[i] = replicas[restarter].voted[i];
+    if (replicas[restarter].vot_pipes[i].fd_in != 0) {
       memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
       replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
-      sendPipe(i, restarter);
+      replicas[restartee].vot_pipes[i].buff_index = replicas[restarter].vot_pipes[i].buff_index;
+      sendPipe(i, restarter); // TODO: Need to check if available?
     }
   }
 
@@ -191,9 +190,9 @@ bool checkSync(void) {
 
   // check each that for each pipe, each replica has the same number of votes
   for (p_index = 0; p_index < pipe_count; p_index++) {
-    int votes = replicas[0].voted[p_index];
+    int votes = replicas[0].vot_pipes[p_index].buff_index;
     for (r_index = 1; r_index < rep_count; r_index++) {
-      if (votes != replicas[r_index].voted[p_index]) {
+      if (votes != replicas[r_index].vot_pipes[p_index].buff_index) {
         nsync = false;
       }
     }
@@ -229,7 +228,7 @@ void doOneUpdate(void) {
   FD_ZERO(&select_set);
   // Check external in pipes
   // Hmm... only if the controllers are ready for it?
-  bool check_inputs = checkSync(); //if (voter_priority < 5) { //  if (checkSync() || !timer_started) {
+  bool check_inputs = true; //= checkSync(); //if (voter_priority < 5) { //  if (checkSync() || !timer_started) {
 
   if (check_inputs) {
     for (p_index = 0; p_index < pipe_count; p_index++) {
@@ -243,13 +242,9 @@ void doOneUpdate(void) {
   // Check pipes from replicas
   for (p_index = 0; p_index < pipe_count; p_index++) {
     for (r_index = 0; r_index < rep_count; r_index++) {
-      if (replicas[r_index].voted[p_index] > 0) {
-        // causes ahead replicas to buffer output in their pipes. TODO: reconsider
-      } else {
-        int rep_pipe_fd = replicas[r_index].vot_pipes[p_index].fd_in;
-        if (rep_pipe_fd != 0) {
-          FD_SET(rep_pipe_fd, &select_set);      
-        }
+      int rep_pipe_fd = replicas[r_index].vot_pipes[p_index].fd_in;
+      if (rep_pipe_fd != 0) {
+        FD_SET(rep_pipe_fd, &select_set);      
       }
     }
   }
@@ -329,56 +324,34 @@ void processData(struct vote_pipe *pipe, int pipe_index) {
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// reset / init voting state
-void resetVotingState(int pipe_num) {
-  int r_index;
-  for (r_index = 0; r_index < rep_count; r_index++) {
-    replicas[r_index].voted[pipe_num]--; // = 0;
-  }
-}
-
-void initVotingState(void) {
-  int p_index;
-  int r_index;
-  for (p_index = 0; p_index < pipe_count; p_index++) {
-    for (r_index = 0; r_index < rep_count; r_index++) {
-      replicas[r_index].voted[p_index] = 0;
-    }
-  }
-}
-
-bool allReporting(int pipe_num) {
-  bool all_reporting = true;
-  int r_index;
-  for (r_index = 0; r_index < rep_count; r_index++) {
-    // Check that all have reported
-    all_reporting = all_reporting && 
-      (replicas[r_index].voted[pipe_num] == replicas[(r_index + 1) % rep_count].voted[pipe_num]);
-  }
-
-  return all_reporting;
-}
-
 void sendPipe(int pipe_num, int replica_num) {
-  if (!allReporting(pipe_num)) {
+  int r_index;
+  int bytes_avail = bytesReady(replicas, rep_count, pipe_num);
+  if (bytes_avail == 0) {
     return;
   }
-  
+
   if (pipe_num == timer_stop_index) {  
     // reset the timer
     timer_started = false;
   }
 
-  writeBuffer(ext_pipes[pipe_num].fd_out, replicas[replica_num].vot_pipes[pipe_num].buffer, replicas[replica_num].vot_pipes[pipe_num].buff_count);
-  
-  resetVotingState(pipe_num);
+  printf("Voter sending data out\n");
+  for (r_index = 0; r_index < rep_count; r_index++) {
+    if (replica_num == r_index) {
+      int retval;
+      retval = buffToPipe(&(replicas[replica_num].vot_pipes[pipe_num]), ext_pipes[pipe_num].fd_out, bytes_avail);
+      printf("Write out returned: %d\n", retval);
+    } else {
+      fakeToPipe(&(replicas[replica_num].vot_pipes[pipe_num]), bytes_avail);
+    }
+  }
 }
 
 void checkSDC(int pipe_num) {
   int r_index;
-
-  if (!allReporting(pipe_num)) {
+  int bytes_avail = bytesReady(replicas, rep_count, pipe_num);
+  if (bytes_avail == 0) {
     return;
   }
 
@@ -388,10 +361,9 @@ void checkSDC(int pipe_num) {
       sendPipe(pipe_num, 0);
       return;
     case DMR:
+      printf("Check SDC. bytes_avail: %d\n", bytes_avail);
       // Can detect, and check what to do
-      if (memcmp(replicas[0].vot_pipes[pipe_num].buffer,
-                 replicas[1].vot_pipes[pipe_num].buffer,
-                 replicas[0].vot_pipes[pipe_num].buff_count) != 0) {
+      if (compareBuffs(&(replicas[0].vot_pipes[pipe_num]), &(replicas[1].vot_pipes[pipe_num]), bytes_avail) != 0) {
         printf("Voting disagreement: caught SDC in DMR but can't do anything about it.\n");
       }
 
@@ -401,29 +373,12 @@ void checkSDC(int pipe_num) {
       // Send the solution that at least two agree on
       // TODO: What if buff_count is off?
       for (r_index = 0; r_index < rep_count; r_index++) {
-        if (memcmp(replicas[r_index].vot_pipes[pipe_num].buffer,
-                   replicas[(r_index+1) % rep_count].vot_pipes[pipe_num].buffer,
-                   replicas[r_index].vot_pipes[pipe_num].buff_count) == 0) {
-
+        if (compareBuffs(&(replicas[r_index].vot_pipes[pipe_num]), &(replicas[(r_index + 1)].vot_pipes[pipe_num]), bytes_avail) == 0) {
           // If the third doesn't agree, it should be restarted.
-          if (memcmp(replicas[r_index].vot_pipes[pipe_num].buffer,
-                     replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num].buffer,
-                     replicas[r_index].vot_pipes[pipe_num].buff_count) != 0) {
-            
+          if (compareBuffs(&(replicas[r_index].vot_pipes[pipe_num]), &(replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num]), bytes_avail) != 0) {  
             int restartee = (r_index + 2) % rep_count;
             
             debug_print("Caught SDC: %s\n", controller_name);
-            #ifdef DEBUG_MESSAGING
-              debug_print("Rep num %d\n", restartee);
-              int i, j;
-              for (i = 0; i < rep_count; i++) {
-                for (j = 0; j < pipe_count; j ++) {
-                  debug_print("Rep %d vote count: %d\n", i, replicas[i].voted[j]);
-                  // printBuffer(&replicas[i].vot_pipes[j]);
-                }
-              }
-
-            #endif // DEBUG_MESSAGING
 
             restart_prep(restartee, r_index);
           } else {
@@ -438,51 +393,17 @@ void checkSDC(int pipe_num) {
   }
 }
 
-// New message came in, but already have a message
-void emergencyWrite(int pipe_num, int replica_num) {
-  switch (rep_type) {
-  case SMR: 
-    // Wut? This makes no sense
-    printf("Voter emergencyWrite error: SMR.");
-    return;
-  case DMR:
-    // Just send it.
-    writeBuffer(ext_pipes[pipe_num].fd_out, replicas[replica_num].vot_pipes[pipe_num].buffer, replicas[replica_num].vot_pipes[pipe_num].buff_count);
-    resetVotingState(pipe_num);
-    return;
-  case TMR:
-    // check if match? or just send it.
-    writeBuffer(ext_pipes[pipe_num].fd_out, replicas[replica_num].vot_pipes[pipe_num].buffer, replicas[replica_num].vot_pipes[pipe_num].buff_count);
-    resetVotingState(pipe_num);
-    return;
-  }
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // Process output from replica; vote on it
 void processFromRep(int replica_num, int pipe_num) {
-  if (replicas[replica_num].voted[pipe_num] >= 1) { // Already have a pending message... will lose data if read is done
-    emergencyWrite(pipe_num, replica_num);
-  }
-  struct vote_pipe* curr_pipe = &(replicas[replica_num].vot_pipes[pipe_num]);
-  curr_pipe->buff_count = TEMP_FAILURE_RETRY(read(curr_pipe->fd_in, curr_pipe->buffer, MAX_PIPE_BUFF));
-
-  // TODO: Read may have been interrupted
-  if (curr_pipe->buff_count > 0) {
-    replicas[replica_num].voted[pipe_num]++;
+  printf("Data from the rep!\n");
+  // read from pipe
+  if (pipeToBuff(&(replicas[replica_num].vot_pipes[pipe_num])) == 0) {
     balanceReps(replicas, rep_count, voter_priority - VOTER_PRIO_OFFSET);
-    if (replicas[replica_num].voted[pipe_num] > 1) {
-      // Happens when a process has died.
-      // printf("Run-away lag detected: %s pipe - %d - rep 0, 1, 2: %d, %d, %d\n", controller_name, pipe_num, replicas[0].voted[pipe_num], replicas[1].voted[pipe_num], replicas[2].voted[pipe_num]);
-    }
-
     checkSDC(pipe_num);
-  } else if (curr_pipe->buff_count < 0) {
-    printf("Voter - Controller %s, rep %d, pipe %d\n", controller_name, replica_num, pipe_num);
-    perror("Voter - read problem on internal pipe");
   } else {
     printf("Voter - Controller %s, rep %d, pipe %d\n", controller_name, replica_num, pipe_num);
-    perror("Voter - read == 0 on internal pipe");
+    perror("Voter - read problem on internal pipe");
   }
 }
 
@@ -494,11 +415,12 @@ int initVoterD(void) {
 
   // Setup fd server
   createFDS(&sd, controller_name);
-  initVotingState();
   startReplicas(replicas, rep_count, &sd, controller_name, ext_pipes, pipe_count, voter_priority - VOTER_PRIO_OFFSET);
   
   InitTAS(DEFAULT_CPU, voter_priority); // IMPORTANT: Should be after forking replicas to subvert CoW
   
+  // TODO: I did this to force page faults... but I think there was a different issue.
+  // This section may no longer be necessary. Need to check with the page fault tests.
   int p_index, r_index;
   for (p_index = 0; p_index < pipe_count; p_index++) {
     int read_fd = ext_pipes[p_index].fd_in;

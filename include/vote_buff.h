@@ -11,6 +11,9 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 // Max number of bytes
 #define MAX_PIPE_BUFF 4096
@@ -40,7 +43,12 @@ replication_t reptypeToEnum(char* type);
 
 void resetVotePipe(struct vote_pipe* pipe);
 
-// read n bytes
+// read available bytes
+int pipeToBuff(struct vote_pipe* pipe);
 
+// write n bytes
+int buffToPipe(struct vote_pipe* pipe, int fd_out, int n);
+void fakeToPipe(struct vote_pipe* pipe, int n); // Advances buffer, but no need to write
 
+int compareBuffs(struct vote_pipe *pipeA, struct vote_pipe *pipeB, int n);
 #endif // _VOTE_BUFF_H_

@@ -21,7 +21,7 @@ void initReplicas(struct replica reps[], int rep_num, const char* name, int prio
 
     // clean up pipes if this replica is not fresh
     for (jndex = 0; jndex < new_rep->pipe_count; jndex++) {
-      new_rep->voted[jndex] = 0;
+      // new_rep->voted[jndex] = 0;
       if (new_rep->pipe_count != 0) {
         resetVotePipe(&(new_rep->vot_pipes[jndex]));
         resetVotePipe(&(new_rep->rep_pipes[jndex]));
@@ -56,11 +56,22 @@ void cleanupReplica(struct replica reps[], int rep_index) {
   return;
 }
 
+int bytesReady(struct replica reps[], int num, int pipe_num) {
+  int r_index, min = MAX_PIPE_BUFF;
+  for (r_index = 0; r_index < num; r_index++) {
+    if (reps[r_index].vot_pipes[pipe_num].buff_count < min) {
+      min = reps[r_index].vot_pipes[pipe_num].buff_count;
+    }
+  }
+  return min;
+}
+
 int aheadRep(struct replica reps[], int num, int pipe_num) {
   int r_index = 0;
   int mostAhead = r_index;
   for (r_index = 0; r_index < num; r_index++) {
-    if (reps[r_index].voted[pipe_num] > reps[mostAhead].voted[pipe_num]) {
+    //if (reps[r_index].voted[pipe_num] > reps[mostAhead].voted[pipe_num]) {
+    if (reps[r_index].vot_pipes[pipe_num].buff_count > reps[mostAhead].vot_pipes[pipe_num].buff_count) {
       mostAhead = r_index;
     }
   }
@@ -72,9 +83,9 @@ int behindRep(struct replica reps[], int num, int pipe_num) {
   int r_index;
   int mostBehind = 0;
   for (r_index = 1; r_index < num; r_index++) {
-    if (reps[r_index].voted[pipe_num] < reps[mostBehind].voted[pipe_num]) {
+    if (reps[r_index].vot_pipes[pipe_num].buff_count < reps[mostBehind].vot_pipes[pipe_num].buff_count) {
       mostBehind = r_index;
-    } else if (reps[r_index].voted[pipe_num] == reps[mostBehind].voted[pipe_num]) {
+    } else if (reps[r_index].vot_pipes[pipe_num].buff_count == reps[mostBehind].vot_pipes[pipe_num].buff_count) {
       if (reps[r_index].priority > reps[mostBehind].priority) {
         mostBehind = r_index;
       }
@@ -88,7 +99,7 @@ int rep_gap(struct replica reps[], int num, int rep_num) {
   int gap = 0;
   for (p_index = 0; p_index < reps[0].pipe_count; p_index++) {
     if (reps[0].vot_pipes[p_index].fd_in != 0) { // out from the rep, in to the voter
-      gap += reps[aheadRep(reps, num, p_index)].voted[p_index] - reps[rep_num].voted[p_index];
+      gap += reps[aheadRep(reps, num, p_index)].vot_pipes[p_index].buff_count - reps[rep_num].vot_pipes[p_index].buff_count;
     }
   }
   return gap;

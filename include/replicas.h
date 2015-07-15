@@ -28,11 +28,12 @@ struct replica {
   struct vote_pipe vot_pipes[PIPE_LIMIT]; // Voter side of pipes
   int voter_rep_in_copy[PIPE_LIMIT];       // Voter needs a copy of the read side of rep pipes
   struct vote_pipe rep_pipes[PIPE_LIMIT]; // rep side of pipes
-  int voted[PIPE_LIMIT];
+  // int voted[PIPE_LIMIT];
 };  
 
 void initReplicas(struct replica reps[], int rep_num, const char* name, int priority);
 void cleanupReplica(struct replica reps[], int rep_index);
+int bytesReady(struct replica reps[], int num, int pipe_num);
 void startReplicas(struct replica reps[], int num, struct server_data *sd, const char* name, struct vote_pipe ext_pipes[], int pipe_count, int default_priority);
 int behindRep(struct replica reps[], int num, int pipe_num);
 void balanceReps(struct replica reps[], int num, int default_priority);

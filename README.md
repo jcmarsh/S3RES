@@ -67,3 +67,15 @@ This is likely a temporary repo (thus the terrible name). Meant to simulate Sing
 ## Compiling and Running
 
 Currently dependant on Player / Stage. 
+
+## libccv needed for Load component.
+
+Install in directory containing PINT folder (I know).
+
+* Download tar from http://libccv.org/
+* Unzip: `tar -xf liuliu-ccv-785aba2.tar.gz` (filename may change)
+* change directory name: `mv liuliu-ccv-785aba2 ccv`
+* `cd ccv/lib/`
+* `./configure` - check to see if anything you want is missing (libpng and libjpeg in the `LINK FLAGS` bit at the end)
+* `make`
+* copy `./lib/libccv.a` into a directory checked by ld (`/usr/local/lib/`)
