@@ -16,12 +16,13 @@
 #include <stdlib.h>
 
 // Max number of bytes
-#define MAX_PIPE_BUFF 4096
+//#define MAX_PIPE_BUFF 4096
+#define MAX_VOTE_PIPE_BUFF 128 // TODO: just for testing. REMOVE!
 // Why 10? No reason.
 #define PIPE_LIMIT 10
 
 // Here more for convenience
-typedef enum {NONE,	SMR, DMR, TMR, REP_TYPE_ERROR} replication_t;
+typedef enum {NONE, SMR, DMR, TMR, REP_TYPE_ERROR} replication_t;
 
 static const char* REP_TYPE_T[] = {"NONE", "SMR", "DMR", "TMR", "REP_TYPE_ERROR"};
 
@@ -36,7 +37,7 @@ struct vote_pipe {
 	bool timed; // timers start on input timed pipe reads, reset on output timed pipe writes
 	int buff_count;
 	int buff_index;
-	char buffer[MAX_PIPE_BUFF];
+	char buffer[MAX_VOTE_PIPE_BUFF];
 };
 
 replication_t reptypeToEnum(char* type);

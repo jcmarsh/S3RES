@@ -68,7 +68,7 @@ void restart_prep(int restartee, int restarter) {
     perror("Voter failed to malloc memory");
   }
   for (i = 0; i < PIPE_LIMIT; i++) {
-    restarter_buffer[i] = (char *)malloc(sizeof(char) * MAX_PIPE_BUFF);
+    restarter_buffer[i] = (char *)malloc(sizeof(char) * MAX_VOTE_PIPE_BUFF);
     if (restarter_buffer[i] == NULL) {
       perror("Voter failed to allocat memory");
     }
@@ -165,7 +165,7 @@ void stealBuffers(int rep_num, char **buffer, int *buff_count) {
   if (retval > 0) { // Copy buffers
     for (i = 0; i < replicas[rep_num].pipe_count; i++) {
       if (FD_ISSET(replicas[rep_num].voter_rep_in_copy[i], &select_set)) {
-        buff_count[i] = read(replicas[rep_num].voter_rep_in_copy[i], buffer[i], MAX_PIPE_BUFF);
+        buff_count[i] = read(replicas[rep_num].voter_rep_in_copy[i], buffer[i], MAX_VOTE_PIPE_BUFF);
         if (buff_count[i] < 0) {
           perror("Voter error stealing pipe");
         }
@@ -263,7 +263,7 @@ void doOneUpdate(void) {
             timer_started = true;
             watchdog = generate_timestamp();
           }
-          ext_pipes[p_index].buff_count = TEMP_FAILURE_RETRY(read(read_fd, ext_pipes[p_index].buffer, MAX_PIPE_BUFF));
+          ext_pipes[p_index].buff_count = TEMP_FAILURE_RETRY(read(read_fd, ext_pipes[p_index].buffer, MAX_VOTE_PIPE_BUFF));
           if (ext_pipes[p_index].buff_count > 0) { // TODO: read may still have been interrupted
             processData(&(ext_pipes[p_index]), p_index);
           } else if (ext_pipes[p_index].buff_count < 0) {

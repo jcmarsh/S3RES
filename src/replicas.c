@@ -57,7 +57,7 @@ void cleanupReplica(struct replica reps[], int rep_index) {
 }
 
 int bytesReady(struct replica reps[], int num, int pipe_num) {
-  int r_index, min = MAX_PIPE_BUFF;
+  int r_index, min = MAX_VOTE_PIPE_BUFF;
   for (r_index = 0; r_index < num; r_index++) {
     if (reps[r_index].vot_pipes[pipe_num].buff_count < min) {
       min = reps[r_index].vot_pipes[pipe_num].buff_count;

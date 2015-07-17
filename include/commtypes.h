@@ -86,6 +86,7 @@ char* serializePipe(struct typed_pipe pipe);
 void deserializePipe(const char* serial, struct typed_pipe* pipe);
 void resetPipe(struct typed_pipe* pipe);
 
+// Used in benchmarker and fd_server
 void convertTypedToVote(struct typed_pipe ext_pipes[], int pipe_count, struct vote_pipe *new_pipes);
 void convertVoteToTyped(struct vote_pipe ext_pipes[], int pipe_count, struct typed_pipe *new_pipes);
 

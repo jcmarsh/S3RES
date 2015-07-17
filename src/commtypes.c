@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_PIPE_BUFF 4096
+#define MAX_TYPED_PIPE_BUFF 4096 // This should be the limit on pipes... or something reasonable.
 
 comm_message_t commToEnum(char* name) {
   if (strcmp(name, "WAY_REQ") == 0) {
@@ -193,7 +193,7 @@ int commSendMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg) {
   }
 
   int index = 0;
-  int buffer[MAX_PIPE_BUFF / sizeof(int)] = {0};
+  int buffer[MAX_TYPED_PIPE_BUFF / sizeof(int)] = {0};
   int buff_count = 0;
 
   buffer[buff_count++] = msg->pose_x;
@@ -204,8 +204,8 @@ int commSendMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg) {
     buffer[buff_count++] = msg->obs_x[index];
     buffer[buff_count++] = msg->obs_y[index];
     
-    if (buff_count * sizeof(int) > MAX_PIPE_BUFF) {
-      printf("ERROR: Commtypes:commSendMapUpdate attempting to surpase MAX_PIPE_BUFF\n");
+    if (buff_count * sizeof(int) > MAX_TYPED_PIPE_BUFF) {
+      printf("ERROR: Commtypes:commSendMapUpdate attempting to surpase MAX_TYPED_PIPE_BUFF\n");
       break;
     }
   }
@@ -224,7 +224,7 @@ int commRecvMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg) {
     printf("commRecvMapUpdate Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_in);
     return 0;
   }
-  int recv_msg_buffer[MAX_PIPE_BUFF / sizeof(int)] = {0};
+  int recv_msg_buffer[MAX_TYPED_PIPE_BUFF / sizeof(int)] = {0};
   int header_ints = 3; // pose x, pose y, and obstacle count
   int index = 0;
 
