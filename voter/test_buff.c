@@ -89,6 +89,74 @@ int main (int argc, char ** argv) {
 	readTest(&pipeA, from_rep, 24);	
 
 	// TODO: Test the compare function.
+	printf("Test compare\n");
+	struct vote_pipe pipeB;
+	int to_repB[2];
+	int from_repB[2];
+	struct vote_pipe pipeC;
+	int to_repC[2];
+	int from_repC[2];
+
+	resetVotePipe(&pipeB);
+	resetVotePipe(&pipeC);
+
+	for (i = 0; i < MAX_VOTE_PIPE_BUFF; i++) {
+		pipeB.buffer[i] = '#';
+		pipeC.buffer[i] = '#';
+	}
+
+	if (pipe(to_repB) != 0) {
+		printf("Pipe Fail");
+		return -1;
+	}
+	if (pipe(to_repC) != 0) {
+		printf("Pipe Fail");
+		return -1;
+	}
+	if (pipe(from_repB) != 0) {
+		printf("Pipe Fail");
+		return -1;
+	}
+	if (pipe(from_repC) != 0) {
+		printf("Pipe Fail");
+		return -1;
+	}
+
+	pipeB.fd_in = to_repB[0];
+	pipeC.fd_in = to_repC[0];
+
+	writeTest(&pipeB, to_repB[1], "This is the same message", 24);
+	writeTest(&pipeC, to_repC[1], "This is the same message", 24);
+
+	printf("Compare buffers (==0): %d\n", compareBuffs(&pipeB, &pipeC, 24));
+
+	writeTest(&pipeB, to_repB[1], "This is NOT same message", 24);
+	writeTest(&pipeC, to_repC[1], "This is the same message", 24);
+
+	printf("Compare buffers (==0): %d\n", compareBuffs(&pipeB, &pipeC, 24));
+	printf("Compare buffers (!=0): %d\n", compareBuffs(&pipeB, &pipeC, 48));
+
+	readTest(&pipeB, from_repB, 48);
+	readTest(&pipeC, from_repC, 48);
+
+	writeTest(&pipeB, to_repB[1], "This is a long message to see how things are working out. Well I hope.", 70);
+	writeTest(&pipeC, to_repC[1], "This is a long message to see how things are working out. Well I hope.", 70);
+
+	readTest(&pipeB, from_repB, 70);
+	readTest(&pipeC, from_repC, 70);
+
+	writeTest(&pipeB, to_repB[1], "This is the same message!", 25);
+	writeTest(&pipeC, to_repC[1], "This is the same message", 24);
+
+	printf("Compare buffers (==0): %d\n", compareBuffs(&pipeB, &pipeC, 24));
+
+	readTest(&pipeB, from_repB, 25);
+	readTest(&pipeC, from_repC, 24);
+
+	writeTest(&pipeB, to_repB[1], "This is the same message!", 25);
+	writeTest(&pipeC, to_repC[1], "This is the same message", 24);
+
+	printf("Compare buffers (==-1): %d\n", compareBuffs(&pipeB, &pipeC, 24));
 
 	return 0;
 }
