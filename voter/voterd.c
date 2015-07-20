@@ -336,14 +336,12 @@ void sendPipe(int pipe_num, int replica_num) {
     timer_started = false;
   }
 
-  printf("Voter sending data out\n");
   for (r_index = 0; r_index < rep_count; r_index++) {
     if (replica_num == r_index) {
       int retval;
-      retval = buffToPipe(&(replicas[replica_num].vot_pipes[pipe_num]), ext_pipes[pipe_num].fd_out, bytes_avail);
-      printf("Write out returned: %d\n", retval);
+      retval = buffToPipe(&(replicas[r_index].vot_pipes[pipe_num]), ext_pipes[pipe_num].fd_out, bytes_avail);
     } else {
-      fakeToPipe(&(replicas[replica_num].vot_pipes[pipe_num]), bytes_avail);
+      fakeToPipe(&(replicas[r_index].vot_pipes[pipe_num]), bytes_avail);
     }
   }
 }
@@ -396,7 +394,6 @@ void checkSDC(int pipe_num) {
 ////////////////////////////////////////////////////////////////////////////////
 // Process output from replica; vote on it
 void processFromRep(int replica_num, int pipe_num) {
-  printf("Data from the rep!\n");
   // read from pipe
   if (pipeToBuff(&(replicas[replica_num].vot_pipes[pipe_num])) == 0) {
     balanceReps(replicas, rep_count, voter_priority - VOTER_PRIO_OFFSET);

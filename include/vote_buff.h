@@ -16,8 +16,7 @@
 #include <stdlib.h>
 
 // Max number of bytes
-//#define MAX_PIPE_BUFF 4096
-#define MAX_VOTE_PIPE_BUFF 128 // TODO: just for testing. REMOVE!
+#define MAX_VOTE_PIPE_BUFF 4096
 // Why 10? No reason.
 #define PIPE_LIMIT 10
 
