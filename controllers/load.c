@@ -17,7 +17,7 @@
 
 struct typed_pipe pipes[PIPE_COUNT];
 int pipe_count = PIPE_COUNT;
-int read_in_index;
+int out_to_log;
 
 // TAS related
 int priority;
@@ -28,7 +28,7 @@ bool insertCFE = false;
 bool insertSDC = false; // Not used
 
 void setPipeIndexes(void) {
-  read_in_index = 0;
+  out_to_log = 0;
 }
 
 int parseArgs(int argc, const char **argv) {
@@ -40,7 +40,7 @@ int parseArgs(int argc, const char **argv) {
     pid_t pid = getpid();
     connectRecvFDS(pid, pipes, pipe_count, "Load");
   } else {
-    deserializePipe(argv[3], &pipes[read_in_index]);
+    deserializePipe(argv[3], &pipes[0]);
   }
 
   return 0;
@@ -105,7 +105,14 @@ void perCyclePedestrian(void) {
       //printf("%d %d %d %d %f\n", comp->rect.x, comp->rect.y, comp->rect.width, comp->rect.height, comp->classification.confidence);
     }
     // This should be a message to the logger.
-    printf("total : %d in time %dms\n", seq->rnum, elapsed_time);
+    struct comm_msg_buffer msg_buff;
+    msg_buff.length = asprintf(&(msg_buff.message), "Ped total: %d in time %dms\n", seq->rnum, elapsed_time);
+    printf("Load message buffer length: %d\n", msg_buff.length);
+    if (msg_buff.length <= 0) {
+      perror("Load component failed to create message buffer");
+    }
+    commSendMsgBuffer(&(pipes[out_to_log]), &msg_buff);
+    free(msg_buff.message);
     ccv_array_free(seq);
     ccv_matrix_free(image);
   }

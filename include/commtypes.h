@@ -25,12 +25,13 @@ typedef enum {
   MOV_CMD,
   RANGE_POSE_DATA,
   MAP_UPDATE,
-  COMM_ACK
+  COMM_ACK,
+  MSG_BUFFER,
 } comm_message_t;
 
 // Not happy with this, but clean. Order needs to be the same as above.
 // Used to serialize / deserialize the pipe type
-static const char* MESSAGE_T[] = {"COMM_ERROR", "WAY_REQ", "WAY_RES", "MOV_CMD", "RANGE_POSE_DATA", "MAP_UPDATE", "COMM_ACK"};
+static const char* MESSAGE_T[] = {"COMM_ERROR", "WAY_REQ", "WAY_RES", "MOV_CMD", "RANGE_POSE_DATA", "MAP_UPDATE", "COMM_ACK", "MSG_BUFFER"};
 
 #define INDEX_X 0
 #define INDEX_Y 1
@@ -75,6 +76,11 @@ struct comm_ack {
   long hash;
 };
 
+struct comm_msg_buffer {
+  int length;
+  char* message;
+};
+
 // Hack to check when parsing
 // Also need for deserialization
 comm_message_t commToEnum(char* name);
@@ -106,4 +112,8 @@ int commSendRanger(struct typed_pipe* pipe, double* ranger_data, double* pose_da
 void commCopyRanger(struct comm_range_pose_data* recv_msg, double* range_data, double* pose_data);
 
 int commSendAck(struct typed_pipe* pipe, long state_hash);
+
+int commSendMsgBuffer(struct typed_pipe* pipe, struct comm_msg_buffer* msg); // If I don't stipulate null terminated, these message can pass arbitrary buffers, which might be nice
+int commRecvMsgBuffer(struct typed_pipe* pipe, struct comm_msg_buffer* msg);
+
 #endif // _COMM_TYPES_H_

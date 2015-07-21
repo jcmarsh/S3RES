@@ -18,6 +18,8 @@ comm_message_t commToEnum(char* name) {
     return MAP_UPDATE;
   } else if (strcmp(name, "COMM_ACK") == 0) {
     return COMM_ACK;
+  } else if (strcmp(name, "MSG_BUFFER") == 0) {
+    return MSG_BUFFER;
   } else {
     return COMM_ERROR;
   }
@@ -315,4 +317,54 @@ void commCopyRanger(struct comm_range_pose_data* recv_msg, double* range_data, d
   }
 
   return;
+}
+
+int commSendMsgBuffer(struct typed_pipe* pipe, struct comm_msg_buffer* msg) {
+  if (pipe->fd_out == 0 || pipe->type != MSG_BUFFER) {
+    printf("commSendMsgBuffer Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
+    return 0;
+  }
+  
+  printf("Comm about to send buffer, length %d\n", msg->length);
+  int written = TEMP_FAILURE_RETRY(write(pipe->fd_out, msg, msg->length + sizeof(msg->length)));
+  if (written != msg->length + sizeof(msg->length)) { // TODO: more should check this
+    perror("Write for commSendMsgBuffer did not complete.\n");
+  }
+
+  return written;
+}
+
+int commRecvMsgBuffer(struct typed_pipe* pipe, struct comm_msg_buffer* msg) {
+  if (pipe->fd_in == 0 || pipe->type != MSG_BUFFER) {
+    printf("commRecvMsgBuffer Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_in);
+    return 0;
+  }
+
+  int read_ret = TEMP_FAILURE_RETRY(read(pipe->fd_in, &(msg->length), sizeof(msg->length)));
+  printf("Comm msg buffer length: %d\n", msg->length);
+  if (read_ret == sizeof(msg->length)) { // TODO: Read may still have been interrupted.
+    msg->message = (char*) malloc(sizeof(char) * msg->length);
+
+    if (msg->length > 0) {
+      read_ret = TEMP_FAILURE_RETRY(read(pipe->fd_in, msg->message, sizeof(char) * msg->length));
+      if (read_ret == msg->length) {
+        // All good
+        printf("Message received word: %c%c%c%c\n", msg->message[0], msg->message[1], msg->message[2], msg->message[3]);
+      } else if (read_ret > 0) {
+        printf("commRecvMsgBuffer read buffer count (%d) did not match expected size (%d)\n", read_ret, msg->length); 
+      } else if (read_ret < 0) {
+        perror("commRecvMsgBuffer read buffer problems");
+      } else {
+        perror("commRecvMsgBuffer inner read buffer == 0");
+      }   
+    }
+  } else if (read_ret > 0) {
+    printf("commRecvMsgBuffer read length did not match expected size: %d\n", read_ret); 
+  } else if (read_ret < 0) {
+    perror("commRecvMsgBuffer outer read buffer problems");
+  } else {
+    perror("commRecvMsgBuffer outer read buffer == 0");
+  }
+
+  return read_ret;
 }

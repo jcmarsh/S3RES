@@ -11,7 +11,7 @@
 
 #define GOAL_X      7.0
 #define GOAL_Y      7.0
-#define PIPE_COUNT  1
+#define PIPE_COUNT  5
 
 int pipe_count = PIPE_COUNT;
 
@@ -47,9 +47,19 @@ int parseArgs(int argc, const char **argv) {
   if (argc < 4) { // Must request fds
     // printf("Usage: Logger <priority> <pipe_num> <pipe_in>\n");
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, PIPE_COUNT, name);
+    connectRecvFDS(currentPID, pipes, 1, name); // TODO: lame. What about strings to print?
   } else {
     deserializePipe(argv[3], &pipes[data_index]);
+    int i;
+    pipe_count = 1;
+    for (i = 4; i < argc; i++) {
+      if (pipe_count >= PIPE_COUNT) {
+        printf("ERROR: Logger needs to raise pipe limit.\n");
+        return -1;
+      }
+      deserializePipe(argv[i], &pipes[pipe_count]);
+      pipe_count++;
+    }
   }
 
   return 0;
@@ -116,6 +126,11 @@ void enterLoop(void) {
     FD_ZERO(&select_set);
     FD_SET(pipes[data_index].fd_in, &select_set);
 
+    int i;
+    for (i = 1; i < pipe_count; i++) {
+      FD_SET(pipes[i].fd_in, &select_set);      
+    }
+
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
       if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
@@ -131,6 +146,25 @@ void enterLoop(void) {
         } else {
           perror("Logger read_ret == 0 on data_index");
         }
+      }
+      for (i = 1; i < pipe_count; i++) {
+        if (FD_ISSET(pipes[i].fd_in, &select_set)) {  
+          struct comm_msg_buffer msg;
+          commRecvMsgBuffer(&pipes[i], &msg);
+          printf("Logger received %d bytes\n\tMessage: ", msg.length);
+          printf("%c", msg.message[0]);
+          printf("%c", msg.message[1]);
+          printf("%c", msg.message[2]);
+          printf("%c", msg.message[3]);
+          printf("%c", msg.message[4]);
+          printf("%c\n", msg.message[5]);
+          for (i = 0; i < msg.length - sizeof(msg.length); i++) {
+            //printf("%c", msg.message[i]);
+          }
+          printf("\n");
+          //fprintf(log_file, "LOGGED MSG: %s", msg.message);
+          free(msg.message);
+        }   
       }
     }
   }
