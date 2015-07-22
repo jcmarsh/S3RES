@@ -190,9 +190,9 @@ bool checkSync(void) {
 
   // check each that for each pipe, each replica has the same number of votes
   for (p_index = 0; p_index < pipe_count; p_index++) {
-    int votes = replicas[0].vot_pipes[p_index].buff_index;
+    int votes = replicas[0].vot_pipes[p_index].buff_count;
     for (r_index = 1; r_index < rep_count; r_index++) {
-      if (votes != replicas[r_index].vot_pipes[p_index].buff_index) {
+      if (votes != replicas[r_index].vot_pipes[p_index].buff_count) {
         nsync = false;
       }
     }
@@ -228,7 +228,7 @@ void doOneUpdate(void) {
   FD_ZERO(&select_set);
   // Check external in pipes
   // Hmm... only if the controllers are ready for it?
-  bool check_inputs = true; //= checkSync(); //if (voter_priority < 5) { //  if (checkSync() || !timer_started) {
+  bool check_inputs = checkSync();
 
   if (check_inputs) {
     for (p_index = 0; p_index < pipe_count; p_index++) {
