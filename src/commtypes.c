@@ -319,14 +319,22 @@ void commCopyRanger(struct comm_range_pose_data* recv_msg, double* range_data, d
   return;
 }
 
+// TODO: Consider making this smarter so that the sender doesn't have to do as much work.
 int commSendMsgBuffer(struct typed_pipe* pipe, struct comm_msg_buffer* msg) {
   if (pipe->fd_out == 0 || pipe->type != MSG_BUFFER) {
     printf("commSendMsgBuffer Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
     return 0;
   }
   
-  printf("Comm about to send buffer, length %d\n", msg->length);
-  int written = TEMP_FAILURE_RETRY(write(pipe->fd_out, msg, msg->length + sizeof(msg->length)));
+  char *buffer = (char *) malloc(sizeof(int) + sizeof(char) * msg->length);
+  int i;
+  for (i = 0; i < (int) sizeof(int); i++) {
+    buffer[i] = ((char *)(&(msg->length)))[i];
+  }
+
+  memcpy(&(buffer[4]), msg->message, msg->length);
+
+  int written = TEMP_FAILURE_RETRY(write(pipe->fd_out, &(buffer[0]), msg->length + sizeof(msg->length)));
   if (written != msg->length + sizeof(msg->length)) { // TODO: more should check this
     perror("Write for commSendMsgBuffer did not complete.\n");
   }
@@ -341,7 +349,6 @@ int commRecvMsgBuffer(struct typed_pipe* pipe, struct comm_msg_buffer* msg) {
   }
 
   int read_ret = TEMP_FAILURE_RETRY(read(pipe->fd_in, &(msg->length), sizeof(msg->length)));
-  printf("Comm msg buffer length: %d\n", msg->length);
   if (read_ret == sizeof(msg->length)) { // TODO: Read may still have been interrupted.
     msg->message = (char*) malloc(sizeof(char) * msg->length);
 
@@ -349,7 +356,6 @@ int commRecvMsgBuffer(struct typed_pipe* pipe, struct comm_msg_buffer* msg) {
       read_ret = TEMP_FAILURE_RETRY(read(pipe->fd_in, msg->message, sizeof(char) * msg->length));
       if (read_ret == msg->length) {
         // All good
-        printf("Message received word: %c%c%c%c\n", msg->message[0], msg->message[1], msg->message[2], msg->message[3]);
       } else if (read_ret > 0) {
         printf("commRecvMsgBuffer read buffer count (%d) did not match expected size (%d)\n", read_ret, msg->length); 
       } else if (read_ret < 0) {

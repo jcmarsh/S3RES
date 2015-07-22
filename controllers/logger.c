@@ -151,18 +151,7 @@ void enterLoop(void) {
         if (FD_ISSET(pipes[i].fd_in, &select_set)) {  
           struct comm_msg_buffer msg;
           commRecvMsgBuffer(&pipes[i], &msg);
-          printf("Logger received %d bytes\n\tMessage: ", msg.length);
-          printf("%c", msg.message[0]);
-          printf("%c", msg.message[1]);
-          printf("%c", msg.message[2]);
-          printf("%c", msg.message[3]);
-          printf("%c", msg.message[4]);
-          printf("%c\n", msg.message[5]);
-          for (i = 0; i < msg.length - sizeof(msg.length); i++) {
-            //printf("%c", msg.message[i]);
-          }
-          printf("\n");
-          //fprintf(log_file, "LOGGED MSG: %s", msg.message);
+          fprintf(log_file, "LOGGED MSG: %s", msg.message);
           free(msg.message);
         }   
       }
