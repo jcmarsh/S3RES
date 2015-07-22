@@ -107,7 +107,6 @@ void perCyclePedestrian(void) {
     // This should be a message to the logger.
     struct comm_msg_buffer msg_buff;
     msg_buff.length = asprintf(&(msg_buff.message), "Ped total: %d in time %dms\n", seq->rnum, elapsed_time);
-    printf("Load message buffer length: %d\n", msg_buff.length);
     if (msg_buff.length <= 0) {
       perror("Load component failed to create message buffer");
     }
