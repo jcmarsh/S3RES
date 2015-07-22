@@ -1,15 +1,5 @@
 #include "vote_buff.h"
 
-printVoteBuff(struct vote_pipe *vp) {
-	printf("VOTE PIPE:\n");
-	printf("\tindex: %d\tcount: %d\n", vp->buff_index, vp->buff_count);
-	int i;
-	for (i = 0; i < MAX_VOTE_PIPE_BUFF; i++) {
-		printf("%c", vp->buffer[i]);
-	}
-	printf("\n");
-}
-
 writeTest(struct vote_pipe *vp, int fd, char* str, int len) {
 	if (write(fd, str, len) != len) {
 		printf("Write fail\n");

@@ -111,3 +111,23 @@ int compareBuffs(struct vote_pipe *pipeA, struct vote_pipe *pipeB, int n) {
     return memcmp(&(pipeA->buffer[0]), &(pipeB->buffer[0]), n - part_cmp);
   }
 }
+
+void printVoteBuff(struct vote_pipe *vp) {
+  printf("VOTE PIPE:\n");
+  printf("\tindex: %d\tcount: %d\nBuffer: ", vp->buff_index, vp->buff_count);
+  int i;
+  if (vp->buff_index + vp->buff_count < MAX_VOTE_PIPE_BUFF) {
+    // simple case just print
+    for (i = vp->buff_index; i < (vp->buff_index + vp->buff_count); i ++) {
+      printf("%2x ", vp->buffer[i]);
+    }
+  } else {
+    for (i = vp->buff_index; i < MAX_VOTE_PIPE_BUFF; i++) {
+      printf("%2x ", vp->buffer[i]);
+    }
+    for (i = 0; i < (vp->buff_count - (MAX_VOTE_PIPE_BUFF - vp->buff_index)); i++) {
+      printf("%2x ", vp->buffer[i]);
+    }
+  }
+  printf("\n");
+}
