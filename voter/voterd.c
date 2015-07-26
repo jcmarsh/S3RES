@@ -225,7 +225,6 @@ void doOneUpdate(void) {
   // See if any of the read pipes have anything
   FD_ZERO(&select_set);
   // Check external in pipes
-  // Hmm... only if the controllers are ready for it?
   bool check_inputs = checkSync();
 
   if (check_inputs) {
@@ -235,6 +234,10 @@ void doOneUpdate(void) {
         FD_SET(e_pipe_fd, &select_set);
       }
     }
+  } else if (voter_priority < 5 && ! timer_started) {
+    // non-RT controller is now lagging behind.
+    timer_started = true;
+    watchdog = generate_timestamp();
   }
 
   // Check pipes from replicas
@@ -256,11 +259,6 @@ void doOneUpdate(void) {
       int read_fd = ext_pipes[p_index].fd_in;
       if (read_fd != 0) {
         if (FD_ISSET(read_fd, &select_set)) {
-          if (voter_priority < 5 && !checkSync()) {
-            // non-RT controller is now lagging behind.
-            timer_started = true;
-            watchdog = generate_timestamp();
-          }
           ext_pipes[p_index].buff_count = TEMP_FAILURE_RETRY(read(read_fd, ext_pipes[p_index].buffer, MAX_VOTE_PIPE_BUFF));
           if (ext_pipes[p_index].buff_count > 0) { // TODO: read may still have been interrupted
             processData(&(ext_pipes[p_index]), p_index);
