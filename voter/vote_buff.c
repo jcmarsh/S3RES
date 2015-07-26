@@ -112,6 +112,20 @@ int compareBuffs(struct vote_pipe *pipeA, struct vote_pipe *pipeB, int n) {
   }
 }
 
+void copyBuff(struct vote_pipe *dest_pipe, struct vote_pipe *src_pipe) {
+  dest_pipe->buff_count = src_pipe->buff_count;
+  dest_pipe->buff_index = src_pipe->buff_index;
+
+  if (src_pipe->buff_index + src_pipe->buff_count < MAX_VOTE_PIPE_BUFF) {
+    // simple case
+    memcpy(&(dest_pipe->buffer[dest_pipe->buff_index]), &(src_pipe->buffer[src_pipe->buff_index]), src_pipe->buff_count);
+  } else {
+    int part_cpy = MAX_VOTE_PIPE_BUFF - src_pipe->buff_index;
+    memcpy(&(dest_pipe->buffer[dest_pipe->buff_index]), &(src_pipe->buffer[src_pipe->buff_index]), part_cpy);
+    memcpy(&(dest_pipe->buffer[0]), &(src_pipe->buffer[0]), src_pipe->buff_count - part_cpy);
+  }
+}
+
 void printVoteBuff(struct vote_pipe *vp) {
   printf("VOTE PIPE:\n");
   printf("\tindex: %d\tcount: %d\nBuffer: ", vp->buff_index, vp->buff_count);

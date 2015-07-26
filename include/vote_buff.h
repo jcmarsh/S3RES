@@ -51,6 +51,7 @@ int buffToPipe(struct vote_pipe* pipe, int fd_out, int n);
 void fakeToPipe(struct vote_pipe* pipe, int n); // Advances buffer, but no need to write
 
 int compareBuffs(struct vote_pipe *pipeA, struct vote_pipe *pipeB, int n);
+void copyBuff(struct vote_pipe *dest_pipe, struct vote_pipe *src_pipe);
 
 void printVoteBuff(struct vote_pipe *vp);
 #endif // _VOTE_BUFF_H_

@@ -23,12 +23,22 @@ readTest(struct vote_pipe *vp, int fds[2], int len) {
 	printf("Read back data: %s\n", buffer);
 }
 
+void myReset(struct vote_pipe *vp) {
+	vp->fd_in = 0;
+	vp->fd_out = 0;
+	vp->buff_count = 0;
+	vp->buff_index = 0;
+}
+
+// Needs to have MAX_VOTE_PIPE_BUFF set at somthing link 128 to test the edge cases)
 int main (int argc, char ** argv) {
 	struct vote_pipe pipeA;
 	int to_rep[2];
 	int from_rep[2];
 
-	resetVotePipe(&pipeA);
+	myReset(&pipeA);
+
+	printf("Some number: %d\n", MAX_VOTE_PIPE_BUFF);
 
 	int i;
 	for (i = 0; i < MAX_VOTE_PIPE_BUFF; i++) {
@@ -36,11 +46,11 @@ int main (int argc, char ** argv) {
 	}
 
 	if (pipe(to_rep) != 0) {
-		printf("Pipe Fail");
+		perror("Pipe Fail");
 		return -1;
 	}
 	if (pipe(from_rep) != 0) {
-		printf("Pipe Fail");
+		perror("Pipe Fail");
 		return -1;
 	}
 
@@ -87,8 +97,8 @@ int main (int argc, char ** argv) {
 	int to_repC[2];
 	int from_repC[2];
 
-	resetVotePipe(&pipeB);
-	resetVotePipe(&pipeC);
+	myReset(&pipeB);
+	myReset(&pipeC);
 
 	for (i = 0; i < MAX_VOTE_PIPE_BUFF; i++) {
 		pipeB.buffer[i] = '#';
@@ -96,19 +106,19 @@ int main (int argc, char ** argv) {
 	}
 
 	if (pipe(to_repB) != 0) {
-		printf("Pipe Fail");
+		perror("Pipe Fail");
 		return -1;
 	}
 	if (pipe(to_repC) != 0) {
-		printf("Pipe Fail");
+		perror("Pipe Fail");
 		return -1;
 	}
 	if (pipe(from_repB) != 0) {
-		printf("Pipe Fail");
+		perror("Pipe Fail");
 		return -1;
 	}
 	if (pipe(from_repC) != 0) {
-		printf("Pipe Fail");
+		perror("Pipe Fail");
 		return -1;
 	}
 
@@ -147,6 +157,63 @@ int main (int argc, char ** argv) {
 	writeTest(&pipeC, to_repC[1], "This is the same message", 24);
 
 	printf("Compare buffers (==-1): %d\n", compareBuffs(&pipeB, &pipeC, 24));
+
+	printf("Test copy\n");
+	struct vote_pipe pipeD;
+	int to_repD[2];
+	int from_repD[2];
+	struct vote_pipe pipeE;
+	int to_repE[2];
+	int from_repE[2];
+
+	myReset(&pipeD);
+	myReset(&pipeE);
+
+	for (i = 0; i < MAX_VOTE_PIPE_BUFF; i++) {
+		pipeD.buffer[i] = '#';
+		pipeE.buffer[i] = '#';
+	}
+
+	if (pipe(to_repD) != 0) {
+		perror("Pipe Fail");
+		return -1;
+	}
+	if (pipe(to_repE) != 0) {
+		perror("Pipe Fail");
+		return -1;
+	}
+	if (pipe(from_repD) != 0) {
+		perror("Pipe Fail");
+		return -1;
+	}
+	if (pipe(from_repE) != 0) {
+		perror("Pipe Fail");
+		return -1;
+	}
+
+	pipeD.fd_in = to_repD[0];
+	pipeE.fd_in = to_repE[0];
+
+	writeTest(&pipeD, to_repD[1], "This is the same message", 24);
+	copyBuff(&pipeE, &pipeD);
+
+	printf("Compare buffers (==0): %d\n", compareBuffs(&pipeD, &pipeE, 24));
+
+	readTest(&pipeD, from_repD, 24);
+	readTest(&pipeE, from_repE, 24);
+
+	writeTest(&pipeE, to_repE[1], "This is a long message to see how things are working out. Well I hope.", 70);
+	copyBuff(&pipeD, &pipeE);
+
+	printf("Compare buffers (==0): %d\n", compareBuffs(&pipeD, &pipeE, 70));
+
+	readTest(&pipeD, from_repD, 70);
+	readTest(&pipeE, from_repE, 70);
+
+	writeTest(&pipeD, to_repD[1], "This is a long message to see how things are working out. Well I hope.", 70);
+	copyBuff(&pipeE, &pipeD);
+
+	printf("Compare buffers (==0): %d\n", compareBuffs(&pipeD, &pipeE, 70));
 
 	return 0;
 }

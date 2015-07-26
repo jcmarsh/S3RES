@@ -51,8 +51,8 @@ void doOneUpdate(void);
 void processData(struct vote_pipe *pipe, int pipe_index);
 void resetVotingState(int pipe_num);
 void sendPipe(int pipe_num, int replica_num);
-void stealBuffers(int rep_num, char **buffer, int *buff_count);
-void returnBuffers(int rep_num, char **buffer, int *buff_count);
+void stealPipes(int rep_num, char **buffer, int *buff_count);
+void returnPipes(int rep_num, char **buffer, int *buff_count);
 void checkSDC(int pipe_num);
 void processFromRep(int replica_num, int pipe_num);
 void writeBuffer(int fd_out, char* buffer, int buff_count);
@@ -75,8 +75,8 @@ void restart_prep(int restartee, int restarter) {
   }
   int restarter_buff_count[PIPE_LIMIT] = {0};
 
-  // Steal the buffers from healthy reps. This stops them from processing mid restart
-  stealBuffers(restarter, restarter_buffer, restarter_buff_count);
+  // Steal the pipes from healthy reps. This stops them from processing mid restart (also need to copy data to new rep)
+  stealPipes(restarter, restarter_buffer, restarter_buff_count);
 
   // reset timer
   timer_started = false;
@@ -84,16 +84,14 @@ void restart_prep(int restartee, int restarter) {
 
   for (i = 0; i < replicas[restarter].pipe_count; i++) {
     if (replicas[restarter].vot_pipes[i].fd_in != 0) {
-      memcpy(replicas[restartee].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buffer, replicas[restarter].vot_pipes[i].buff_count);
-      replicas[restartee].vot_pipes[i].buff_count = replicas[restarter].vot_pipes[i].buff_count;
-      replicas[restartee].vot_pipes[i].buff_index = replicas[restarter].vot_pipes[i].buff_index;
+      copyBuff(&(replicas[restartee].vot_pipes[i]), &(replicas[restarter].vot_pipes[i]));
       sendPipe(i, restarter); // TODO: Need to check if available?
     }
   }
 
   // Give the buffers back
-  returnBuffers(restartee, restarter_buffer, restarter_buff_count);
-  returnBuffers(restarter, restarter_buffer, restarter_buff_count);
+  returnPipes(restartee, restarter_buffer, restarter_buff_count);
+  returnPipes(restarter, restarter_buffer, restarter_buff_count);
   // free the buffers
   for (i = 0; i < PIPE_LIMIT; i++) {
     free(restarter_buffer[i]);
@@ -111,7 +109,7 @@ void restart_prep(int restartee, int restarter) {
 void voterRestartHandler(void) {
   // Timer went off, so the timer_stop_index is the pipe which is awaiting a rep
   int p_index;
-  debug_print("Caught Exec / Control loop error\n");
+  debug_print("Caught Exec / Control loop error (%s)\n", controller_name);
 
   switch (rep_type) {
     case SMR: {
@@ -144,9 +142,9 @@ void voterRestartHandler(void) {
   }
 }
 
-// Steal the buffers from a single replica
+// Steal the pipe contents from a single replica
 // buff_count and buffer should already be alocated.
-void stealBuffers(int rep_num, char **buffer, int *buff_count) {
+void stealPipes(int rep_num, char **buffer, int *buff_count) {
   int i = 0;
 
   struct timeval select_timeout;
@@ -174,8 +172,8 @@ void stealBuffers(int rep_num, char **buffer, int *buff_count) {
   }  
 }
 
-// replace buffers in a replica. Does NOT free the buffer (so the same one can be copied again)
-void returnBuffers(int rep_num, char **buffer, int *buff_count) {  
+// replace pipe buffers in a replica. Does NOT free the buffer (so the same one can be copied again)
+void returnPipes(int rep_num, char **buffer, int *buff_count) {  
   int i = 0;
   for (i = 0; i < replicas[rep_num].pipe_count; i++) {
     if (buff_count[i] > 0) {
