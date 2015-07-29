@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_TYPED_PIPE_BUFF 4096 // This should be the limit on pipes... or something reasonable.
+#define MAX_TYPED_PIPE_BUFF 4096 // This should be the limit kernel on pipes... or something reasonable.
 
 comm_message_t commToEnum(char* name) {
   if (strcmp(name, "WAY_REQ") == 0) {

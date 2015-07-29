@@ -1,11 +1,6 @@
 // Test filter
 
-#include <time.h>
-
-#include "../include/taslimited.h"
-#include "../include/commtypes.h"
-#include "../include/replicas.h"
-#include "../include/fd_server.h"
+#include "test.h"
 
 struct replica rep;
 const char* controller_name = "Filter";
@@ -13,8 +8,6 @@ struct typed_pipe pipes[PIPE_LIMIT];
 
 // FD server
 struct server_data sd;
-
-timestamp_t last;
 
 int main(int argc, const char** argv) {
   // Setup fd server
@@ -49,19 +42,11 @@ int main(int argc, const char** argv) {
   		sim_range_data.ranges[i] = i * 1.5;
   	}
 
-    last = generate_timestamp();
-
   	write(rep.vot_pipes[0].fd_out, &sim_range_data, sizeof(struct comm_range_pose_data));
 
     // read filtered data
     read(rep.vot_pipes[1].fd_in, &sim_range_data, sizeof(sim_range_data));
-    // printf("Pose returned %f, %f\n", sim_range_data.pose[0], sim_range_data.pose[1]);
-
-    timestamp_t current = generate_timestamp();
-    // check against previous interrupt count
-
-    printf("%lld\n", current - last);
-
+    printf("Pose returned %f, %f\n", sim_range_data.pose[0], sim_range_data.pose[1]);
 
     usleep(100000);
   }

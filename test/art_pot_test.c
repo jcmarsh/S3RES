@@ -1,8 +1,6 @@
 // Test ArtPot
 
-#include "../include/commtypes.h"
-#include "../include/replicas.h"
-#include "../include/fd_server.h"
+#include "test.h"
 
 struct replica rep;
 const char* controller_name = "ArtPot";

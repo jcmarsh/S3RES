@@ -3,9 +3,7 @@
  * The just send dummy data to exercise the program so that Valgrind can catch errors.
  */
 
-#include "../include/commtypes.h"
-#include "../include/replicas.h"
-#include "../include/fd_server.h"
+#include "test.h"
 
 struct replica rep;
 const char* controller_name = "Mapper";
@@ -54,7 +52,7 @@ int main(int argc, const char** argv) {
   	write(rep.vot_pipes[0].fd_out, &sim_range_data, sizeof(struct comm_range_pose_data));
 
     // read the map update, should at least have the pose
-    char buffer[MAX_PIPE_BUFF];
+    char buffer[MAX_TYPED_PIPE_BUFF];
     read(rep.vot_pipes[1].fd_in, buffer, sizeof(buffer));
     printf("Pose returned %d, %d\n", ((int *)buffer)[0], ((int *)buffer)[1]);
 

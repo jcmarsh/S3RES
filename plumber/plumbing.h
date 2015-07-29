@@ -6,7 +6,6 @@
 
 #include <stdbool.h>
 #include "../include/commtypes.h"
-#include "../include/vote_buff.h"
 
 // Data structure for components that need to be initialized by the plumber
 struct node {
