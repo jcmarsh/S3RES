@@ -2,9 +2,8 @@
 
 #include "test.h"
 
-struct replica rep;
 const char* controller_name = "AStar";
-struct typed_pipe pipes[PIPE_LIMIT];
+struct typed_pipe t_pipes[PIPE_LIMIT];
 
 // FD server
 struct server_data sd;
@@ -15,26 +14,29 @@ int main(int argc, const char** argv) {
 
   // Setup pipe type and direction
   // Map Update data in
-  pipes[0].type = MAP_UPDATE;
+  pipes[0].rep_info = (char *) MESSAGE_T[MAP_UPDATE];
   pipes[0].fd_in = 42;
   pipes[0].fd_out = 0;
   // ack out
-  pipes[1].type = COMM_ACK;
+  pipes[1].rep_info = (char *) MESSAGE_T[COMM_ACK];
   pipes[1].fd_in = 0;
   pipes[1].fd_out = 42;
   // waypoint request in
-  pipes[2].type = WAY_REQ;
+  pipes[2].rep_info = (char *) MESSAGE_T[WAY_REQ];
   pipes[2].fd_in = 42;
   pipes[2].fd_out = 0;
   // waypoint resopnse out
-  pipes[3].type = WAY_RES;
+  pipes[3].rep_info = (char *) MESSAGE_T[WAY_RES];
   pipes[3].fd_in = 0;
   pipes[3].fd_out = 42;
+
 
   initReplicas(&rep, 1, controller_name, 10);
   createPipes(&rep, 1, pipes, 4);
   // send new pipe through fd server (should have a request)
   acceptSendFDS(&sd, &(rep.pid), rep.rep_pipes, rep.pipe_count);
+
+  convertVoteToTyped(rep.vot_pipes, 4, t_pipes);
 
   // Should be connected now.
 
@@ -56,7 +58,7 @@ int main(int argc, const char** argv) {
   	}
   	map_update.obs_x = obs_x;
   	map_update.obs_y = obs_y;
-  	commSendMapUpdate(rep.vot_pipes[0], &map_update);
+  	commSendMapUpdate(&(t_pipes[0]), &map_update);
 
   	// Get ack
   	struct comm_ack ack;
@@ -64,7 +66,7 @@ int main(int argc, const char** argv) {
     printf("AStar acked\n");
 
   	// send waypoint request
-  	commSendWaypointRequest(rep.vot_pipes[2]);
+  	commSendWaypointRequest(&(t_pipes[2]));
 
   	// get waypoint response
   	struct comm_way_res way_res;

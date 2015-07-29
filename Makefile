@@ -6,7 +6,7 @@ regular: libs
 	make -C ./stage_control
 	make -C ./plumber
 	make -C ./fault_injection
-#	make -C ./test
+	make -C ./test
 
 libs:
 	make -C ./tas_lib

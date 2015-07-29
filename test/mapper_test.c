@@ -5,9 +5,7 @@
 
 #include "test.h"
 
-struct replica rep;
 const char* controller_name = "Mapper";
-struct typed_pipe pipes[PIPE_LIMIT];
 
 // FD server
 struct server_data sd;
@@ -18,15 +16,15 @@ int main(int argc, const char** argv) {
 
   // Setup pipe type and direction
   // Ranger data in
-  pipes[0].type = RANGE_POSE_DATA;
+  pipes[0].rep_info = (char *) MESSAGE_T[RANGE_POSE_DATA];
   pipes[0].fd_in = 42;
   pipes[0].fd_out = 0;
   // map updates out
-  pipes[1].type = MAP_UPDATE;
+  pipes[1].rep_info = (char *) MESSAGE_T[MAP_UPDATE];
   pipes[1].fd_in = 0;
   pipes[1].fd_out = 42;
   // Comm acks in
-  pipes[2].type = COMM_ACK;
+  pipes[2].rep_info = (char *) MESSAGE_T[COMM_ACK];
   pipes[2].fd_in = 42;
   pipes[2].fd_out = 0;
 
