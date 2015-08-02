@@ -6,6 +6,9 @@ all: Controllers MapperTest FilterTest ArtPotTest AStarTest EmptyTest
 %.o: %.c
 	gcc -c -o $@ $< $(INC)
 
+Micro:
+	make -C ./micro_test
+
 Controllers:
 	make -C ../controllers
 
@@ -30,6 +33,7 @@ EmptyTest: empty_test.o $(SRC)
 	cp ../controllers/Empty ./
 
 clean:
+	make -C ./micro_test clean
 	rm -f *.o
 	rm -rf MapperTest
 	rm -rf MapperTest_fd_server
