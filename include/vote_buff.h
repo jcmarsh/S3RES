@@ -36,7 +36,7 @@ struct vote_pipe {
 	bool timed; // timers start on input timed pipe reads, reset on output timed pipe writes
 	int buff_count;
 	int buff_index;
-	char buffer[MAX_VOTE_PIPE_BUFF];
+	unsigned char buffer[MAX_VOTE_PIPE_BUFF];
 };
 
 replication_t reptypeToEnum(char* type);

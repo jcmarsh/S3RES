@@ -133,14 +133,14 @@ void printVoteBuff(struct vote_pipe *vp) {
   if (vp->buff_index + vp->buff_count < MAX_VOTE_PIPE_BUFF) {
     // simple case just print
     for (i = vp->buff_index; i < (vp->buff_index + vp->buff_count); i ++) {
-      printf("%2x ", vp->buffer[i]);
+      printf("%2x ", (unsigned)vp->buffer[i]);
     }
   } else {
     for (i = vp->buff_index; i < MAX_VOTE_PIPE_BUFF; i++) {
-      printf("%2x ", vp->buffer[i]);
+      printf("%2x ", (unsigned)vp->buffer[i]);
     }
     for (i = 0; i < (vp->buff_count - (MAX_VOTE_PIPE_BUFF - vp->buff_index)); i++) {
-      printf("%2x ", vp->buffer[i]);
+      printf("%2x ", (unsigned)vp->buffer[i]);
     }
   }
   printf("\n");

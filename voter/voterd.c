@@ -367,7 +367,7 @@ void checkSDC(int pipe_num) {
       // Send the solution that at least two agree on
       // TODO: What if buff_count is off?
       for (r_index = 0; r_index < rep_count; r_index++) {
-        if (compareBuffs(&(replicas[r_index].vot_pipes[pipe_num]), &(replicas[(r_index + 1)].vot_pipes[pipe_num]), bytes_avail) == 0) {
+        if (compareBuffs(&(replicas[r_index].vot_pipes[pipe_num]), &(replicas[(r_index + 1) % rep_count].vot_pipes[pipe_num]), bytes_avail) == 0) {
           // If the third doesn't agree, it should be restarted.
           if (compareBuffs(&(replicas[r_index].vot_pipes[pipe_num]), &(replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num]), bytes_avail) != 0) {  
             int restartee = (r_index + 2) % rep_count;
