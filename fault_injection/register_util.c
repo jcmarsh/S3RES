@@ -15,7 +15,7 @@
 #include "print_registers.h"
 
 // Modify the register structure to have one (not quite? uniformily distributed) bit flip.
-void injectRegError(pid_t pid) //struct user_regs_struct * regs)
+int injectRegError(pid_t pid) //struct user_regs_struct * regs)
 {
   struct user_regs_struct copy_regs;
   // Create a new bitmask with 1 bit set true... xor 
@@ -27,8 +27,8 @@ void injectRegError(pid_t pid) //struct user_regs_struct * regs)
   int bit_pick = 0;
 
   if (ptrace(PTRACE_GETREGS, pid, NULL, &copy_regs) < 0) {
-    perror("GETREGS error.");
-    return;
+    perror("GETREGS error");
+    return -1;
   }
 
   byte_num =  __WORDSIZE / 8;
@@ -70,6 +70,8 @@ void injectRegError(pid_t pid) //struct user_regs_struct * regs)
     printf("SETREGS error for reg %d, bit %d\n", reg_pick, bit_pick);
     perror("SETREGS error:");
   }
+
+  return 0;
 }
 
 void main(int argc, char** argv) {
@@ -91,7 +93,9 @@ void main(int argc, char** argv) {
   }
   waitpid(attack_pid);
   
-  injectRegError(attack_pid);
+  if (injectRegError(attack_pid) != 0) {
+    return;
+  }
   
   if (ptrace(PTRACE_CONT, attack_pid, NULL, NULL) < 0) {
     perror("Failed to resume");

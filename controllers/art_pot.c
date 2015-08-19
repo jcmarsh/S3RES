@@ -6,17 +6,29 @@
  */
 
 #include "controller.h"
+#include "./inc/mapping.h"
 #include <math.h>
 
 // Configuration parameters
-#define VEL_SCALE 2
-#define DIST_EPSILON .6
-#define GOAL_RADIUS 0
-#define GOAL_EXTENT .5
-#define GOAL_SCALE 1
-#define OBST_RADIUS .3
-#define OBST_EXTENT .5
-#define OBST_SCALE 1
+#if GRID_NUM==96
+  #define VEL_SCALE 2
+  #define DIST_EPSILON .4
+  #define GOAL_RADIUS 0
+  #define GOAL_EXTENT .3
+  #define GOAL_SCALE 1
+  #define OBST_RADIUS .2
+  #define OBST_EXTENT .5
+  #define OBST_SCALE 1
+#else // GRID_NUM==80
+  #define VEL_SCALE 2
+  #define DIST_EPSILON .6
+  #define GOAL_RADIUS 0
+  #define GOAL_EXTENT .5
+  #define GOAL_SCALE 1
+  #define OBST_RADIUS .3
+  #define OBST_EXTENT .5
+  #define OBST_SCALE 1
+#endif
 
 #define PIPE_COUNT 4
 

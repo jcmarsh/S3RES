@@ -128,12 +128,13 @@ void voterRestartHandler(void) {
 
       break;
     }
-    case DMR: {
+    case DMR: { // Intentional fall-through to TMR
     }
     case TMR: {
       // The failed rep should be the one behind on the timer pipe
       int restartee = behindRep(replicas, rep_count, timer_stop_index);
       int restarter = (restartee + (rep_count - 1)) % rep_count;
+      debug_print("\tPID: %d\n", replicas[restartee].pid);
       restart_prep(restartee, restarter);
       break;
     }
@@ -355,7 +356,6 @@ void checkSDC(int pipe_num) {
       sendPipe(pipe_num, 0);
       return;
     case DMR:
-      printf("Check SDC. bytes_avail: %d\n", bytes_avail);
       // Can detect, and check what to do
       if (compareBuffs(&(replicas[0].vot_pipes[pipe_num]), &(replicas[1].vot_pipes[pipe_num]), bytes_avail) != 0) {
         printf("Voting disagreement: caught SDC in DMR but can't do anything about it.\n");
@@ -372,7 +372,7 @@ void checkSDC(int pipe_num) {
           if (compareBuffs(&(replicas[r_index].vot_pipes[pipe_num]), &(replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num]), bytes_avail) != 0) {  
             int restartee = (r_index + 2) % rep_count;
             
-            debug_print("Caught SDC: %s\n", controller_name);
+            debug_print("Caught SDC: %s : %d\n", controller_name, replicas[restartee].pid);
 
             restart_prep(restartee, r_index);
           } else {
