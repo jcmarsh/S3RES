@@ -94,6 +94,8 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
+  sleep(1);
+
   enterLoop();
 
   return 0;

@@ -143,16 +143,6 @@ int TranslatorDriver::MainSetup() {
   pose[INDEX_Y] = -7.0;
   pose[INDEX_A] = 0.0;
 
-  // Initialize the position device we are reading from
-  if (this->SetupOdom() != 0) {
-    return -1;
-  }
-
-  // Initialize the ranger
-  if (this->ranger_addr.interf && this->SetupRanger() != 0) {
-    return -1;
-  }
-
   struct replica* r_p = (struct replica *) &rep;
   initReplicas(r_p, 1, "BenchMarker", 98);
 
@@ -182,6 +172,18 @@ int TranslatorDriver::MainSetup() {
   fcntl(rep.vot_pipes[1].fd_in, F_SETFL, flags | O_NONBLOCK);
 
   puts("Translator driver ready");
+
+  // Initialize the position device we are reading from
+  if (this->SetupOdom() != 0) {
+    return -1;
+  }
+
+  // Initialize the ranger
+  if (this->ranger_addr.interf && this->SetupRanger() != 0) {
+    return -1;
+  }
+
+  sleep(1);
 
   return(0);
 }

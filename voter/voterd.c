@@ -25,7 +25,7 @@
 long voting_timeout;
 int timer_start_index;
 int timer_stop_index;
-bool timer_started;
+bool timer_started = false;
 timestamp_t watchdog;
 
 // Replica related data
@@ -218,7 +218,7 @@ void doOneUpdate(void) {
       select_timeout.tv_sec = 0;
       select_timeout.tv_usec = remaining / 1000;
     } else {
-      // printf("Restart handler called, %ld late\n", remaining);
+      // printf("Restart handler called, %s is %ld late\n", controller_name, remaining);
       voterRestartHandler();
     }
   }
@@ -307,6 +307,7 @@ void writeBuffer(int fd_out, char* buffer, int buff_count) {
 // Process data
 void processData(struct vote_pipe *pipe, int pipe_index) {
   int r_index;
+
   if (pipe_index == timer_start_index) {
     if (!timer_started) {
       timer_started = true;
@@ -497,6 +498,8 @@ int main(int argc, const char **argv) {
     puts("ERROR: failure in setup function.");
     return -1;
   }
+
+  sleep(1);
 
   while(1) {
     doOneUpdate();
