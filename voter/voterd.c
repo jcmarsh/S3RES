@@ -84,7 +84,7 @@ void restart_prep(int restartee, int restarter) {
 
   for (i = 0; i < replicas[restarter].pipe_count; i++) {
     if (replicas[restarter].vot_pipes[i].fd_in != 0) {
-      copyBuff(&(replicas[restartee].vot_pipes[i]), &(replicas[restarter].vot_pipes[i]));
+      copyPipe(&(replicas[restartee].vot_pipes[i]), &(replicas[restarter].vot_pipes[i]));
       sendPipe(i, restarter); // TODO: Need to check if available?
     }
   }
@@ -374,7 +374,28 @@ void checkSDC(int pipe_num) {
             int restartee = (r_index + 2) % rep_count;
             
             debug_print("Caught SDC: %s : %d\n", controller_name, replicas[restartee].pid);
+            if (DEBUG_PRINT) {
+              // print all three or just two?
 
+              // Create typed pipes for meta data
+              struct typed_pipe print_pipesA[pipe_count];
+              struct typed_pipe print_pipesB[pipe_count];
+              convertVoteToTyped(replicas[r_index].vot_pipes, pipe_count, print_pipesA);
+              convertVoteToTyped(replicas[(r_index + 2) % rep_count].vot_pipes, pipe_count, print_pipesB);
+              
+              // Copy the buffer over
+              char *buffer_A = (char *)malloc(sizeof(char) * MAX_VOTE_PIPE_BUFF);
+              char *buffer_B = (char *)malloc(sizeof(char) * MAX_VOTE_PIPE_BUFF);
+              copyBuffer(&(replicas[r_index].vot_pipes[pipe_num]), buffer_A, bytes_avail);
+              copyBuffer(&(replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num]), buffer_B, bytes_avail);
+
+              // print them out.
+              printBuffer(&(print_pipesA[pipe_num]), buffer_A, bytes_avail);
+              printBuffer(&(print_pipesB[pipe_num]), buffer_B, bytes_avail);
+
+              free(buffer_A);
+              free(buffer_B);
+            }
             restart_prep(restartee, r_index);
           } else {
             // If all agree, send and be happy. Otherwise the send is done as part of the restart process

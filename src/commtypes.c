@@ -82,12 +82,9 @@ void convertVoteToTyped(struct vote_pipe ext_pipes[], int pipe_count, struct typ
   }
 }
 
-/*
-void printBuffer(struct typed_pipe* pipe) {
-  printf("Print Buffer type %s, buff_count %d\n", MESSAGE_T[pipe->type], pipe->buff_count);
-  #ifdef DEBUG_MESSAGING
-    printf("\tSend count: %d\tRecv count: %d\n", pipe->count_send, pipe->count_recv);
-  #endif //DEBUG_MESSAGING
+void printBuffer(struct typed_pipe* pipe, char *buffer, int buff_count) {
+  printf("Print Buffer type %s, buff_count %d\n", MESSAGE_T[pipe->type], buff_count);
+
   int i;
   switch (pipe->type) {
     case COMM_ERROR:
@@ -97,16 +94,16 @@ void printBuffer(struct typed_pipe* pipe) {
       printf("\tNo data.\n");
       break;
     case WAY_RES: ;
-      struct comm_way_res *way_res = (struct comm_way_res *) pipe->buffer;
+      struct comm_way_res *way_res = (struct comm_way_res *) buffer;
       printf("\tpoint (%f, %f) - %f\n", way_res->point[0], way_res->point[1], way_res->point[2]);
       printf("\tn_point (%f, %f) - %f\n", way_res->n_point[0], way_res->n_point[1], way_res->n_point[2]);
       break;
     case MOV_CMD: ;
-      struct comm_mov_cmd *mov_cmd = (struct comm_mov_cmd *) pipe->buffer;
+      struct comm_mov_cmd *mov_cmd = (struct comm_mov_cmd *) buffer;
       printf("\tvel_cmd (%f, %f)\n", mov_cmd->vel_cmd[0], mov_cmd->vel_cmd[1]);
       break;
     case RANGE_POSE_DATA: ;
-      struct comm_range_pose_data *rp_data = (struct comm_range_pose_data *) pipe->buffer;
+      struct comm_range_pose_data *rp_data = (struct comm_range_pose_data *) buffer;
       for (i = 0; i < RANGER_COUNT; i = i + 4) {
         printf("\tRange reading: %f %f %f %f\n", rp_data->ranges[i], rp_data->ranges[i+1], rp_data->ranges[i+2], rp_data->ranges[i+3]);
       }
@@ -114,17 +111,24 @@ void printBuffer(struct typed_pipe* pipe) {
       break;
     case MAP_UPDATE: ;
       int header_ints = 3; // pose x, pose y, and obstacle count
-      struct comm_map_update *map_update = (struct comm_map_update *) pipe->buffer;
+      struct comm_map_update *map_update = (struct comm_map_update *) buffer;
       printf("\tpose: (%d, %d)\t Obs count: %d\n", map_update->pose_x, map_update->pose_y, map_update->obs_count);
       for (i = 0; i < map_update->obs_count; i++) {
-        printf("\tObs: (%d, %d)\n", pipe->buffer[header_ints + (i *2)], pipe->buffer[header_ints + (i *2 + 1)]);//map_update->obs_x[i], map_update->obs_y[i]);
+        printf("\tObs: (%d, %d)\n", buffer[header_ints + (i *2)], buffer[header_ints + (i *2 + 1)]);//map_update->obs_x[i], map_update->obs_y[i]);
       }
       break;
-    case COMM_ACK:
-      printf("\tNo data.\n");
+    case COMM_ACK: ;
+      struct comm_ack *ack = (struct comm_ack *) buffer;
+      printf("\tHash: %08lx\n", ack->hash);
+      break;
+    case MSG_BUFFER:
+      printf("\tNot implemented.\n");
+      break;
+    default:
+      printf("\tUnknown type.\n");
       break;
   }
-} */
+}
 
 int commSendWaypoints(struct typed_pipe* pipe, 
                       double way_x, double way_y, double way_a,

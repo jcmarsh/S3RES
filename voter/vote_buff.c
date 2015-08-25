@@ -61,6 +61,17 @@ int pipeToBuff(struct vote_pipe* pipe) {
   return 0;
 }
 
+// Used for testing. Buffer should be allocated to MAX_VOTE_PIPE_BUFF by caller.
+void copyBuffer(struct vote_pipe* pipe, char *buffer, int n) {
+  if (pipe->buff_index + n < MAX_VOTE_PIPE_BUFF) { // simple case: just write
+    memcpy(buffer, &(pipe->buffer[pipe->buff_index]), n);
+  } else {
+    int part_write = MAX_VOTE_PIPE_BUFF - pipe->buff_index;
+    memcpy(&(buffer[0]), &(pipe->buffer[pipe->buff_index]), part_write);
+    memcpy(&(buffer[part_write]), &(pipe->buffer[0]), n - part_write);
+  }
+}
+
 // write n bytes
 int buffToPipe(struct vote_pipe* pipe, int fd_out, int n) {
   // Just needs to write out the data! But may need two writes...
@@ -112,7 +123,7 @@ int compareBuffs(struct vote_pipe *pipeA, struct vote_pipe *pipeB, int n) {
   }
 }
 
-void copyBuff(struct vote_pipe *dest_pipe, struct vote_pipe *src_pipe) {
+void copyPipe(struct vote_pipe *dest_pipe, struct vote_pipe *src_pipe) {
   dest_pipe->buff_count = src_pipe->buff_count;
   dest_pipe->buff_index = src_pipe->buff_index;
 

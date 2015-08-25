@@ -128,7 +128,7 @@ int main (int argc, char ** argv) {
 
   for (i = 0; i < 2 * MAX_VOTE_PIPE_BUFF; i++) {
     writeTest(&pipeD, to_repD[1], "ABCDEFG", 7);
-    copyBuff(&pipeE, &pipeD);
+    copyPipe(&pipeE, &pipeD);
 
     if (compareBuffs(&pipeD, &pipeE, 7) != 0) {
       printf("Compare buffs failed\n");
