@@ -159,8 +159,7 @@ void enterLoop(void) {
   }
 }
 
-// Create a log file... could use date / time in log name
-// something like "11_3_8:15am_log.txt". Seems better than log_00.txt
+// Create a log file
 int openFile(void) {
   time_t t = time(NULL);
   struct tm tm = *localtime(&t);
