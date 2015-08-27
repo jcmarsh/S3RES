@@ -3,16 +3,16 @@ PINT
 
 Problem Injection Named Thoughtfully
 
-This is likely a temporary repo (thus the terrible name). Meant to simulate Single Event Upsets, and protect againts them using triple redundancy.
+This is likely a temporary repo (thus the terrible name). Meant to simulate Single Event Upsets, and protect against them using triple redundancy.
 
-## Directorie / Contents
+## Directory / Contents
 * `./controllers/` - Components in a robotic control system. Each runs as a process, and communication is done through pipes
   * `art_pot.c` - Uses the artificial potential method to generate control commands for local navigation.
   * `a_star.c` - An A* implementation for path planning.
   * `benchmarker.c` - The entry and exit point for the system; sits between the player translator driver and the control system. Also launches Plumber to set up the rest of the system.
-  * `empty.c` - Simpliest component: sends back the same move command with every input.
-  * `filter.c` - Perhaps should rename spliter: just repeats position and range data to multiple other components. Originally used a sliding window to average range readings, but this wasn't found to be very useful. May be useful if noise is introduced.
-  * `logger.c` - Not intened for replication: used for measuring robot's task performance. Records the location readings of the robot in a text file (named based on date/time).
+  * `empty.c` - Simplest component: sends back the same move command with every input.
+  * `filter.c` - Perhaps should rename splitter: just repeats position and range data to multiple other components. Originally used a sliding window to average range readings, but this wasn't found to be very useful. May be useful if noise is introduced.
+  * `logger.c` - Not intended for replication: used for measuring robot's task performance. Records the location readings of the robot in a text file (named based on date/time).
   * `mapper.c` - Creates a 2d map of the environment from range readings. Has a configurable threshold (x readings before considered an obstacle) and granularity setting (shared with AStar... check mapping.h).
   * `./configs/` - Descriptions of possible control systems
     * `all.cfg` - Every component, with no redundancy
@@ -30,8 +30,6 @@ This is likely a temporary repo (thus the terrible name). Meant to simulate Sing
   * `injector.py` - Python script for selecting a process to inject an error into via supplied list of names, and then executing the specified command on that process' pid (such as 'kill -9')
   * `print_registers.h` - Useful macro for printing a `user_regs_struct`
   * `register_util.c` - Used to inject a random bit-flip into the given pid using ptrace to snoop registers.
-* `./voter/` -
-  * `voterd.c` -
 * `./include/` - See comments for `/src/`
   * `bench_config.h` - Defines that select what timing is done
   * `commtypes.h` - Data types based between components
@@ -44,9 +42,9 @@ This is likely a temporary repo (thus the terrible name). Meant to simulate Sing
   * `replicas.h` -
   * `taslimited.h` -
   * `time.h` -
-* `./player_translator_driver/` - Connects to the player instance running the simulator on a different machine. It translate between player and pipes. Launches and then connects to Benchmaker.
+* `./player_translator_driver/` - Connects to the player instance running the simulator on a different machine. It translate between player and pipes. Launches and then connects to Benchmarker.
   * `baseline.cfg` - example player config
-  * `translator_driver.cc` - The Player plugin-able driver.
+  * `translator_driver.cc` - The Player plugin driver.
 * `./plumber/` - Need a way to describe a graph of components, and then initiate the system. Plumber does that.
   * `pb.l` and `pb.y` - The Flex and Bison files describing the custom language used. See `/controllers/configs/` for examples.
   * `plumbing.c` -
@@ -66,7 +64,7 @@ This is likely a temporary repo (thus the terrible name). Meant to simulate Sing
 
 ## Compiling and Running
 
-Currently dependant on Player / Stage. 
+Currently dependent on Player / Stage. 
 
 ## libccv needed for Load component.
 
