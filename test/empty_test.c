@@ -2,16 +2,16 @@
 
 #include "test.h"
 
-//const char* controller_name = "Empty";
-const char* controller_name = "VoterD";
+const char* controller_name = "Empty";
+//const char* controller_name = "VoterD";
 
 // FD server
 struct server_data sd;
 
 int main(int argc, const char** argv) {
   // Setup fd server
-  //createFDS(&sd, controller_name);
-  createFDS(&sd, "EmptyTest");
+  createFDS(&sd, controller_name);
+  //createFDS(&sd, "EmptyTest");
 
   // Setup pipe type and direction
   // Ranger data in

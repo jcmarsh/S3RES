@@ -23,3 +23,17 @@
 
 # Build directory
 build/
+
+# The Empty controllers of different sizes
+Empty_01092
+Empty_02048
+Empty_03072
+Empty_04096
+Empty_06144
+Empty_08192
+Empty_12288
+Empty_16384
+Empty_24576
+Empty_32768
+Empty_49152
+Empty_65536
