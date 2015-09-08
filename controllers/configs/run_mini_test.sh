@@ -284,7 +284,7 @@ for index in `seq 0 $ITARS`; do
 	sleep 5
 	timeout $BASIC_TIME $PINT_DIR/stage_control/basic $SIM_IP &
 	sleep 5
-	ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm > sdc_test_tri_injector_$index.txt
+	ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm > sdc_test_tri_injector_wl_$index.txt
 	timeout $ANOTHER_TIME python injector.py "/bin/kill -s SIGRTMIN+2" >> sdc_test_tri_injector_wl_$index.txt &
 	sleep $ANOTHER_TIME
 	ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm >> sdc_test_tri_injector_wl_$index.txt
