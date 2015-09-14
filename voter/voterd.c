@@ -100,7 +100,7 @@ void restart_prep(int restartee, int restarter) {
 
   #ifdef TIME_RESTART_REPLICA
     timestamp_t end_restart = generate_timestamp();
-    debug_print("Restart time elapsed (%lld)\n", end_restart - start_restart);
+    printf("Restart time elapsed (%lld)\n", end_restart - start_restart);
   #endif // TIME_RESTART_REPLICA
 
   return;

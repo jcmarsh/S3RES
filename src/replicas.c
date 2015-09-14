@@ -3,6 +3,10 @@
 #include <string.h>
 #include <stdlib.h>
 
+#ifdef TIME_RESTART_SIGNAL
+#include "../tas_lib/inc/tas_time.h"
+#endif // TIME_RESTART_SIGNAL
+
 #define ARGV_REQ 3 // Every controller has it's own name, followed by priority and pipe_num, then all the pipes
 
 void initReplicas(struct replica reps[], int rep_num, const char* name, int priority) {  
