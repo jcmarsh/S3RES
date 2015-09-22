@@ -487,7 +487,7 @@ int parseArgs(int argc, const char **argv) {
     voting_timeout = PERIOD_NSEC;
   }
 
-  if (argc <= required_args) { 
+  if (argc < required_args) { 
     puts("Usage: VoterD <controller_name> <rep_type> <timeout> <priority> <fd_in:fd_out:time> <...>");
     return -1;
   } else {
