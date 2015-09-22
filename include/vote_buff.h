@@ -21,9 +21,9 @@
 #define PIPE_LIMIT 10
 
 // Here more for convenience
-typedef enum {NONE, SMR, DMR, TMR, REP_TYPE_ERROR} replication_t;
+typedef enum {NONE, RSMR, SMR, DMR, TMR, REP_TYPE_ERROR} replication_t;
 
-static const char* REP_TYPE_T[] = {"NONE", "SMR", "DMR", "TMR", "REP_TYPE_ERROR"};
+static const char* REP_TYPE_T[] = {"NONE", "RSMR", "SMR", "DMR", "TMR", "REP_TYPE_ERROR"};
 
 struct vote_pipe {
 	char *rep_info; // extra string passed on to the replica. For example, the pipe's type
@@ -40,6 +40,7 @@ struct vote_pipe {
 };
 
 replication_t reptypeToEnum(char* type);
+int reptypeToCount(replication_t type);
 
 void resetVotePipe(struct vote_pipe* pipe);
 

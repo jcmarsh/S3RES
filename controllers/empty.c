@@ -99,7 +99,7 @@ int main(int argc, const char **argv) {
   // filler = malloc(sizeof(char) * 1024 * 952 + (sizeof(char) * (6144 + 16384) * 1024)); // for 24576
   // filler = malloc(sizeof(char) * 1024 * 952 + (sizeof(char) * (6144 + 24576) * 1024)); // for 32768
   // filler = malloc(sizeof(char) * 1024 * 952 + (sizeof(char) * (6144 + 24576 + 16384) * 1024)); // for 49152
-  filler = malloc(sizeof(char) * 1024 * 952 + (sizeof(char) * (6144 + 24576 + 32768) * 1024)); // for 65536
+  // filler = malloc(sizeof(char) * 1024 * 952 + (sizeof(char) * (6144 + 24576 + 32768) * 1024)); // for 65536
 
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");

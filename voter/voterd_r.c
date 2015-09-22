@@ -20,7 +20,7 @@
  
 #define REP_MAX 3
 #define PERIOD_NSEC 120000 // Max time for voting in nanoseconds (120 micro seconds)
-#define VOTER_PRIO_OFFSET 5 // Replicas run with a -5 offset
+#define VOTER_PRIO_OFFSET 10 // Replicas run with a -5 offset
 
 long voting_timeout;
 int timer_start_index;
@@ -33,7 +33,6 @@ struct replica replicas[REP_MAX];
 
 // TAS Stuff
 int voter_priority;
-int replica_priority;
 
 // FD server
 struct server_data sd;
@@ -81,7 +80,7 @@ void restart_prep(int restartee, int restarter) {
 
   // reset timer
   timer_started = false;
-  restartReplica(replicas, rep_count, &sd, ext_pipes, restarter, restartee, replica_priority);
+  restartReplica(replicas, rep_count, &sd, ext_pipes, restarter, restartee, voter_priority - VOTER_PRIO_OFFSET);
 
   for (i = 0; i < replicas[restarter].pipe_count; i++) {
     if (replicas[restarter].vot_pipes[i].fd_in != 0) {
@@ -113,11 +112,27 @@ void voterRestartHandler(void) {
   debug_print("Caught Exec / Control loop error (%s)\n", controller_name);
 
   switch (rep_type) {
+    case RSMR: {
+      // Need to cold restart the replica
+      cleanupReplica(replicas, 0);
+
+      startReplicas(replicas, rep_count, &sd, controller_name, ext_pipes, pipe_count, voter_priority - VOTER_PRIO_OFFSET);
+      
+      // Resend last data
+      for (p_index = 0; p_index < pipe_count; p_index++) {
+        int read_fd = ext_pipes[p_index].fd_in;
+        if (read_fd != 0) {
+          processData(&(ext_pipes[p_index]), p_index);    
+        }
+      }
+      
+      break;
+    }
     case SMR: {
       // Need to cold restart the replica
       cleanupReplica(replicas, 0);
 
-      startReplicas(replicas, rep_count, &sd, controller_name, ext_pipes, pipe_count, replica_priority);
+      startReplicas(replicas, rep_count, &sd, controller_name, ext_pipes, pipe_count, voter_priority - VOTER_PRIO_OFFSET);
       
       // Resend last data
       for (p_index = 0; p_index < pipe_count; p_index++) {
@@ -203,11 +218,17 @@ bool checkSync(void) {
 void doOneUpdate(void) {
   int p_index, r_index;
   int retval = 0;
+  int exit_pid;
 
   struct timeval select_timeout;
   fd_set select_set;
 
-  //waitpid(-1, NULL, WNOHANG); // Seems to take a while for to clean up zombies
+  exit_pid = waitpid(-1, NULL, WNOHANG); // Seems to take a while for to clean up zombies
+
+  if (exit_pid > 0) {
+    debug_print("PID %d exited on its own.\n", exit_pid);
+    voterRestartHandler();
+  }
 
   select_timeout.tv_sec = 0;
   select_timeout.tv_usec = 50000;
@@ -316,7 +337,7 @@ void processData(struct vote_pipe *pipe, int pipe_index) {
     }
   }
 
-  balanceReps(replicas, rep_count, replica_priority);
+  balanceReps(replicas, rep_count, voter_priority - VOTER_PRIO_OFFSET);
 
   for (r_index = 0; r_index < rep_count; r_index++) {
     writeBuffer(replicas[r_index].vot_pipes[pipe_index].fd_out, pipe->buffer, pipe->buff_count);
@@ -353,6 +374,9 @@ void checkSDC(int pipe_num) {
   }
 
   switch (rep_type) {
+    case RSMR:
+      sendPipe(pipe_num, 0);
+      return;
     case SMR: 
       // Only one rep, so pretty much have to trust it
       sendPipe(pipe_num, 0);
@@ -415,7 +439,7 @@ void checkSDC(int pipe_num) {
 void processFromRep(int replica_num, int pipe_num) {
   // read from pipe
   if (pipeToBuff(&(replicas[replica_num].vot_pipes[pipe_num])) == 0) {
-    balanceReps(replicas, rep_count, replica_priority);
+    balanceReps(replicas, rep_count, voter_priority - VOTER_PRIO_OFFSET);
     checkSDC(pipe_num);
   } else {
     printf("Voter - Controller %s, rep %d, pipe %d\n", controller_name, replica_num, pipe_num);
@@ -429,19 +453,15 @@ int initVoterD(void) {
   struct sigevent sev;
   sigset_t mask;
 
-  replica_priority = voter_priority - VOTER_PRIO_OFFSET;
-
   // Setup fd server
   createFDS(&sd, controller_name);
-  startReplicas(replicas, rep_count, &sd, controller_name, ext_pipes, pipe_count, replica_priority);
-
+  startReplicas(replicas, rep_count, &sd, controller_name, ext_pipes, pipe_count, voter_priority - VOTER_PRIO_OFFSET);
+  
   InitTAS(DEFAULT_CPU, voter_priority); // IMPORTANT: Should be after forking replicas to subvert CoW
   
-
   // TODO: I did this to force page faults... but I think there was a different issue.
   // This section may no longer be necessary. Need to check with the page fault tests.
   int p_index, r_index;
-
   for (p_index = 0; p_index < pipe_count; p_index++) {
     int read_fd = ext_pipes[p_index].fd_in;
     if (read_fd != 0) {  // Causes page faults

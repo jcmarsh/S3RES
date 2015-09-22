@@ -32,6 +32,10 @@ void setPipeIndexes(void) {
 }
 
 int parseArgs(int argc, const char **argv) {
+  if (argc < 2) {
+    printf("Usage: Load <priority> <pipe_cound(ignored)> <pipe_out(optional)>\n");
+    return -1;
+  }
   setPipeIndexes();
   // TODO: error checking
   priority = atoi(argv[1]);
@@ -93,13 +97,11 @@ void perCyclePedestrian(void) {
   ccv_dense_matrix_t* image = 0;
   ccv_icf_classifier_cascade_t* cascade = ccv_icf_read_classifier_cascade("ccv_related/pedestrian.icf");
   ccv_read("ccv_related/126.jpg", &image, CCV_IO_ANY_FILE | CCV_IO_RGB_COLOR);
-  if (image != 0)
-  {
+  if (image != 0) {
     unsigned int elapsed_time = get_current_time();
     ccv_array_t* seq = ccv_icf_detect_objects(image, &cascade, 1, ccv_icf_default_params);
     elapsed_time = get_current_time() - elapsed_time;
-    for (i = 0; i < seq->rnum; i++)
-    {
+    for (i = 0; i < seq->rnum; i++) {
       ccv_comp_t* comp = (ccv_comp_t*)ccv_array_get(seq, i);
       // This would be intersting output for checking for errors / voting
       //printf("%d %d %d %d %f\n", comp->rect.x, comp->rect.y, comp->rect.width, comp->rect.height, comp->classification.confidence);
@@ -117,7 +119,8 @@ void perCyclePedestrian(void) {
   }
   ccv_icf_classifier_cascade_free(cascade);
   ccv_disable_cache();
-  return;
+  
+  exit(0);
 }
 
 void enterLoop(void) {

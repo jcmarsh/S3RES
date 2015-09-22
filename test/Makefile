@@ -1,7 +1,7 @@
 SRC=../src/commtypes.c ../src/replicas.c ../src/fd_server.c ../voter/vote_buff.c
 INC=-I../include/
 
-all: Controllers MapperTest FilterTest ArtPotTest AStarTest EmptyTest
+all: Controllers MapperTest FilterTest ArtPotTest AStarTest EmptyTest LoadTest
 
 %.o: %.c
 	gcc -c -o $@ $< $(INC)
@@ -32,6 +32,10 @@ EmptyTest: empty_test.o $(SRC)
 	gcc -o EmptyTest empty_test.o $(SRC) -lrt -lTASLimited
 	cp ../controllers/Empty ./
 
+LoadTest: load_test.o $(SRC)
+	gcc -o LoadTest load_test.o $(SRC) -lrt -lTASLimited
+	cp ../controllers/Load ./
+
 clean:
 	make -C ./micro_test clean
 	rm -f *.o
@@ -50,3 +54,6 @@ clean:
 	rm -rf EmptyTest
 	rm -rf EmptyTest_fd_server
 	rm -rf Empty
+	rm -rf LoadTest
+	rm -rf LoadTest_fd_server
+	rm -rf Load

@@ -48,7 +48,7 @@ print "executing: ", cmd_start
 
 # This will need to change if mixing TMR and DMR
 victim_types = len(victim_programs) # different controllers
-victim_count = 3 # replicated 3 times
+victim_count = 1 # 3 # replicated 3 times
 while True:
 	time.sleep(1/2.0)
 	victim_pids = []
