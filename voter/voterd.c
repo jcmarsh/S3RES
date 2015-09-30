@@ -114,6 +114,10 @@ void voterRestartHandler(void) {
 
   switch (rep_type) {
     case SMR: {
+      #ifdef TIME_RESTART_REPLICA
+        timestamp_t start_restart = generate_timestamp();
+      #endif // TIME_RESTART_REPLICA
+
       // Need to cold restart the replica
       cleanupReplica(replicas, 0);
 
@@ -126,6 +130,11 @@ void voterRestartHandler(void) {
           processData(&(ext_pipes[p_index]), p_index);    
         }
       }
+
+      #ifdef TIME_RESTART_REPLICA
+        timestamp_t end_restart = generate_timestamp();
+        printf("Restart time elapsed (%lld)\n", end_restart - start_restart);
+      #endif // TIME_RESTART_REPLICA
 
       break;
     }
