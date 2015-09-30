@@ -90,11 +90,12 @@ void main(int argc, char** argv) {
   // Attach stops the process
   if (ptrace(PTRACE_ATTACH, attack_pid, NULL, NULL) < 0) {
     perror("Failed to attach");
+    return;
   }
   waitpid(attack_pid);
   
   if (injectRegError(attack_pid) != 0) {
-    return;
+    //return;
   }
   
   if (ptrace(PTRACE_CONT, attack_pid, NULL, NULL) < 0) {
