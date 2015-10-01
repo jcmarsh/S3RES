@@ -110,6 +110,7 @@ void enterLoop() {
     timestamp_t last;
   #endif
 
+  char fake_msg[1024] = {1};
   while(1) {
     select_timeout.tv_sec = 1;
     select_timeout.tv_usec = 0;
@@ -138,9 +139,12 @@ void enterLoop() {
             last = generate_timestamp(); // TODO: Not sure about this
           #endif
 
-	  if (TEMP_FAILURE_RETRY(write(replica.vot_pipes[0].fd_out, &range_pose_data_msg, sizeof(struct comm_range_pose_data)) != sizeof(struct comm_range_pose_data))) {
-            perror("BenchMarker failed range data write");
+          if (write(replica.vot_pipes[0].fd_out, fake_msg, sizeof(fake_msg)) != sizeof(fake_msg)) {
+            perror("BenchMarker failed fake msg write");
           }
+          //if (TEMP_FAILURE_RETRY(write(replica.vot_pipes[0].fd_out, &range_pose_data_msg, sizeof(struct comm_range_pose_data)) != sizeof(struct comm_range_pose_data))) {
+          //  perror("BenchMarker failed range data write");
+          //}
         } else if (retval > 0) {
           printf("Bench pipe 0 read did no match expected size.\n");
         } else if (retval < 0) {
@@ -152,8 +156,9 @@ void enterLoop() {
 
       if (FD_ISSET(replica.vot_pipes[1].fd_in, &select_set)) {
         // Second part of the cycle: response from replica
-        retval = TEMP_FAILURE_RETRY(read(replica.vot_pipes[1].fd_in, &mov_cmd_msg, sizeof(struct comm_mov_cmd)));
-        if (retval == sizeof(struct comm_mov_cmd)) {
+        //retval = TEMP_FAILURE_RETRY(read(replica.vot_pipes[1].fd_in, &mov_cmd_msg, sizeof(struct comm_mov_cmd)));
+        //if (retval == sizeof(struct comm_mov_cmd)) {
+        if (read(replica.vot_pipes[1].fd_in, &fake_msg, sizeof(fake_msg)) == sizeof(fake_msg)) {
           waiting_response = false;
 
           #ifdef TIME_FULL_BENCH
@@ -162,7 +167,7 @@ void enterLoop() {
           #endif
 
           // data was set by read in enterLoop
-	  if (TEMP_FAILURE_RETRY(write(trans_pipes[1].fd_out, &mov_cmd_msg, sizeof(struct comm_mov_cmd)) != sizeof(struct comm_mov_cmd))) {
+          if (TEMP_FAILURE_RETRY(write(trans_pipes[1].fd_out, &mov_cmd_msg, sizeof(struct comm_mov_cmd)) != sizeof(struct comm_mov_cmd))) {
             perror("Bencmarker failed mov_cmd write");
           }
         } else if (retval > 0) {

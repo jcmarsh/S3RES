@@ -34,6 +34,9 @@ Mapper: mapper.o mapping.c $(SRC) $(DEP) ./inc/*.h
 Load: load.o $(SRC) $(DEP)
 	gcc -O3 -Werror -L"~/research/ccv/lib" -I"~/research/ccv/lib" -o Load load.o $(SRC) $(INC) $(LIB) -lccv `cat ~/research/ccv/lib/.deps`
 
+GenericEmpty: generic_empty.o $(SRC) $(DEP)
+	gcc $(FLAGS) -o Empty generic_empty.o $(SRC) $(INC) $(LIB) 
+
 copy:
 	cp ArtPot ../../stage/experiments/
 	cp AStar ../../stage/experiments/

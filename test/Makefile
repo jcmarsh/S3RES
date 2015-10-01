@@ -36,6 +36,9 @@ LoadTest: load_test.o $(SRC)
 	gcc -o LoadTest load_test.o $(SRC) -lrt -lTASLimited
 	cp ../controllers/Load ./
 
+GenericEmptyTest: generic_empty_test.o $(SRC)
+	gcc -o GenericEmptyTest generic_empty_test.o $(SRC) -lrt -lTASLimited
+
 clean:
 	make -C ./micro_test clean
 	rm -f *.o
@@ -57,3 +60,4 @@ clean:
 	rm -rf LoadTest
 	rm -rf LoadTest_fd_server
 	rm -rf Load
+	rm -rf GenericEmptyTest

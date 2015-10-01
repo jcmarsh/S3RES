@@ -37,7 +37,7 @@ for index in `seq 0 1`; do
 	ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm > smr_empty_restart_injector_02048_$index.txt
 	timeout $ANOTHER_TIME python injector.py "kill -9" "Empty" >> smr_empty_restart_injector_02048_$index.txt &
 	sleep $ANOTHER_TIME
-	ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm >> empty_restart_injector_02048_$index.txt
+	ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm >> smr_empty_restart_injector_02048_$index.txt
 	sleep 60
 done
 
