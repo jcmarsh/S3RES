@@ -1,7 +1,12 @@
-#define TIME_FULL_BENCH
+//#define TIME_FULL_BENCH
+//#define TEST_IPC_ROUND // Needs TIME_FULL_BENCH
 //#define TIME_RESTART_SIGNAL
-//#define TIME_RESTART_REPLICA
-#define TEST_IPC_ROUND
+#define TIME_RESTART_REPLICA
+#define PIPE_SMASH
+
+#ifdef PIPE_SMASH
+  #define PIPE_FILL_SIZE 2048
+#endif
 
 #ifdef TEST_IPC_ROUND
   #define IPC_SIZE 4096

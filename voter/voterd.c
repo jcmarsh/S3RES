@@ -59,11 +59,26 @@ void processFromRep(int replica_num, int pipe_num);
 void writeBuffer(int fd_out, char* buffer, int buff_count);
 
 void restart_prep(int restartee, int restarter) {
+  int i;
+
   #ifdef TIME_RESTART_REPLICA
     timestamp_t start_restart = generate_timestamp();
   #endif // TIME_RESTART_REPLICA
 
-  int i;
+  // Normally the pipes are stolen, then written back.
+  // Here, we want to fill the pipes to test the impact of large messages.
+  // So we will write to them, and then steal them (so that the fake data isn't processed).
+  // But probably won't work if real data is there...
+  // Problem: normally steal once, write twice. Need a second write... use restarted rep?
+  #ifdef PIPE_SMASH
+    char pipe_fill[PIPE_FILL_SIZE] = {1};
+    for (i = 0; i < PIPE_LIMIT; i++) {
+      if (replicas[restarter].vot_pipes[i].fd_out != 0) {
+        writeBuffer(replicas[restarter].vot_pipes[i].fd_out, pipe_fill, sizeof(pipe_fill));
+      }
+    }  
+  #endif // PIPE_SMASH
+
   char **restarter_buffer = (char **)malloc(sizeof(char *) * PIPE_LIMIT);
   if (restarter_buffer == NULL) {
     perror("Voter failed to malloc memory");
@@ -90,19 +105,50 @@ void restart_prep(int restartee, int restarter) {
     }
   }
 
-  // Give the buffers back
-  returnPipes(restartee, restarter_buffer, restarter_buff_count);
-  returnPipes(restarter, restarter_buffer, restarter_buff_count);
-  // free the buffers
-  for (i = 0; i < PIPE_LIMIT; i++) {
-    free(restarter_buffer[i]);
-  }
-  free(restarter_buffer);
+  #ifndef PIPE_SMASH
+    // Give the buffers back
+    returnPipes(restartee, restarter_buffer, restarter_buff_count);
+    returnPipes(restarter, restarter_buffer, restarter_buff_count);
+    // free the buffers
+    for (i = 0; i < PIPE_LIMIT; i++) {
+      free(restarter_buffer[i]);
+    }
+    free(restarter_buffer);
+  #endif // !PIPE_SMASH
+
+  // The second write
+  #ifdef PIPE_SMASH
+    for (i = 0; i < PIPE_LIMIT; i++) {
+      if (replicas[restarter].vot_pipes[i].fd_out != 0) {
+        writeBuffer(replicas[restarter].vot_pipes[i].fd_out, pipe_fill, sizeof(pipe_fill));
+      }
+    }  
+  #endif // PIPE_SMASH
 
   #ifdef TIME_RESTART_REPLICA
     timestamp_t end_restart = generate_timestamp();
     printf("Restart time elapsed (%lld)\n", end_restart - start_restart);
   #endif // TIME_RESTART_REPLICA
+
+  // Clean up by stealing the extra write. Not timed.
+  #ifdef PIPE_SMASH
+    if (restarter_buffer == NULL) {
+      perror("Voter failed to malloc memory");
+    }
+    for (i = 0; i < PIPE_LIMIT; i++) {
+      restarter_buffer[i] = (char *)malloc(sizeof(char) * MAX_VOTE_PIPE_BUFF);
+      if (restarter_buffer[i] == NULL) {
+        perror("Voter failed to allocat memory");
+      }
+    }
+
+    stealPipes(restarter, restarter_buffer, restarter_buff_count);
+    // free the buffers
+    for (i = 0; i < PIPE_LIMIT; i++) {
+      free(restarter_buffer[i]);
+    }
+    free(restarter_buffer);
+  #endif // PIPE_SMASH
 
   return;
 }
