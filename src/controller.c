@@ -54,6 +54,7 @@ int initController(void) {
   return 0;
 }
 
+// TODO: really need to check the flow of priority here
 static void restartHandler(int signo, siginfo_t *si, void *unused) {
   #ifdef TIME_RESTART_SIGNAL
     timestamp_t curr_time = generate_timestamp();

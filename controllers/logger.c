@@ -65,6 +65,7 @@ int parseArgs(int argc, const char **argv) {
   return 0;
 }
 
+bool finished = false;
 double prev_x = -7.0, prev_y = -7.0;
 timestamp_t prev_time = 0;
 double time_elapsed = 0.0;
@@ -77,6 +78,7 @@ void command(void) {
   double distance_goal = sqrt(((pose[0] - GOAL_X) * (pose[0] - GOAL_X)) + ((pose[1] - GOAL_Y) * (pose[1] - GOAL_Y)));
   if (distance_goal < 1) { // Robot stops short
     // Skip; too close to end
+    finished = true;
   } else if (prev_time == 0) {
     // Skip; first cycle 
   } else {
@@ -151,7 +153,9 @@ void enterLoop(void) {
         if (FD_ISSET(pipes[i].fd_in, &select_set)) {  
           struct comm_msg_buffer msg;
           commRecvMsgBuffer(&pipes[i], &msg);
-          fprintf(log_file, "LOGGED MSG: %s", msg.message);
+          if(!finished) {
+            fprintf(log_file, "LOGGED MSG: %s", msg.message);
+          }
           free(msg.message);
         }   
       }

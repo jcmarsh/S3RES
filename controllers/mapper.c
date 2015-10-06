@@ -51,12 +51,18 @@ bool insertCFE = false;
 
 int parseArgs(int argc, const char **argv) {
   int i;
+
+  if (argc < 3) {
+    printf("Usage: Mapper <priority> <pipe_count> <pipes...>\n");
+    exit(0);
+  }
   // TODO: error checking
   priority = atoi(argv[1]);
   pipe_count = atoi(argv[2]); // For now always 3
   if (argc < 6) { // Must request fds
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "Mapper");
+    // connectRecvFDS(currentPID, pipes, PIPE_COUNT, "Mapper");
+    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "MapperTest");
     setPipeIndexes();
   } else {
     for (i = 0; (i < argc - 3) && (i < PIPE_COUNT); i++) {
