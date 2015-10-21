@@ -7,7 +7,6 @@
 %%
 [ \t\r]
 "Bench"			{ yylval.str = "Bench"; return BENCH; }
-"RSMR"                  { yylval.rep_type = RSMR; return P_RSMR; }
 "SMR"			{ yylval.rep_type = SMR; return P_SMR; }
 "DMR"			{ yylval.rep_type = DMR; return P_DMR; }
 "TMR"			{ yylval.rep_type = TMR; return P_TMR; }

@@ -27,6 +27,7 @@ int timer_start_index;
 int timer_stop_index;
 bool timer_started = false;
 timestamp_t watchdog;
+pid_t last_dead = -1;
 
 // Replica related data
 struct replica replicas[REP_MAX];
@@ -165,6 +166,7 @@ void voterRestartHandler(void) {
       #endif // TIME_RESTART_REPLICA
 
       // Need to cold restart the replica
+      last_dead = replicas[0].pid;
       cleanupReplica(replicas, 0);
 
       startReplicas(replicas, rep_count, &sd, controller_name, ext_pipes, pipe_count, replica_priority);
@@ -189,6 +191,7 @@ void voterRestartHandler(void) {
     case TMR: {
       // The failed rep should be the one behind on the timer pipe
       int restartee = behindRep(replicas, rep_count, timer_stop_index);
+      //last_dead = replicas[restartee].pid;
       int restarter = (restartee + (rep_count - 1)) % rep_count;
       debug_print("\tPID: %d\n", replicas[restartee].pid);
       restart_prep(restartee, restarter);
@@ -262,7 +265,28 @@ void doOneUpdate(void) {
   struct timeval select_timeout;
   fd_set select_set;
 
-  //waitpid(-1, NULL, WNOHANG); // Seems to take a while for to clean up zombies
+  if (rep_type == SMR) { // Detect replica that self-kills, has no timer (Load does this due to memory leak)
+    #ifdef TIME_WAITPID
+      timestamp_t start_restart = generate_timestamp();
+    #endif // TIME_WAITPID
+
+    // can only waitpid for children (unless subreaper is used (prctl is not POSIX compliant)).
+    int exit_pid = waitpid(-1, NULL, WNOHANG); // Seems to take a while for to clean up zombies
+      
+    #ifdef TIME_WAITPID
+      timestamp_t end_restart = generate_timestamp();
+      if (exit_pid > 0 && exit_pid != last_dead) {
+        printf("Waitpid for %d (%s) took (%lld)\n", exit_pid, REP_TYPE_T[rep_type], end_restart - start_restart);
+      } else {
+        //printf("No zombie took (%lld)\n", end_restart - start_restart);
+      }
+    #endif // TIME_WAITPID
+
+    if (exit_pid > 0 && exit_pid != last_dead) {
+      debug_print("PID %d exited on its own.\n", exit_pid);
+      voterRestartHandler();
+    }
+  }
 
   select_timeout.tv_sec = 0;
   select_timeout.tv_usec = 50000;

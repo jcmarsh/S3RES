@@ -3,8 +3,6 @@
 replication_t reptypeToEnum(char* type) {
   if (strcmp(type, "NONE") == 0) {
     return NONE;
-  } else if (strcmp(type, "RSMR") == 0) {
-    return RSMR;
   } else if (strcmp(type, "SMR") == 0) {
     return SMR;
   } else if (strcmp(type, "DMR") == 0) {
@@ -16,10 +14,9 @@ replication_t reptypeToEnum(char* type) {
   }
 }
 
+// Seems superfluous, but needed if special cases like RSMR is ever reintroduced.
 int reptypeToCount(replication_t type) {
   switch(type) {
-  case RSMR:
-    return 1;
   case SMR:
     return 1;
   case DMR:

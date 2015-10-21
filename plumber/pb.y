@@ -19,7 +19,6 @@ struct typed_pipe cmd_out;
 }
 
 %token <str> BENCH
-%token <rep_type> P_RSMR
 %token <rep_type> P_SMR
 %token <rep_type> P_DMR
 %token <rep_type> P_TMR
@@ -37,7 +36,6 @@ struct typed_pipe cmd_out;
 %type <str> rep_comp
 %type <str> rep_name
 %type <rep_type> rep_strat
-%type <rep_type> rep_strat_special
 
 %%
 line
@@ -53,9 +51,6 @@ declaration
 
   | VAR_NAME ASSIGN rep_comp rep_strat DELIM NUMBER_VAL NUMBER_VAL {
       add_node(&all_nodes, $1, $3, $4, "VoterD", $6, $7); }
-
-  | VAR_NAME ASSIGN rep_comp rep_strat_special DELIM NUMBER_VAL NUMBER_VAL {
-      add_node(&all_nodes, $1, $3, $4, "VoterD_R", $6, $7); }
   ;
 
 rep_comp
@@ -66,10 +61,6 @@ rep_strat
   : P_SMR { $$ = $1; }
   | P_DMR { $$ = $1; }
   | P_TMR { $$ = $1; }
-  ;
-
-rep_strat_special
-  : P_RSMR { $$ = $1; }
   ;
 
 relationship
