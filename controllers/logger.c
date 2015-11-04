@@ -6,6 +6,7 @@
 
 #include "controller.h"
 #include "tas_time.h"
+#include "bench_config.h"
 #include <math.h>
 #include <time.h>
 
@@ -85,7 +86,7 @@ void command(void) {
     // calc velocity
     double velocity = 0.0;
     double distance = sqrt(((pose[0] - prev_x) * (pose[0] - prev_x)) + ((pose[1] - prev_y) * (pose[1] - prev_y)));
-    double time_this_round = ((current_time - prev_time) / (1000000 * 3092.0)); // did the math: matches J. Taylor's time.cpp
+    double time_this_round = ((current_time - prev_time) / (1000000 * CPU_MHZ)); // did the math: matches J. Taylor's time.cpp // unit is seconds
     time_elapsed = time_elapsed + time_this_round;    
 
     if (pose[0] == prev_x && pose[1] == prev_y) {

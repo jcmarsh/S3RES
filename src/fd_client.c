@@ -87,6 +87,7 @@ int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const ch
   
   if(TEMP_FAILURE_RETRY(connect(sock_fd, (struct sockaddr *) &address, sizeof(struct sockaddr_un))) != 0) {
     perror("Replica connect() failed");
+    printf("Args: fd %d\t actual_name %s\n", sock_fd, actual_name);
     retval = -1;
     goto connect_recv_FDS_sock_out;
   }

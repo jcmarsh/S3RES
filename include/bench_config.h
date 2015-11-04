@@ -1,9 +1,11 @@
-//#define TIME_FULL_BENCH
+#define CPU_MHZ 3092.0
+
+#define TIME_FULL_BENCH
 //#define TEST_IPC_ROUND // Needs TIME_FULL_BENCH
 //#define TIME_RESTART_SIGNAL
 //#define TIME_RESTART_REPLICA
 //#define PIPE_SMASH
-#define TIME_WAITPID
+//#define TIME_WAITPID
 
 #ifdef PIPE_SMASH
   #define PIPE_FILL_SIZE 2048
@@ -17,4 +19,3 @@
 #define DEBUG_PRINT 0
 #define debug_print(...) \
 	do { if (DEBUG_PRINT) fprintf(stderr, ##__VA_ARGS__); } while (0)
-

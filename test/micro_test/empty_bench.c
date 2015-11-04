@@ -62,6 +62,6 @@ int main(int argc, const char** argv) {
     
     timestamp_t current = generate_timestamp();
 
-    printf("(%lld)\n", current - last);
+    printf("usec (%lf)\n", (current - last) / CPU_MHZ);
   }
 }

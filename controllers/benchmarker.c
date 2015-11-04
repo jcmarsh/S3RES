@@ -132,7 +132,7 @@ void enterLoop() {
             debug_print("ERROR, sending data but still waiting on previous response.\n");
             #ifdef TIME_FULL_BENCH
               timestamp_t toss = generate_timestamp();
-              printf("Error time elapsed (%lld)\n", toss - last);
+              printf("Error time elapsed usec (%lf)\n", (toss - last) / CPU_MHZ);
             #endif
           }
           waiting_response = true;
@@ -171,7 +171,7 @@ void enterLoop() {
 
           #ifdef TIME_FULL_BENCH
             timestamp_t current = generate_timestamp();
-            printf("(%lld)\n", current - last);
+            printf("usec (%lf)\n", (current - last) / CPU_MHZ);
           #endif
 
           // data was set by read in enterLoop

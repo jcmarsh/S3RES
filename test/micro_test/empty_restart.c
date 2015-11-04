@@ -58,7 +58,7 @@ int main(int argc, const char **argv) {
     timestamp_t last = generate_timestamp();
     restartReplica(replicas, rep_count, &sd, ext_pipes, restarter, restartee, voter_priority - 5);
     timestamp_t current = generate_timestamp();
-    printf("(%lld)\n", current - last);
+    printf("usec (%lf)\n", (current - last) / CPU_MHZ);
     
     usleep(100000);
   }

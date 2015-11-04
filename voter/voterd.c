@@ -19,7 +19,7 @@
 #include "replicas.h"
  
 #define REP_MAX 3
-#define PERIOD_NSEC 120000 // Max time for voting in nanoseconds (120 micro seconds)
+#define PERIOD_USEC 120 // Max time for voting in micro seconds
 #define VOTER_PRIO_OFFSET 5 // Replicas run with a -5 offset
 
 long voting_timeout;
@@ -128,7 +128,7 @@ void restart_prep(int restartee, int restarter) {
 
   #ifdef TIME_RESTART_REPLICA
     timestamp_t end_restart = generate_timestamp();
-    printf("Restart time elapsed (%lld)\n", end_restart - start_restart);
+    printf("Restart time elapsed usec (%lf)\n", (end_restart - start_restart) / CPU_MHZ);
   #endif // TIME_RESTART_REPLICA
 
   // Clean up by stealing the extra write. Not timed.
@@ -181,7 +181,7 @@ void voterRestartHandler(void) {
 
       #ifdef TIME_RESTART_REPLICA
         timestamp_t end_restart = generate_timestamp();
-        printf("Restart time elapsed (%lld)\n", end_restart - start_restart);
+        printf("Restart time elapsed usec (%lf)\n", (end_restart - start_restart) / CPU_MHZ);
       #endif // TIME_RESTART_REPLICA
 
       break;
@@ -276,7 +276,7 @@ void doOneUpdate(void) {
     #ifdef TIME_WAITPID
       timestamp_t end_restart = generate_timestamp();
       if (exit_pid > 0 && exit_pid != last_dead) {
-        printf("Waitpid for %d (%s) took (%lld)\n", exit_pid, REP_TYPE_T[rep_type], end_restart - start_restart);
+        printf("Waitpid for %d (%s) took usec (%lf)\n", exit_pid, REP_TYPE_T[rep_type], (end_restart - start_restart) / CPU_MHZ);
       } else {
         //printf("No zombie took (%lld)\n", end_restart - start_restart);
       }
@@ -293,10 +293,10 @@ void doOneUpdate(void) {
 
   if (timer_started) {
     timestamp_t current = generate_timestamp();
-    long remaining = voting_timeout - ((current - watchdog) / 3.092);
+    long remaining = voting_timeout - ((current - watchdog) / CPU_MHZ);
     if (remaining > 0) {
       select_timeout.tv_sec = 0;
-      select_timeout.tv_usec = remaining / 1000;
+      select_timeout.tv_usec = remaining;
     } else {
       // printf("Restart handler called, %s is %ld late\n", controller_name, remaining);
       voterRestartHandler();
@@ -563,7 +563,7 @@ int parseArgs(int argc, const char **argv) {
   voting_timeout = atoi(argv[3]);
   voter_priority = atoi(argv[4]);
   if (voting_timeout == 0) {
-    voting_timeout = PERIOD_NSEC;
+    voting_timeout = PERIOD_USEC;
   }
 
   if (argc < required_args) { 
