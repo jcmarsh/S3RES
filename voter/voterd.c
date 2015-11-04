@@ -285,6 +285,7 @@ void doOneUpdate(void) {
     if (exit_pid > 0 && exit_pid != last_dead) {
       debug_print("PID %d exited on its own.\n", exit_pid);
       voterRestartHandler();
+      timer_started = false;
     }
   }
 
