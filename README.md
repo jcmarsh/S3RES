@@ -5,6 +5,44 @@ Problem Injection Named Thoughtfully
 
 This is likely a temporary repo (thus the terrible name). Meant to simulate Single Event Upsets, and protect against them using triple redundancy.
 
+## Compiling and Running
+
+Currently dependent on Player / Stage.
+
+First install Player... version? Steps? Was there special steps needed?
+
+Then Stage. Should also include a good way to test / confirm installation worked.
+
+`tas_lib` should be made first:
+  
+    cd tas_lib
+    make
+    sudo make install
+
+`player_translator_driver` is next. On the first make additional steps are needed:
+
+    cd player_translator_driver
+    mkdir build
+    cd build
+    ccmake ..
+    make
+    sudo make install
+
+From the top level PINT directory, `make` and `make install`. Note that `make install` does not require `sudo`, because all it is doing is copying the executables to `../stage/experiments/`.
+  
+
+## libccv needed for Load component.
+
+Only used for the Load component; can skip this step so long as the appropriate Makefile is altered to not build Load. Install in directory containing PINT folder (I know).
+
+* Download tar from http://libccv.org/
+* Unzip: `tar -xf liuliu-ccv-785aba2.tar.gz` (filename may change)
+* change directory name: `mv liuliu-ccv-785aba2 ccv`
+* `cd ccv/lib/`
+* `./configure` - check to see if anything you want is missing (libpng and libjpeg in the `LINK FLAGS` bit at the end)
+* `make`
+* copy `./lib/libccv.a` into a directory checked by ld (`/usr/local/lib/`)
+
 ## Directory / Contents
 * `./controllers/` - Components in a robotic control system. Each runs as a process, and communication is done through pipes
   * `art_pot.c` - Uses the artificial potential method to generate control commands for local navigation.
@@ -61,19 +99,4 @@ This is likely a temporary repo (thus the terrible name). Meant to simulate Sing
 * `./test/` - Test code to allow components to be run in isolation. Handy for debugging and finding memory leaks.
   * `./micro_test/` - Tests used for micro benchmarks.
 * `./voter/` - Code for the Voter.
-
-## Compiling and Running
-
-Currently dependent on Player / Stage. 
-
-## libccv needed for Load component.
-
-Install in directory containing PINT folder (I know).
-
-* Download tar from http://libccv.org/
-* Unzip: `tar -xf liuliu-ccv-785aba2.tar.gz` (filename may change)
-* change directory name: `mv liuliu-ccv-785aba2 ccv`
-* `cd ccv/lib/`
-* `./configure` - check to see if anything you want is missing (libpng and libjpeg in the `LINK FLAGS` bit at the end)
-* `make`
-* copy `./lib/libccv.a` into a directory checked by ld (`/usr/local/lib/`)
+* 
