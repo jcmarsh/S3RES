@@ -7,9 +7,22 @@ This is likely a temporary repo (thus the terrible name). Meant to simulate Sing
 
 ## Compiling and Running
 
-Currently dependent on Player / Stage.
+PINT currently uses Player / Stage as a simulation environment. One machine will act as the simulator and needs to have Player and Stage installed, while the machines that are acting as the robots only require Player. One machine can be used for everything, which is convenient for testing an development. For experiments dealing with timing, using dedicate machines for each robot is required.
 
-First install Player... version? Steps? Was there special steps needed?
+![Alternate setup options, one machine vs multiple](docs/alternate_setups.png?raw=true "Alternate Setups")
+
+Currently using Player 3.1.0-SVN with the following drivers: differential, fakelocalize, gridmap, lasertoranger, mapcspace, mapfile, mapscale, rangertolaser, velcmd, vfh, vmapfile, wavefront. Deselecting unused drivers will greatly speed compilation.
+
+To setup / install Player (from [Player FAQ](http://playerstage.sourceforge.net/wiki/Basic_FAQ)):
+
+    svn checkout svn://svn.code.sf.net/p/playerstage/svn/code/player/trunk player
+    cd player
+    mkdir build
+    ccmake ../
+
+Most defaults at this step are fine, but you likely want deselect many of the drivers. Boost is not required.
+
+    make
 
 Then Stage. Should also include a good way to test / confirm installation worked.
 
@@ -99,4 +112,3 @@ Only used for the Load component; can skip this step so long as the appropriate 
 * `./test/` - Test code to allow components to be run in isolation. Handy for debugging and finding memory leaks.
   * `./micro_test/` - Tests used for micro benchmarks.
 * `./voter/` - Code for the Voter.
-* 
