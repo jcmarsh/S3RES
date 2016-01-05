@@ -11,20 +11,35 @@ PINT currently uses Player / Stage as a simulation environment. One machine will
 
 ![Alternate setup options, one machine vs multiple](docs/alternate_setups.png?raw=true "Alternate Setups")
 
-Currently using Player 3.1.0-SVN with the following drivers: differential, fakelocalize, gridmap, lasertoranger, mapcspace, mapfile, mapscale, rangertolaser, velcmd, vfh, vmapfile, wavefront. Deselecting unused drivers will greatly speed compilation.
+### Player
 
-To setup / install Player (from [Player FAQ](http://playerstage.sourceforge.net/wiki/Basic_FAQ)):
+Currently using Player 3.1.0-SVN. To setup / install (from [Player FAQ](http://playerstage.sourceforge.net/wiki/Basic_FAQ)):
 
     svn checkout svn://svn.code.sf.net/p/playerstage/svn/code/player/trunk player
     cd player
     mkdir build
     ccmake ../
 
-Most defaults at this step are fine, but you likely want deselect many of the drivers. Boost is not required.
+Most defaults at this step are fine, but you likely want deselect many of the drivers (greatly speeds up compilation). My setup has the following drivers: `differential fakelocalize gridmap lasertoranger mapcspace mapfile mapscale rangertolaser velcmd vfh vmapfile wavefront.` Boost is not required.
 
     make
+    sudo make install
+    player --version
+    
+The last command should show version 3.1.0-svn and all included drivers. You may need to ensure that player is in your library paths by adding one of the following to your `.bashrc` file (first works for ARM, second works for x86_64):
 
-Then Stage. Should also include a good way to test / confirm installation worked.
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib:/usr/local/lib64
+
+### Stage
+
+TODO: Add instructions for install Stage and testing that it works with Player.
+
+### PINT
+
+Clone this repo. Will need to set the CPU speed. See bench_config.h for options. If real-time is of concern, make sure host machine is not running CPU scalling and that hyper threading is off. Likely want to skip libccv for now.
+
+You will need to update the the file `directory_paths` so that the paths to PINT and Player source are correct. `TOP_LVL` should be set to directory which contains the PINT directory, `PLAYERC` to the actual player directory.
 
 `tas_lib` should be made first:
   
@@ -44,7 +59,7 @@ Then Stage. Should also include a good way to test / confirm installation worked
 From the top level PINT directory, `make` and `make install`. Note that `make install` does not require `sudo`, because all it is doing is copying the executables to `../stage/experiments/`.
   
 
-## libccv needed for Load component.
+#### libccv needed for Load component.
 
 Only used for the Load component; can skip this step so long as the appropriate Makefile is altered to not build Load. Install in directory containing PINT folder (I know).
 
@@ -55,6 +70,19 @@ Only used for the Load component; can skip this step so long as the appropriate 
 * `./configure` - check to see if anything you want is missing (libpng and libjpeg in the `LINK FLAGS` bit at the end)
 * `make`
 * copy `./lib/libccv.a` into a directory checked by ld (`/usr/local/lib/`)
+
+On the BeagleBone Black `libccv` ran out of memory while building. I was able to remedy this by creating a large swap file on a microSD card and waiting a long time ([source](https://sheldondwill.wordpress.com/2013/12/14/beaglebone-black-ubuntu-adding-a-swapfile/)):
+
+    (On the BeagleBone Black)
+    cd /media/<Partition Label>
+    sudo mkdir swap
+    sudo dd if=/dev/zero of=./swap/swapfile bs=1M count=940
+    sudo chmod 0600 ./swap/swapfile 
+    sudo mkswap ./swap/swapfile
+    sudo swapon ./swap/swapfile
+    free -m 
+    
+If it worked, last like should show available swap: `Swap:          939          0        939`. I still had issues, and ended up commenting out the vgg sample.
 
 ## Directory / Contents
 * `./controllers/` - Components in a robotic control system. Each runs as a process, and communication is done through pipes
