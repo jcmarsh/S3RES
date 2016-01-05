@@ -1,3 +1,5 @@
+include ../directory_paths
+
 SRC=../src/commtypes.c ../src/fd_client.c ../src/controller.c
 DEP=../include/*.h ../tas_lib/inc/*.h
 INC=-I../include/ -I../tas_lib/inc/
@@ -5,7 +7,7 @@ LIB=-lrt -lTASLimited
 FLAGS=-O3 -Werror -static
 #FLAGS=-g -O0 -Werror -static
 
-all: ArtPot AStar BenchMarker Empty Filter Logger Mapper Load
+all: ArtPot AStar BenchMarker Empty Filter Logger Mapper #Load
 
 %.o: %.c
 	gcc -c $(FLAGS) -o $@ $< -I../include/ -I../tas_lib/inc/
@@ -38,14 +40,14 @@ GenericEmpty: generic_empty.o $(SRC) $(DEP)
 	gcc $(FLAGS) -o Empty generic_empty.o $(SRC) $(INC) $(LIB) 
 
 copy:
-	cp ArtPot ../../stage/experiments/
-	cp AStar ../../stage/experiments/
-	cp BenchMarker ../../stage/experiments/
-	cp Empty ../../stage/experiments/
-	cp Filter ../../stage/experiments/
-	cp Logger ../../stage/experiments/
-	cp Mapper ../../stage/experiments/
-	cp Load ../../stage/experiments/
+	cp ArtPot $(INSTALL_DIR)
+	cp AStar $(INSTALL_DIR)
+	cp BenchMarker $(INSTALL_DIR)
+	cp Empty $(INSTALL_DIR)
+	cp Filter $(INSTALL_DIR)
+	cp Logger $(INSTALL_DIR)
+	cp Mapper $(INSTALL_DIR)
+#	cp Load $(INSTALL_DIR)
 
 clean:
 	rm -f *.o

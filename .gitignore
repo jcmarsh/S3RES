@@ -21,6 +21,9 @@
 # Emacs backup files
 *~
 
+# Config files
+directory_paths
+
 # Build directory
 build/
 

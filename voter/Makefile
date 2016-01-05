@@ -1,3 +1,5 @@
+include ../directory_paths
+
 LIB=-lrt -lTASLimited
 INC=-I../include/ -I../tas_lib/inc/
 FLAGS=-O3 -Werror -static
@@ -14,7 +16,7 @@ test: test_buff.o vote_buff.c
 	gcc -g -o testBuff test_buff.o vote_buff.c $(INC) $(LIB)
 
 copy:
-	cp VoterD ../../stage/experiments/
+	cp VoterD $(INSTALL_DIR)
 
 clean:
 	rm -f *.o

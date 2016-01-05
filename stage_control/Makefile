@@ -1,5 +1,5 @@
-RESEARCH=/home/jcmarsh/research
-PLAYERC=$(RESEARCH)/player
+include ../directory_paths
+
 R_INC=-I$(PLAYERC)/ -I$(PLAYERC)/client_libs/ -I$(PLAYERC)/build/
 
 regular:

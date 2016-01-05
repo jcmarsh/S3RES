@@ -1,7 +1,7 @@
 SRC=../src/commtypes.c ../src/replicas.c ../src/fd_server.c ../voter/vote_buff.c
 INC=-I../include/
 
-all: Controllers MapperTest FilterTest ArtPotTest AStarTest EmptyTest LoadTest
+all: Controllers MapperTest FilterTest ArtPotTest AStarTest EmptyTest #LoadTest
 
 %.o: %.c
 	gcc -c -o $@ $< $(INC)
