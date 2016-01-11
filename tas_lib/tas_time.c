@@ -9,11 +9,12 @@ timestamp_t generate_timestamp( void ) {
   rdtscll( ts );
   return ts;
 }
-#elif defined(__ARM_ARCH_6__)
+#elif defined(__ARM_ARCH_7A__)
 timestamp_t generate_timestamp( void ) {
-  uint32_t pmccntr;
-  uint32_t pmuseren;
-  uint32_t pmcntenset;
+  unsigned int pmccntr;
+  unsigned int pmuseren;
+  unsigned int pmcntenset;
+
   // Read the user mode perf monitor counter access permissions.
   asm volatile ("mrc p15, 0, %0, c9, c14, 0" : "=r" (pmuseren));
   if (pmuseren & 1) {  // Allows reading perfmon counters for user mode code.
@@ -24,12 +25,12 @@ timestamp_t generate_timestamp( void ) {
       return (timestamp_t)((pmccntr) * 64);  // Should optimize to << 6
     }
   }
-  printf("Arm performance monitor not enabled (check for module)\n");
+  //  printf("Arm performance monitor not enabled (check for module)\n");
   return 0;
 }
 #else
 timestamp_t generate_timestamp( void ) {
-  printf("Unsupported Arch for timestamps!\n");
+  //  printf("Unsupported Arch for timestamps!\n");
   return 0;
 }
 #endif
