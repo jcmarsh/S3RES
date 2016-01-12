@@ -59,7 +59,7 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
   #ifdef TIME_RESTART_SIGNAL
     timestamp_t curr_time = generate_timestamp();
     timestamp_t parent_time = (timestamp_t)si->si_value.sival_ptr;
-    printf("Signal Time - usec (%lf)\n", (curr_time - parent_time) / CPU_MHZ);
+    printf("Signal Time - usec (%lf)\n", diff_time(curr_time, parent_time, CPU_MHZ));
   #endif
 
   int index = 0;

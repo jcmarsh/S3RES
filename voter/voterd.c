@@ -128,7 +128,7 @@ void restart_prep(int restartee, int restarter) {
 
   #ifdef TIME_RESTART_REPLICA
     timestamp_t end_restart = generate_timestamp();
-    printf("Restart time elapsed usec (%lf)\n", (end_restart - start_restart) / CPU_MHZ);
+    printf("Restart time elapsed usec (%lf)\n", diff_time(end_restart, start_restart, CPU_MHZ));
   #endif // TIME_RESTART_REPLICA
 
   // Clean up by stealing the extra write. Not timed.
@@ -181,7 +181,7 @@ void voterRestartHandler(void) {
 
       #ifdef TIME_RESTART_REPLICA
         timestamp_t end_restart = generate_timestamp();
-        printf("Restart time elapsed usec (%lf)\n", (end_restart - start_restart) / CPU_MHZ);
+        printf("Restart time elapsed usec (%lf)\n", diff_time(end_restart, start_restart, CPU_MHZ));
       #endif // TIME_RESTART_REPLICA
 
       break;
@@ -276,7 +276,7 @@ void doOneUpdate(void) {
     #ifdef TIME_WAITPID
       timestamp_t end_restart = generate_timestamp();
       if (exit_pid > 0 && exit_pid != last_dead) {
-        printf("Waitpid for %d (%s) took usec (%lf)\n", exit_pid, REP_TYPE_T[rep_type], (end_restart - start_restart) / CPU_MHZ);
+        printf("Waitpid for %d (%s) took usec (%lf)\n", exit_pid, REP_TYPE_T[rep_type], diff_time(end_restart, start_restart, CPU_MHZ));
       } else {
         //printf("No zombie took (%lld)\n", end_restart - start_restart);
       }
@@ -294,7 +294,7 @@ void doOneUpdate(void) {
 
   if (timer_started) {
     timestamp_t current = generate_timestamp();
-    long remaining = voting_timeout - ((current - watchdog) / CPU_MHZ);
+    long remaining = voting_timeout - diff_time(current, watchdog, CPU_MHZ);
     if (remaining > 0) {
       select_timeout.tv_sec = 0;
       select_timeout.tv_usec = remaining;

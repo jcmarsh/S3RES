@@ -86,7 +86,7 @@ void command(void) {
     // calc velocity
     double velocity = 0.0;
     double distance = sqrt(((pose[0] - prev_x) * (pose[0] - prev_x)) + ((pose[1] - prev_y) * (pose[1] - prev_y)));
-    double time_this_round = ((current_time - prev_time) / (1000000 * CPU_MHZ)); // did the math: matches J. Taylor's time.cpp // unit is seconds
+    double time_this_round = diff_time(current_time, prev_time, (1000000 * CPU_MHZ)); // diff_time normally returns usec, multiplying CPU_MHZ by 1 mil gives seconds
     time_elapsed = time_elapsed + time_this_round;    
 
     if (pose[0] == prev_x && pose[1] == prev_y) {

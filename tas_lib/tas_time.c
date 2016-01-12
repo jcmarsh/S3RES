@@ -35,15 +35,14 @@ timestamp_t generate_timestamp( void ) {
 }
 #endif
 
-void print_time(timestamp_t current, timestamp_t last, float cpu_mhz) {
+float diff_time(timestamp_t current, timestamp_t last, float cpu_mhz) {
   if (current > last) {
-    printf("usec (%lf)\n", (current - last) / cpu_mhz);
+    return (current - last) / cpu_mhz;
   } else {
 #if defined(__ARM_ARCH_7A__)
-    printf("usec (%lf)\n", (((UINT_MAX * 64) - last) + current) / cpu_mhz);
+    return ((((timestamp_t) UINT_MAX * 64) - last) + current) / cpu_mhz;
 #else
-    printf("Timing error: current time < previous reading. Unknown Arch.\n");
-    printf("\tcurrent: %llu\tlast: %llu\n", current, last);
+    return 0.0;
 #endif
   }
 }
