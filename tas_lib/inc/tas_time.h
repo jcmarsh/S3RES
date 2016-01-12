@@ -11,6 +11,8 @@ author: James Taylor : jrt@gwu.edu
 //-----------------------------------------------------------------------------
 
 #include <sys/time.h>           // POSIX time
+#include <stdio.h>
+#include <limits.h>
 #include "cpu.h"
 
 //-----------------------------------------------------------------------------
@@ -34,5 +36,7 @@ typedef cycle_t timestamp_t;
 //-----------------------------------------------------------------------------
 
 timestamp_t generate_timestamp( void );
+
+void print_time(timestamp_t current, timestamp_t last, float cpu_mhz);
 
 #endif // _TIME_H_

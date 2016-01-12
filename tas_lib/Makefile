@@ -1,6 +1,8 @@
+FLAGS=-O3 -fPIC -c
+#FLAGS=-g -O0 -fPIC -c
 
 %.o: %.c inc/*.h
-	gcc -O3 -fPIC -c -o $@ $<
+	gcc $(FLAGS) -o $@ $<
 
 libTASLimited.a: taslimited.o cpu.o force.o tas_time.o
 	ar -cvq libTASLimited.a *.o
