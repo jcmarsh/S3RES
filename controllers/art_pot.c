@@ -38,7 +38,7 @@ double next_goal[] = {0.0, 0.0, 0.0};
 
 // Position
 double pos[3];
-int ranger_count = 16;
+int ranger_count = 16; // TODO: used what's in commtypes... already included I think
 double ranges[16]; // 16 is the size in commtypes.h
 
 int pipe_count = PIPE_COUNT; // 4 with a planner, 2 otherwise
@@ -107,8 +107,8 @@ void command(void) {
   double vel_cmd[2];
   int total_factors, i;
   bool request_way = false;
-  
-  pid_t currentPID = getpid();
+
+  pid_t currentPID = getpid(); // TODO: left over from debugging?
 
   // Head towards the goal! odom_pose: 0-x, 1-y, 2-theta
   dist = sqrt(pow(goal[INDEX_X] - pos[INDEX_X], 2)  + pow(goal[INDEX_Y] - pos[INDEX_Y], 2));
@@ -141,7 +141,7 @@ void command(void) {
     delta_y = v * sin(theta);
     total_factors += 1;
   }
-  
+
   if (dist > DIST_EPSILON) {
     // Makes the assumption that scans are evenly spaced around the robot.
     for (i = 0; i < ranger_count; i++) {
@@ -152,7 +152,7 @@ void command(void) {
       // obs.x and obs.y are relative to the robot, and I'm okay with that.
       dist = sqrt(pow(obs_x, 2) + pow(obs_y, 2));
       theta = atan2(obs_y, obs_x);
-    
+
       if (dist <= OBST_EXTENT + OBST_RADIUS) {
         delta_x += -OBST_SCALE * (OBST_EXTENT + OBST_RADIUS - dist) * cos(theta);
         delta_y += -OBST_SCALE * (OBST_EXTENT + OBST_RADIUS - dist) * sin(theta);
