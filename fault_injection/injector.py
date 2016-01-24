@@ -47,6 +47,8 @@ else:
 
 print "executing: ", cmd_start
 
+random.seed(None) # uses system time
+
 # This will need to change if mixing TMR and DMR
 victim_types = len(victim_programs) # different controllers
 victim_count = 1 # 3 # replicated 3 times
@@ -61,15 +63,24 @@ while True:
 		search_str = 'ps -ao pid,pcpu,comm | grep "' + name + '" | grep -v "Test" | grep -v "defunct"'
 		getPIDs(victim_pids, victim_weights, victim_names, search_str)
 
-# Uncomment when implement weighting.
-#	if (len(victim_pids) < (victim_types * victim_count)):
-#		print "Error: One of the controllers did not successfully restart"
+	if (len(victim_pids) < (victim_types * victim_count)):
+		print "Error: One of the controllers did not successfully restart"
 		#sys.exit()
-#	else:
-#		kill_index = random.randint(0, len(victim_pids)-1)
-#		print "Executing ", cmd_start, " on a ", victim_names[kill_index], ": ", victim_pids[kill_index]
-#		Popen(cmd_start + " " + str(victim_pids[kill_index]), shell=True)
-		# These lines are only needed if there is no voter (testing)
-		#rep_index = (kill_index + (victim_count - 1)) % victim_count
-		#print "Restarting through ", victim_names[rep_index], " ", victim_pids[rep_index]
-		#Popen("kill -s USR1 " + str(victim_pids[rep_index]), shell=True)
+	else:
+		# The vicitm is selected based on victim cpu load, so the fault
+		# may not be injected if load is low.
+		kill_index = random.random() * 100 # * 100 to convert to percent
+		psum = 0.0
+		for index in range(0, len(victim_pids)):
+			psum = psum + victim_weights[index]
+			if psum > kill_index:
+				print "Executing ", cmd_start, " on a ", victim_names[index], ": ", victim_pids[index]
+				Popen(cmd_start + " " + str(victim_pids[index]), shell=True)
+				break
+		print "\tInjection done.\t", psum, " - ", kill_index
+
+
+# These lines are only needed if there is no voter (testing) (now defunct, need update)
+#rep_index = (kill_index + (victim_count - 1)) % victim_count
+#print "Restarting through ", victim_names[rep_index], " ", victim_pids[rep_index]
+#Popen("kill -s USR1 " + str(victim_pids[rep_index]), shell=True)
