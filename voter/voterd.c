@@ -295,6 +295,7 @@ void doOneUpdate(void) {
   if (timer_started) {
     timestamp_t current = generate_timestamp();
     long remaining = voting_timeout - diff_time(current, watchdog, CPU_MHZ);
+    // debug_print("Diff time: %f = diff_time(%llu, %llu, %f); %ld\n", diff_time(current, watchdog, CPU_MHZ), current, watchdog, CPU_MHZ, remaining);
     if (remaining > 0) {
       select_timeout.tv_sec = 0;
       select_timeout.tv_usec = remaining;

@@ -70,10 +70,10 @@ int InitTAS(cpu_id_t cpu, int priority) {
   call_setrlimit(RLIMIT_RTPRIO, RLIM_INFINITY, RLIM_INFINITY);
   call_getrlimit(RLIMIT_RTPRIO);
 
-  // Bind
-  if( cpu_bind(pid, cpu) != CPU_ERROR_NONE ) {
-    printf("InitTAS() failed calling cpu_bind(pid, cpu), with pid %d, cpu %d\n", pid, cpu);
-  }
+  // Bind // TODO: Commenting out for ARM
+  //if( cpu_bind(pid, cpu) != CPU_ERROR_NONE ) {
+  //  printf("InitTAS() failed calling cpu_bind(pid, cpu), with pid %d, cpu %d\n", pid, cpu);
+  //}
 
   // Set Scheduling
   if( sched_set_policy(pid, priority) != 0 ) {
