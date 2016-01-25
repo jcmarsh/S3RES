@@ -299,7 +299,7 @@ void doOneUpdate(void) {
       select_timeout.tv_sec = 0;
       select_timeout.tv_usec = remaining;
     } else {
-      // printf("Restart handler called, %s is %ld late\n", controller_name, remaining);
+      debug_print("Restart handler called, %s is %ld late\n", controller_name, remaining);
       voterRestartHandler();
     }
   }

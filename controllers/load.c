@@ -96,7 +96,7 @@ void perCyclePedestrian(void) {
   ccv_enable_default_cache();
   ccv_dense_matrix_t* image = 0;
   ccv_icf_classifier_cascade_t* cascade = ccv_icf_read_classifier_cascade("ccv_related/pedestrian.icf");
-  ccv_read("ccv_related/126.jpg", &image, CCV_IO_ANY_FILE | CCV_IO_RGB_COLOR);
+  ccv_read("ccv_related/street.png", &image, CCV_IO_ANY_FILE | CCV_IO_RGB_COLOR);
   if (image != 0) {
     unsigned int elapsed_time = get_current_time();
     ccv_array_t* seq = ccv_icf_detect_objects(image, &cascade, 1, ccv_icf_default_params);

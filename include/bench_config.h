@@ -1,8 +1,8 @@
 #ifndef BENCH_H
 #define BENCH_H
 
-#define CPU_MHZ 3092.0
-//#define CPU_MHZ 800.0
+//#define CPU_MHZ 3092.0
+#define CPU_MHZ 800.0
 
 #define TIME_FULL_BENCH
 //#define TEST_IPC_ROUND // Needs TIME_FULL_BENCH
@@ -20,7 +20,7 @@
 #endif // TEST_IPC_ROUND
 
 // From http://stackoverflow.com/a/1644898
-#define DEBUG_PRINT 0
+#define DEBUG_PRINT 1
 #define debug_print(...) \
 	do { if (DEBUG_PRINT) fprintf(stderr, ##__VA_ARGS__); } while (0)
 
