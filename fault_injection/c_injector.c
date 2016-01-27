@@ -12,16 +12,16 @@
  /*
   * TODO:
   *   Should write to a log file instead of stdout
-  *   Should run as a real time process, max priority
   *   May need to support different signals (right now just kills)
-  *   Test for memory leaks.
   */
 
+#include <sched.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 void printUsage(void) {
 	printf("Usage: ./c_injector <ignored> [controller_name_0 ... controller_name_n]\n");
@@ -56,9 +56,18 @@ int main(int argc, char *argv[]) {
 	if (argc < 2) {
 		printUsage();
 		exit(0);
-	} 
+	}
 
-	if (2 == argc) { 
+	// Set as RT, high priority
+	struct sched_param param;
+	param.sched_priority = sched_get_priority_max(SCHED_RR) - 1;
+
+	// set the scheduler as with policy of round robin (realtime)
+	if (sched_setscheduler(getpid(), SCHED_RR, &param ) == -1) {
+		printf("Running as non-RT\n");
+	}
+
+	if (2 == argc) {
 		// No process names specified, assume default 4
 		process_names = (char **)default_names;
 	} else {
@@ -75,8 +84,9 @@ int main(int argc, char *argv[]) {
 
 	int name_length = 0;
 	for (i = 0; i < count; i++) {
-		name_length += strlen(process_names[i]) + 1; // 2 for the \| separator needed, -1 for the \0
+		name_length += strlen(process_names[i]) + 2; // 2 for the \| separator needed, -1 for the \0
 	}
+	name_length--;
 
 	char * names_string = malloc(name_length * sizeof(char));
 	int total_i = 0;
@@ -99,8 +109,8 @@ int main(int argc, char *argv[]) {
 	srand(time(NULL));
 	while(true) {
 		int total = 0;
-		sleep(1);
-		
+		usleep(500 * 1000);
+
 		total = getPIDs(pids, weights, cmd_str);
 		if (total < count) {
 			printf("Error, less processes found than named.\n");
@@ -112,7 +122,7 @@ int main(int argc, char *argv[]) {
 				psum += weights[i];
 				if (psum > kill_index) {
 					printf("Killing pid %d\n", pids[i]);
-					//kill(pids[i], SIGKILL);
+					kill(pids[i], SIGKILL);
 					break;
 				}
 			}
