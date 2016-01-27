@@ -7,7 +7,7 @@ LIB=-lrt -lTASLimited
 FLAGS=-O3 -Werror -static
 #FLAGS=-g -O0 -Werror -static
 
-all: ArtPot AStar BenchMarker Empty Filter Logger Mapper Load
+all: ArtPot AStar BenchMarker Empty Filter Logger Mapper # Load
 
 %.o: %.c
 	gcc -c $(FLAGS) -o $@ $< -I../include/ -I../tas_lib/inc/
@@ -47,7 +47,7 @@ copy:
 	cp Filter $(INSTALL_DIR)
 	cp Logger $(INSTALL_DIR)
 	cp Mapper $(INSTALL_DIR)
-	cp Load $(INSTALL_DIR)
+	# cp Load $(INSTALL_DIR)
 
 clean:
 	rm -f *.o
