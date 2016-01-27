@@ -10,12 +10,11 @@
  */
 
  /*
-  * TODO:
-  *   Should write to a log file instead of stdout
-  *   May need to support different signals (right now just kills)
+  * TODO: May need to support different signals (right now just kills)
   */
 
 #include <sched.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -52,6 +51,13 @@ int main(int argc, char *argv[]) {
 	char **process_names;
 	unsigned int count = 4;
 	int i, j;
+	FILE *log_file;
+
+	log_file = fopen("injector_log.txt", "w");
+	if (log_file == NULL) {
+		printf("ERROR: c_injector failed open file.\n");
+		exit(0);
+	}
 
 	if (argc < 2) {
 		printUsage();
@@ -121,13 +127,13 @@ int main(int argc, char *argv[]) {
 			for (i = 0; i < total; i++) {
 				psum += weights[i];
 				if (psum > kill_index) {
-					printf("Killing pid %d\n", pids[i]);
+					fprintf(log_file, "Killing pid %d\n", pids[i]);
 					kill(pids[i], SIGKILL);
 					break;
 				}
 			}
 			
-			printf("\tInjection done. %f %f\n", psum, kill_index);
+			fprintf(log_file, "\tInjection done. %f %f\n", psum, kill_index);
 		}
 	}
 
