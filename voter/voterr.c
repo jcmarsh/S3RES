@@ -1,6 +1,5 @@
 /*
- * Voter that is able to start and connect to other voters, and maybe
- * even be generic
+ * Voter intended only for RT components (strict priority, tighter timeouts, possible protection measures).
  *
  * Author - James Marshall
  */
@@ -8,7 +7,6 @@
 #include "controller.h"
 #include "tas_time.h"
 
-#include <malloc.h>
 #include <signal.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -43,7 +41,7 @@ int rep_count;
 char* controller_name;
 // pipes to external components (not replicas)
 int pipe_count = 0;
-struct vote_pipe ext_pipes[PIPE_LIMIT];
+struct vote_pipe ext_pipes[PIPE_LIMIT]; // TODO: likely not needed for RT
 
 // Functions!
 int initVoterD(void);
@@ -52,8 +50,6 @@ void doOneUpdate(void);
 void processData(struct vote_pipe *pipe, int pipe_index);
 void resetVotingState(int pipe_num);
 void sendPipe(int pipe_num, int replica_num);
-void stealPipes(int rep_num, char **buffer, int *buff_count);
-void returnPipes(int rep_num, char **buffer, int *buff_count);
 void checkSDC(int pipe_num);
 void processFromRep(int replica_num, int pipe_num);
 void writeBuffer(int fd_out, char* buffer, int buff_count);
@@ -65,39 +61,13 @@ void restart_prep(int restartee, int restarter) {
     timestamp_t start_restart = generate_timestamp();
   #endif // TIME_RESTART_REPLICA
 
-  // Normally the pipes are stolen, then written back.
-  // Here, we want to fill the pipes to test the impact of large messages.
-  // So we will write to them, and then steal them (so that the fake data isn't processed).
-  // But probably won't work if real data is there...
-  // Problem: normally steal once, write twice. Need a second write... use restarted rep?
-  #ifdef PIPE_SMASH
-    char pipe_fill[PIPE_FILL_SIZE] = {1};
-    for (i = 0; i < PIPE_LIMIT; i++) {
-      if (replicas[restarter].vot_pipes[i].fd_out != 0) {
-        writeBuffer(replicas[restarter].vot_pipes[i].fd_out, pipe_fill, sizeof(pipe_fill));
-      }
-    }  
-  #endif // PIPE_SMASH
-
-  char **restarter_buffer = (char **)malloc(sizeof(char *) * PIPE_LIMIT);
-  if (restarter_buffer == NULL) {
-    perror("Voter failed to malloc memory");
-  }
-  for (i = 0; i < PIPE_LIMIT; i++) {
-    restarter_buffer[i] = (char *)malloc(sizeof(char) * MAX_VOTE_PIPE_BUFF);
-    if (restarter_buffer[i] == NULL) {
-      perror("Voter failed to allocat memory");
-    }
-  }
-  int restarter_buff_count[PIPE_LIMIT] = {0};
-
-  // Steal the pipes from healthy reps. This stops them from processing mid restart (also need to copy data to new rep)
-  stealPipes(restarter, restarter_buffer, restarter_buff_count);
-
   // reset timer
   timer_started = false;
   restartReplica(replicas, rep_count, &sd, ext_pipes, restarter, restartee, replica_priority);
 
+  // Shouldn't need. Vote_pipes solve a problem only nonRT has,
+  // and send_pipe not needed since pipes should all be empty.
+  // EXCEPT: components may have multiple pipes... but all are demand - response, right?
   for (i = 0; i < replicas[restarter].pipe_count; i++) {
     if (replicas[restarter].vot_pipes[i].fd_in != 0) {
       copyPipe(&(replicas[restartee].vot_pipes[i]), &(replicas[restarter].vot_pipes[i]));
@@ -105,50 +75,10 @@ void restart_prep(int restartee, int restarter) {
     }
   }
 
-  #ifndef PIPE_SMASH
-    // Give the buffers back
-    returnPipes(restartee, restarter_buffer, restarter_buff_count);
-    returnPipes(restarter, restarter_buffer, restarter_buff_count);
-    // free the buffers
-    for (i = 0; i < PIPE_LIMIT; i++) {
-      free(restarter_buffer[i]);
-    }
-    free(restarter_buffer);
-  #endif // !PIPE_SMASH
-
-  // The second write
-  #ifdef PIPE_SMASH
-    for (i = 0; i < PIPE_LIMIT; i++) {
-      if (replicas[restarter].vot_pipes[i].fd_out != 0) {
-        writeBuffer(replicas[restarter].vot_pipes[i].fd_out, pipe_fill, sizeof(pipe_fill));
-      }
-    }  
-  #endif // PIPE_SMASH
-
   #ifdef TIME_RESTART_REPLICA
     timestamp_t end_restart = generate_timestamp();
     printf("Restart time elapsed usec (%lf)\n", diff_time(end_restart, start_restart, CPU_MHZ));
   #endif // TIME_RESTART_REPLICA
-
-  // Clean up by stealing the extra write. Not timed.
-  #ifdef PIPE_SMASH
-    if (restarter_buffer == NULL) {
-      perror("Voter failed to malloc memory");
-    }
-    for (i = 0; i < PIPE_LIMIT; i++) {
-      restarter_buffer[i] = (char *)malloc(sizeof(char) * MAX_VOTE_PIPE_BUFF);
-      if (restarter_buffer[i] == NULL) {
-        perror("Voter failed to allocat memory");
-      }
-    }
-
-    stealPipes(restarter, restarter_buffer, restarter_buff_count);
-    // free the buffers
-    for (i = 0; i < PIPE_LIMIT; i++) {
-      free(restarter_buffer[i]);
-    }
-    free(restarter_buffer);
-  #endif // PIPE_SMASH
 
   return;
 }
@@ -201,46 +131,7 @@ void voterRestartHandler(void) {
   }
 }
 
-// Steal the pipe contents from a single replica
-// buff_count and buffer should already be alocated.
-void stealPipes(int rep_num, char **buffer, int *buff_count) {
-  int i = 0;
-
-  struct timeval select_timeout;
-  fd_set select_set;
-  select_timeout.tv_sec = 0;
-  select_timeout.tv_usec = 0;
-
-  FD_ZERO(&select_set);
-  for (i = 0; i < replicas[rep_num].pipe_count; i++) {
-    if (replicas[rep_num].voter_rep_in_copy[i] != 0) {
-      FD_SET(replicas[rep_num].voter_rep_in_copy[i], &select_set);
-    }
-  }
-
-  int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
-  if (retval > 0) { // Copy buffers
-    for (i = 0; i < replicas[rep_num].pipe_count; i++) {
-      if (FD_ISSET(replicas[rep_num].voter_rep_in_copy[i], &select_set)) {
-        buff_count[i] = read(replicas[rep_num].voter_rep_in_copy[i], buffer[i], MAX_VOTE_PIPE_BUFF);
-        if (buff_count[i] < 0) {
-          perror("Voter error stealing pipe");
-        }
-      }
-    }
-  }  
-}
-
-// replace pipe buffers in a replica. Does NOT free the buffer (so the same one can be copied again)
-void returnPipes(int rep_num, char **buffer, int *buff_count) {  
-  int i = 0;
-  for (i = 0; i < replicas[rep_num].pipe_count; i++) {
-    if (buff_count[i] > 0) {
-      writeBuffer(replicas[rep_num].vot_pipes[i].fd_out, buffer[i], buff_count[i]);
-    }
-  }
-}
-
+// TODO: Not needed? Reps run until they vote.
 bool checkSync(void) {
   int r_index, p_index;
   bool nsync = true;
@@ -263,31 +154,6 @@ void doOneUpdate(void) {
 
   struct timeval select_timeout;
   fd_set select_set;
-
-  // TODO: Would this trip for a SMR component that faulted?
-  if (rep_type == SMR) { // Detect replica that self-kills, has no timer (Load does this due to memory leak)
-    #ifdef TIME_WAITPID
-      timestamp_t start_restart = generate_timestamp();
-    #endif // TIME_WAITPID
-
-    // can only waitpid for children (unless subreaper is used (prctl is not POSIX compliant)).
-    int exit_pid = waitpid(-1, NULL, WNOHANG); // Seems to take a while for to clean up zombies
-      
-    #ifdef TIME_WAITPID
-      timestamp_t end_restart = generate_timestamp();
-      if (exit_pid > 0 && exit_pid != last_dead) {
-        printf("Waitpid for %d (%s) took usec (%lf)\n", exit_pid, REP_TYPE_T[rep_type], diff_time(end_restart, start_restart, CPU_MHZ));
-      } else {
-        //printf("No zombie took (%lld)\n", end_restart - start_restart);
-      }
-    #endif // TIME_WAITPID
-
-    if (exit_pid > 0 && exit_pid != last_dead) {
-      debug_print("PID %d exited on its own.\n", exit_pid);
-      voterRestartHandler();
-      timer_started = false;
-    }
-  }
 
   select_timeout.tv_sec = 0;
   select_timeout.tv_usec = 50000;
@@ -317,12 +183,10 @@ void doOneUpdate(void) {
         FD_SET(e_pipe_fd, &select_set);
       }
     }
-  } else if (voter_priority < 5 && ! timer_started) {
-    // non-RT controller is now lagging behind.
-    timer_started = true;
-    watchdog = generate_timestamp();
   }
 
+  // TODO: Should just run each replica in order. No need to shuffle priority.
+  //   Each select would just be for the replica last written too.
   // Check pipes from replicas
   for (p_index = 0; p_index < pipe_count; p_index++) {
     for (r_index = 0; r_index < rep_count; r_index++) {
@@ -370,23 +234,17 @@ void doOneUpdate(void) {
   }
 }
 
+// TODO: Really needed as a function?
 void writeBuffer(int fd_out, char* buffer, int buff_count) {
   int retval = TEMP_FAILURE_RETRY(write(fd_out, buffer, buff_count));
-  if (retval == buff_count) {
-    // success, do nothing
-  } else if (retval > 0) { // TODO: resume write? 
-    printf("Voter for %s, pipe %d, bytes written: %d\texpected: %d\n", controller_name, fd_out, retval, buff_count);
-    perror("Voter wrote partial message");
-  } else if (retval < 0) {
-    printf("Voter for %s failed write fd: %d\n", controller_name, fd_out);
-    perror("Voter write");
-  } else {
-    printf("Voter wrote == 0 for %s fd: %d\n", controller_name, fd_out);
+  if (retval != buff_count) {
+    perror("Voter writeBuffer failed.");
   }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Process data
+// TODO: replace vote_pipe with simple buffer
 void processData(struct vote_pipe *pipe, int pipe_index) {
   int r_index;
 
@@ -397,6 +255,7 @@ void processData(struct vote_pipe *pipe, int pipe_index) {
     }
   }
 
+  // TODO: No need to balance reps: order tightly controlled.
   balanceReps(replicas, rep_count, replica_priority);
 
   for (r_index = 0; r_index < rep_count; r_index++) {
@@ -411,6 +270,7 @@ void sendPipe(int pipe_num, int replica_num) {
     return;
   }
 
+  // TODO: Timer for every pipe?
   if (pipe_num == timer_stop_index) {  
     // reset the timer
     timer_started = false;
@@ -421,6 +281,7 @@ void sendPipe(int pipe_num, int replica_num) {
       int retval;
       retval = buffToPipe(&(replicas[r_index].vot_pipes[pipe_num]), ext_pipes[pipe_num].fd_out, bytes_avail);
     } else {
+      // TODO: no need to fake writes
       fakeToPipe(&(replicas[r_index].vot_pipes[pipe_num]), bytes_avail);
     }
   }
@@ -456,28 +317,7 @@ void checkSDC(int pipe_num) {
             int restartee = (r_index + 2) % rep_count;
             
             debug_print("Caught SDC: %s : %d\n", controller_name, replicas[restartee].pid);
-            if (DEBUG_PRINT) {
-              // print all three or just two?
 
-              // Create typed pipes for meta data
-              struct typed_pipe print_pipesA[pipe_count];
-              struct typed_pipe print_pipesB[pipe_count];
-              convertVoteToTyped(replicas[r_index].vot_pipes, pipe_count, print_pipesA);
-              convertVoteToTyped(replicas[(r_index + 2) % rep_count].vot_pipes, pipe_count, print_pipesB);
-              
-              // Copy the buffer over
-              char *buffer_A = (char *)malloc(sizeof(char) * MAX_VOTE_PIPE_BUFF);
-              char *buffer_B = (char *)malloc(sizeof(char) * MAX_VOTE_PIPE_BUFF);
-              copyBuffer(&(replicas[r_index].vot_pipes[pipe_num]), buffer_A, bytes_avail);
-              copyBuffer(&(replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num]), buffer_B, bytes_avail);
-
-              // print them out.
-              printBuffer(&(print_pipesA[pipe_num]), buffer_A, bytes_avail);
-              printBuffer(&(print_pipesB[pipe_num]), buffer_B, bytes_avail);
-
-              free(buffer_A);
-              free(buffer_B);
-            }
             restart_prep(restartee, r_index);
           } else {
             // If all agree, send and be happy. Otherwise the send is done as part of the restart process
@@ -496,7 +336,7 @@ void checkSDC(int pipe_num) {
 void processFromRep(int replica_num, int pipe_num) {
   // read from pipe
   if (pipeToBuff(&(replicas[replica_num].vot_pipes[pipe_num])) == 0) {
-    balanceReps(replicas, rep_count, replica_priority);
+    balanceReps(replicas, rep_count, replica_priority); // TODO: No!
     checkSDC(pipe_num);
   } else {
     printf("Voter - Controller %s, rep %d, pipe %d\n", controller_name, replica_num, pipe_num);
@@ -606,7 +446,7 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
-  sleep(1);
+  sleep(1); // TODO: Needed?
 
   while(1) {
     doOneUpdate();

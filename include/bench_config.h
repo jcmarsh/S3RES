@@ -8,7 +8,7 @@
 //#define TEST_IPC_ROUND // Needs TIME_FULL_BENCH
 //#define TIME_RESTART_SIGNAL
 //#define TIME_RESTART_REPLICA
-//#define PIPE_SMASH
+//#define PIPE_SMASH // Not in VoterR right now.
 //#define TIME_WAITPID
 
 #ifdef PIPE_SMASH
