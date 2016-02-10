@@ -11,4 +11,3 @@
 #define CFE_SIM_SIGNAL SIGRTMIN + 3 // For inserting simulated control flow errors
 
 int initController(void);
-static void restartHandler(int signo, siginfo_t *si, void *unused);

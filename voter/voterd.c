@@ -9,7 +9,6 @@
 #include "tas_time.h"
 
 #include <malloc.h>
-#include <signal.h>
 #include <string.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
@@ -56,7 +55,7 @@ void stealPipes(int rep_num, char **buffer, int *buff_count);
 void returnPipes(int rep_num, char **buffer, int *buff_count);
 void checkSDC(int pipe_num);
 void processFromRep(int replica_num, int pipe_num);
-void writeBuffer(int fd_out, char* buffer, int buff_count);
+void writeBuffer(int fd_out, unsigned char* buffer, int buff_count);
 
 void restart_prep(int restartee, int restarter) {
   int i;
@@ -370,7 +369,7 @@ void doOneUpdate(void) {
   }
 }
 
-void writeBuffer(int fd_out, char* buffer, int buff_count) {
+void writeBuffer(int fd_out, unsigned char* buffer, int buff_count) {
   int retval = TEMP_FAILURE_RETRY(write(fd_out, buffer, buff_count));
   if (retval == buff_count) {
     // success, do nothing
@@ -507,9 +506,6 @@ void processFromRep(int replica_num, int pipe_num) {
 ////////////////////////////////////////////////////////////////////////////////
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
 int initVoterD(void) {
-  struct sigevent sev;
-  sigset_t mask;
-
   replica_priority = voter_priority - VOTER_PRIO_OFFSET;
 
   // Setup fd server

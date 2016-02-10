@@ -12,6 +12,8 @@ extern const char* name;
 extern bool insertSDC;
 extern bool insertCFE;
 
+static void restartHandler(int signo, siginfo_t *si, void *unused);
+
 void testSDCHandler(int signo, siginfo_t *si, void *unused) {
   insertSDC = true;
 }

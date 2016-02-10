@@ -7,13 +7,11 @@
 
 #define _GNU_SOURCE 1
 
-#include <error.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 
 // Max number of bytes
 #define MAX_VOTE_PIPE_BUFF 4096

@@ -12,8 +12,8 @@ all: VoterD VoterR
 VoterD: voterd.o vote_buff.c ../src/commtypes.c ../src/replicas.c ../src/fd_server.c ../src/fd_client.c
 	gcc $(FLAGS) -o VoterD voterd.o vote_buff.c ../src/commtypes.c ../src/replicas.c ../src/fd_server.c ../src/fd_client.c $(INC) $(LIB)
 
-VoterR: voterr.o vote_buff.c ../src/commtypes.c ../src/replicas.c ../src/fd_server.c ../src/fd_client.c
-	gcc $(FLAGS) -o VoterR voterr.o vote_buff.c ../src/commtypes.c ../src/replicas.c ../src/fd_server.c ../src/fd_client.c $(INC) $(LIB)
+VoterR: voterr.o fd_serverr.c
+	gcc $(FLAGS) -o VoterR voterr.o fd_serverr.c $(INC) $(LIB)
 
 test: test_buff.o vote_buff.c
 	gcc -g -o testBuff test_buff.o vote_buff.c $(INC) $(LIB)

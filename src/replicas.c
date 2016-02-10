@@ -12,7 +12,6 @@
 void initReplicas(struct replica reps[], int rep_num, const char* name, int priority) {  
   int index, jndex;
 
-  // Init three replicas
   for (index = 0; index < rep_num; index++) {
     struct replica* new_rep = &reps[index];
     if (new_rep->name != NULL) {
@@ -269,7 +268,7 @@ void forkReplicas(struct replica reps[], int num, int additional_argc, char **ad
   for (index = 0; index < num; index++) {
     // Each replica needs to build up it's argvs
     struct replica* curr = &reps[index];
-    int rep_argc = ARGV_REQ + additional_argc + 1; // 0 is the program name, 1 is the priority, and 1 more for a NULL at the end
+    int rep_argc = ARGV_REQ + additional_argc + 1; // 0 is the program name, 1 is the priority, 2 is the pipe count, and 1 more for a NULL at the end
     char** rep_argv = (char**)malloc(sizeof(char *) * rep_argc);
 
     rep_argv[0] = curr->name;
