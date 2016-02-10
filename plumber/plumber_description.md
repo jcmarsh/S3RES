@@ -30,7 +30,7 @@ The rest of the lines describe the communication between the components. The lin
 
 `Bench` is a special component that is always launched and serves as the entry and exit point for the whole system. This component is used for making timing measurements for the whole system (benchmarker... Bench).
 
-![Components with communication channels (Pedestrian is not in the examples shown here).](docs/system.png?raw=true "Components")
+![Components with communication channels (Pedestrian is not in the examples shown here).](../docs/system.png?raw=true "Components")
 
 ## Example with Protection
 
