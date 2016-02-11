@@ -13,6 +13,8 @@ timestamp_t watchdog;
 
 // Replica related data
 struct replicaR *replicas;
+// The replica half of the data
+struct replicaR *for_reps;
 
 // TAS Stuff
 int voter_priority;
@@ -209,11 +211,16 @@ int initVoterD(void) {
   //initReplicas(reps, num, name, default_priority);
   int index, jndex;
   replicas = (struct replicaR *) malloc(sizeof(struct replicaR) * rep_count);
+  for_reps = (struct replicaR *) malloc(sizeof(struct replicaR) * rep_count);
   for (index = 0; index < rep_count; index++) {
     replicas[index].in_pipe_count = in_pipe_count; // Duplicated to make fds data passing easier
+    for_reps[index].in_pipe_count = in_pipe_count;
     replicas[index].fd_ins = (unsigned int *) malloc(sizeof(int) * in_pipe_count);
+    for_reps[index].fd_ins = (unsigned int *) malloc(sizeof(int) * in_pipe_count);
     replicas[index].out_pipe_count = out_pipe_count; // Duplicated to make fds data passing easier
+    for_reps[index].out_pipe_count = out_pipe_count;
     replicas[index].fd_outs = (unsigned int *) malloc(sizeof(int) * out_pipe_count);
+    for_reps[index].fd_outs = (unsigned int *) malloc(sizeof(int) * out_pipe_count);
     replicas[index].buff_counts = (unsigned int *) malloc(sizeof(int) * out_pipe_count);
     replicas[index].buffers = (unsigned char **) malloc(sizeof(char*) * out_pipe_count);
     for (jndex = 0; jndex < out_pipe_count; jndex++) {
@@ -221,27 +228,26 @@ int initVoterD(void) {
     }
   }
 
+
   //createPipes(reps, num, ext_pipes, pipe_count);
   int pipe_fds[2];
-  unsigned int fd_ins_for_rep[rep_count][in_pipe_count];
   for (index = 0; index < rep_count; index++) {
     for (jndex = 0; jndex < in_pipe_count; jndex++) {
       if (pipe(pipe_fds) == -1) {
         printf("Replica pipe error\n");
       } else {
         replicas[index].fd_ins[jndex] = pipe_fds[1];
-        fd_ins_for_rep[index][jndex] = pipe_fds[0];
+        for_reps[index].fd_ins[jndex] = pipe_fds[0];
       }
     }
   }
-  unsigned int fd_outs_for_rep[rep_count][out_pipe_count];
   for (index = 0; index < rep_count; index++) {
     for (jndex = 0; jndex < out_pipe_count; jndex++) {
       if (pipe(pipe_fds) == -1) {
         printf("Replica pipe error\n");
       } else {
         replicas[index].fd_outs[jndex] = pipe_fds[0];
-        fd_ins_for_rep[index][jndex] = pipe_fds[1];
+        for_reps[index].fd_outs[jndex] = pipe_fds[1];
       }
     }
   }
@@ -290,7 +296,7 @@ int initVoterD(void) {
 
   // Give the replicas their pipes (same method as restart)
   for (jndex = 0; jndex < rep_count; jndex++) {
-    if (acceptSendFDS(&sd, &replicas[jndex], rep_info_in, rep_info_out) < 0) {
+    if (acceptSendFDS(&sd, &for_reps[jndex], rep_info_in, rep_info_out) < 0) {
       printf("EmptyRestart acceptSendFDS call failed\n");
       exit(-1);
     }
@@ -298,7 +304,7 @@ int initVoterD(void) {
 
   InitTAS(DEFAULT_CPU, voter_priority); // IMPORTANT: Should be after forking replicas to subvert CoW
 
-  debug_print("Initializing VoterD(%s)\n", controller_name);
+  debug_print("Initializing VoterR(%s)\n", controller_name);
 
   return 0;
 }

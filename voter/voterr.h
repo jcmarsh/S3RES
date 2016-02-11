@@ -38,7 +38,7 @@ struct replicaR {
   unsigned int *fd_ins;
   // The following all have out_pipe_count members
   int out_pipe_count;
-  unsigned int *fd_outs;  
+  unsigned int *fd_outs;
   unsigned int *buff_counts;
   unsigned char **buffers;
 };
