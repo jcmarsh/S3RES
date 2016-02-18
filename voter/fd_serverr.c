@@ -78,8 +78,8 @@ int sendFDS(int connection_fd, struct replicaR * rep, char **rep_info_in, char *
   datas[0].iov_base = send_pipes;
   datas[0].iov_len = sizeof(send_pipes);
 
-  datas[0].iov_base = &pinned_cpu;
-  datas[0].iov_len = sizeof(pinned_cpu);
+  datas[1].iov_base = &pinned_cpu;
+  datas[1].iov_len = sizeof(pinned_cpu);
 
   memset(&hdr, 0, sizeof(hdr));
   hdr.msg_name = NULL;
@@ -109,7 +109,7 @@ int sendFDS(int connection_fd, struct replicaR * rep, char **rep_info_in, char *
   int retval = sendmsg(connection_fd, &hdr, 0);
 
   if(retval < 0) {
-    perror("FD_server sendmsg() failed");
+    perror("FD_ServerR sendmsg() failed");
   }
 
   return retval;
@@ -123,12 +123,12 @@ int createFDS(struct server_data * sd, const char* name) {
   char* actual_name;
   
   if (asprintf(&actual_name, "%s%s%s", pre_name, name, post_name) < 0) {
-    perror("fd_server failed to allocate fd_name");
+    perror("FD_ServerR failed to allocate fd_name");
   }
 
   sd->sock_fd = socket(PF_UNIX, SOCK_STREAM, 0);
   if (sd->sock_fd < 0) {
-    perror("Socket creation failed.");
+    perror("FD_ServerR socket creation failed.");
     return 1;
   }
 
@@ -142,20 +142,20 @@ int createFDS(struct server_data * sd, const char* name) {
   if (strlen(actual_name) < UNIX_PATH_MAX) {
     memcpy(&(sd->address.sun_path), actual_name, strlen(actual_name));
   } else {
-    printf("Server Address length longer than max.\n");
+    printf("FD_ServerR server Address length longer than max.\n");
     return -1;
   }
   free(actual_name);
 
   if(bind(sd->sock_fd, (struct sockaddr *) &(sd->address), sizeof(struct sockaddr_un)) != 0) {
-    printf("bind() failed\n");
+    printf("FD_ServerR bind() failed\n");
     return 1;
   }
 
   // This program will listen to connections on this socket
   // 5 is the backlog: how many pending connections there may be
   if(listen(sd->sock_fd, 5) != 0) {
-    printf("listen() failed\n");
+    printf("FD_ServerR listen() failed\n");
     return 1;
   }
 }
@@ -174,12 +174,12 @@ int acceptSendFDS(struct server_data * sd, struct replicaR * rep, char **rep_inf
   if (connection_fd > -1) {
     // send read end to client
     if (sendFDS(connection_fd, rep, rep_info_in, rep_info_out, pinned_cpu) < 0) {
-      perror("FD_Server failed to sendFDS");
+      perror("FD_ServerR failed to sendFDS");
       retval = -1;
       goto accept_send_FDS_out;
     }
   } else {
-    perror("FD_Server failed to accept");
+    perror("FD_ServerR failed to accept");
     retval = -1;
     goto accept_send_FDS_out;
   }
@@ -187,7 +187,7 @@ int acceptSendFDS(struct server_data * sd, struct replicaR * rep, char **rep_inf
   // read pid... but ignore.
   retval = read(connection_fd, &pid, sizeof(pid_t));
   if (retval != sizeof(pid_t)) {
-    perror("FD_Server failed to read pid");
+    perror("FD_ServerR failed to read pid");
     retval = -1;
   }
 
