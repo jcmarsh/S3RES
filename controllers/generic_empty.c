@@ -14,6 +14,7 @@ int read_in_index, write_out_index;
 
 // TAS related
 int priority;
+int pinned_cpu;
 
 const char* name = "Empty";
 
@@ -36,7 +37,7 @@ int parseArgs(int argc, const char **argv) {
   pipe_count = 2; // For now always 2
   if (argc < 5) { // Must request fds
     pid_t pid = getpid();
-    connectRecvFDS(pid, pipes, pipe_count, "Empty");
+    connectRecvFDS(pid, pipes, pipe_count, "Empty", &pinned_cpu);
   } else {
     deserializePipe(argv[3], &pipes[read_in_index]);
     deserializePipe(argv[4], &pipes[write_out_index]);

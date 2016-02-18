@@ -11,6 +11,7 @@
 
 #include "../include/fd_server.h"
 #include "../include/vote_buff.h"
+#include "../include/system_config.h"
 #include <fcntl.h> // needed to deal with pipes
 #include <sys/user.h> // has pid_t
 #include <signal.h>
@@ -20,6 +21,7 @@
 struct replica {
   pid_t pid; // The pid of the process
   int priority;
+  int pinned_cpu;
   char* name;
 
   // list of connections

@@ -7,21 +7,24 @@
 #include "../include/fd_client.h"
 #include "../include/commtypes.h"
 
-int requestFDS(int sock_fd, struct typed_pipe* pipes, int pipe_count) {
+int requestFDS(int sock_fd, struct typed_pipe* pipes, int pipe_count, int *pinned_cpu) {
   int i;
   struct msghdr hdr;
-  struct iovec data;
+  struct iovec datas[2];
   struct cmsghdr *cmsg;
   int retval;
   
-  data.iov_base = pipes;
-  data.iov_len = sizeof(struct typed_pipe) * pipe_count;
+  datas[0].iov_base = pipes;
+  datas[0].iov_len = sizeof(struct typed_pipe) * pipe_count;
+
+  datas[1].iov_base = pinned_cpu;
+  datas[1].iov_len = sizeof(int);
 
   memset(&hdr, 0, sizeof(hdr));
   hdr.msg_name = NULL;
   hdr.msg_namelen = 0;
-  hdr.msg_iov = &data;
-  hdr.msg_iovlen = 1; // number of iovec data structs, here only one
+  hdr.msg_iov = datas;
+  hdr.msg_iovlen = 2; // number of iovec data structs, here only one
   hdr.msg_flags = 0;
 
   cmsg = (struct cmsghdr*)malloc(CMSG_LEN(sizeof(int) * pipe_count));
@@ -51,7 +54,7 @@ int requestFDS(int sock_fd, struct typed_pipe* pipes, int pipe_count) {
  * Connects to the named file descriptor server, receives new fds for each pipe, and sends back its PID.
  * Returns 0 on success, <0 otherwise.
  */
-int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const char* name) {
+int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const char* name, int *pinned_cpu) {
   int sock_fd;
   int retval = 0;
   struct sockaddr_un address;
@@ -92,7 +95,7 @@ int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const ch
     goto connect_recv_FDS_sock_out;
   }
 
-  if (requestFDS(sock_fd, pipes, pipe_count) < 0) {
+  if (requestFDS(sock_fd, pipes, pipe_count, pinned_cpu) < 0) {
     retval = -1;
     goto connect_recv_FDS_sock_out;
   }

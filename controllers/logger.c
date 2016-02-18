@@ -7,6 +7,7 @@
 #include "controller.h"
 #include "tas_time.h"
 #include "bench_config.h"
+#include "system_config.h"
 #include <math.h>
 #include <time.h>
 
@@ -26,6 +27,7 @@ int data_index;
 
 // TAS related
 int priority;
+int pinned_cpu;
 
 const char* name = "Logger";
 
@@ -48,7 +50,7 @@ int parseArgs(int argc, const char **argv) {
   if (argc < 4) { // Must request fds
     // printf("Usage: Logger <priority> <pipe_num> <pipe_in>\n");
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, 1, name); // TODO: lame. What about strings to print?
+    connectRecvFDS(currentPID, pipes, 1, name, &pinned_cpu); // TODO: lame. What about strings to print?
   } else {
     deserializePipe(argv[3], &pipes[data_index]);
     int i;

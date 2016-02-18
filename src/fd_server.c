@@ -6,24 +6,27 @@
 
 #include "../include/fd_server.h"
 
-int sendFDS(int connection_fd, struct vote_pipe* pipes, int pipe_count) { // pipes are the rep side
+int sendFDS(int connection_fd, struct vote_pipe* pipes, int pipe_count, int pinned_cpu) { // pipes are the rep side
   int i;
   struct msghdr hdr;
-  struct iovec data;
+  struct iovec datas[2];
   // cmsg is the out-of-band data (fds)
   char cmsgbuf[CMSG_SPACE(sizeof(int) * pipe_count)];
 
   struct typed_pipe send_pipes[pipe_count];
   convertVoteToTyped(pipes, pipe_count, send_pipes);
 
-  data.iov_base = send_pipes;
-  data.iov_len = sizeof(send_pipes);
+  datas[0].iov_base = send_pipes;
+  datas[0].iov_len = sizeof(send_pipes);
+
+  datas[1].iov_base = &pinned_cpu;
+  datas[1].iov_len = sizeof(pinned_cpu);
 
   memset(&hdr, 0, sizeof(hdr));
   hdr.msg_name = NULL;
   hdr.msg_namelen = 0;
-  hdr.msg_iov = &data;
-  hdr.msg_iovlen =  1; // number of iovec items in data
+  hdr.msg_iov = datas;
+  hdr.msg_iovlen =  2; // number of iovec items in datas
   hdr.msg_flags = 0;
 
   hdr.msg_control = cmsgbuf;
@@ -101,14 +104,14 @@ int createFDS(struct server_data * sd, const char* name) {
  * Blocks on accept: You better know a client is about to connect!
  * Returns 0 upon success, <0 otherwise.
  */
-int acceptSendFDS(struct server_data * sd, pid_t *pid, struct vote_pipe* pipes, int pipe_count) {
+int acceptSendFDS(struct server_data * sd, pid_t *pid, struct vote_pipe* pipes, int pipe_count, int pinned_cpu) {
   int connection_fd;
   int retval = 0;
 
   connection_fd = TEMP_FAILURE_RETRY(accept(sd->sock_fd, (struct sockaddr *) &(sd->address), &(sd->address_length)));
   if (connection_fd > -1) {
     // send read end to client
-    if (sendFDS(connection_fd, pipes, pipe_count) < 0) {
+    if (sendFDS(connection_fd, pipes, pipe_count, pinned_cpu) < 0) {
       perror("FD_Server failed to sendFDS");
       retval = -1;
       goto accept_send_FDS_out;

@@ -1,8 +1,9 @@
+/*
+ * Meant for configuration related to benchmarks
+ */
+
 #ifndef BENCH_H
 #define BENCH_H
-
-//#define CPU_MHZ 3092.0
-#define CPU_MHZ 1000.0
 
 #define TIME_FULL_BENCH
 //#define TEST_IPC_ROUND // Needs TIME_FULL_BENCH

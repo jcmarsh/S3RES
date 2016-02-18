@@ -18,6 +18,7 @@ int data_index, update_index, ack_index; // Data from range pose, updates to pla
 
 // TAS related
 int priority;
+int pinned_cpu;
 
 struct point_i* current_pose;
 // Count to 3 method worked great before
@@ -61,7 +62,7 @@ int parseArgs(int argc, const char **argv) {
   pipe_count = atoi(argv[2]); // For now always 3
   if (argc < 6) { // Must request fds
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "Mapper");
+    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "Mapper", &pinned_cpu);
     //connectRecvFDS(currentPID, pipes, PIPE_COUNT, "MapperTest");
     setPipeIndexes();
   } else {

@@ -1,6 +1,7 @@
 #include "controller.h"
 #include "taslimited.h"
 
+// All extern here must be in the controller code (such as art_pot.c)
 extern void setPipeIndexes(void);
 extern void enterLoop(void);
 
@@ -8,6 +9,7 @@ extern int priority;
 extern int pipe_count;
 extern struct typed_pipe pipes[];
 extern const char* name;
+extern int pinned_cpu;
 
 extern bool insertSDC;
 extern bool insertCFE;
@@ -50,7 +52,7 @@ int initController(void) {
     return -1;
   }
 
-  InitTAS(DEFAULT_CPU, priority);
+  InitTAS(pinned_cpu, priority);
 
   debug_print("Initializing controller %s\n", name);
   return 0;
@@ -72,8 +74,6 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
       // child sets new id, recreates connects, loops
-      InitTAS(DEFAULT_CPU, priority);
-
       // clean up pipes
       for (index = 0; index < pipe_count; index++) {
         resetPipe(&pipes[index]);
@@ -91,16 +91,18 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
 
       // Get own pid, send to voter
       currentPID = getpid();
-      if (connectRecvFDS(currentPID, pipes, pipe_count, name) < 0) {
+      if (connectRecvFDS(currentPID, pipes, pipe_count, name, &pinned_cpu) < 0) {
         printf("Error in %s: failed connectRecvFDS call.\n", name);
         return;
       }
+
+      InitTAS(pinned_cpu, priority);
       
       setPipeIndexes();
       
       return;
     } else {   // Parent needs to re-lock / walk own pages
-      InitTAS(DEFAULT_CPU, priority);
+      InitTAS(pinned_cpu, priority);
       return;
     }
   } else {

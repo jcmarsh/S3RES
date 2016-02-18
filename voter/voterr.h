@@ -14,6 +14,7 @@
 
 //#include "controller.h"
 #include "bench_config.h"
+#include "system_config.h"
 #include "tas_time.h"
 //#include "commtypes.h"
 
@@ -31,6 +32,7 @@ struct server_data {
 
 // Represents one redundant execution, implemented as a process
 struct replicaR {
+  int pinned_cpu;
   // list of connections
   // Uses the same format as the plumber
   // The following all have in_pipe_count members
@@ -45,7 +47,7 @@ struct replicaR {
 
 // fd_server functions
 int createFDS(struct server_data * sd, const char* name);
-int acceptSendFDS(struct server_data * sd, struct replicaR * rep, char **rep_info_in, char **rep_info_out);
+int acceptSendFDS(struct server_data * sd, struct replicaR * rep, char **rep_info_in, char **rep_info_out, int pinned_cpu);
 
 // VoterR Functions
 // int -> recv -> sendCollect -> vote -> output -> recv

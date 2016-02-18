@@ -21,6 +21,7 @@ int out_to_log;
 
 // TAS related
 int priority;
+int pinned_cpu;
 
 const char* name = "Load";
 
@@ -42,7 +43,7 @@ int parseArgs(int argc, const char **argv) {
   pipe_count = 1;
   if (argc < 4) { // Must request fds
     pid_t pid = getpid();
-    connectRecvFDS(pid, pipes, pipe_count, "Load");
+    connectRecvFDS(pid, pipes, pipe_count, "Load", &pinned_cpu);
   } else {
     deserializePipe(argv[3], &pipes[0]);
   }

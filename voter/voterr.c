@@ -213,6 +213,14 @@ int initVoterD(void) {
   replicas = (struct replicaR *) malloc(sizeof(struct replicaR) * rep_count);
   for_reps = (struct replicaR *) malloc(sizeof(struct replicaR) * rep_count);
   for (index = 0; index < rep_count; index++) {
+    if (CONTROLLER_PIN == QUAD_PIN_POLICY) {
+      replicas[index].pinned_cpu = index + 1; // TODO: don't need both
+      for_reps[index].pinned_cpu = index + 1;
+    } else {
+      replicas[index].pinned_cpu = CONTROLLER_PIN; // TODO: don't need both
+      for_reps[index].pinned_cpu = CONTROLLER_PIN;
+    }
+
     replicas[index].in_pipe_count = in_pipe_count; // Duplicated to make fds data passing easier
     for_reps[index].in_pipe_count = in_pipe_count;
     replicas[index].fd_ins = (unsigned int *) malloc(sizeof(int) * in_pipe_count);
@@ -296,13 +304,13 @@ int initVoterD(void) {
 
   // Give the replicas their pipes (same method as restart)
   for (jndex = 0; jndex < rep_count; jndex++) {
-    if (acceptSendFDS(&sd, &for_reps[jndex], rep_info_in, rep_info_out) < 0) {
+    if (acceptSendFDS(&sd, &for_reps[jndex], rep_info_in, rep_info_out, for_reps[jndex].pinned_cpu) < 0) {
       printf("EmptyRestart acceptSendFDS call failed\n");
       exit(-1);
     }
   }
 
-  InitTAS(DEFAULT_CPU, voter_priority); // IMPORTANT: Should be after forking replicas to subvert CoW
+  InitTAS(VOTER_PIN, voter_priority); // IMPORTANT: Should be after forking replicas to subvert CoW
 
   debug_print("Initializing VoterR(%s)\n", controller_name);
 

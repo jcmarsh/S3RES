@@ -22,7 +22,7 @@ int main(int argc, const char** argv) {
   initReplicas(&rep, 1, controller_name, 10);
   createPipes(&rep, 1, pipes, 1);
   // send new pipe through fd server (should have a request)
-  acceptSendFDS(&sd, &(rep.pid), rep.rep_pipes, rep.pipe_count);
+  acceptSendFDS(&sd, &(rep.pid), rep.rep_pipes, rep.pipe_count, VOTER_PIN);
 
   convertVoteToTyped(rep.vot_pipes, 1, t_pipes);
 

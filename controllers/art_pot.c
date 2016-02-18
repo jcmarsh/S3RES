@@ -47,6 +47,7 @@ int data_index, out_index, way_req_index, way_res_index;
 
 // TAS related
 int priority;
+int pinned_cpu;
 
 const char* name = "ArtPot";
 
@@ -88,7 +89,7 @@ int parseArgs(int argc, const char **argv) {
   pipe_count = atoi(argv[2]);
   if (argc < 5) { // Must request fds
     pid_t currentPID = getpid();
-    if (connectRecvFDS(currentPID, pipes, pipe_count, name) < 0) {
+    if (connectRecvFDS(currentPID, pipes, pipe_count, name, &pinned_cpu) < 0) {
       printf("Error in %s: failed on connectRecvFDS call. Exiting.\n", name);
       exit(-1);
     }

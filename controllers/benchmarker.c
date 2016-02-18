@@ -26,6 +26,7 @@ struct comm_mov_cmd mov_cmd_msg;
 
 // TAS Stuff
 int priority;
+int pinned_cpu;
 
  // These are to your parent (Translator)
 struct typed_pipe trans_pipes[2];

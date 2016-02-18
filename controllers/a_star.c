@@ -28,6 +28,7 @@ struct node_t *current_goal;
 struct node_t *n_current_goal;
 
 int priority;
+int pinned_cpu;
 
 long fake_hash = 42;
 
@@ -96,7 +97,7 @@ int parseArgs(int argc, const char **argv) {
   if (argc < 6) {
     pid_t currentPID = getpid();
     //connectRecvFDS(currentPID, pipes, PIPE_COUNT, "AStarTest"); // For test purposes
-    connectRecvFDS(currentPID, pipes, pipe_count, name);
+    connectRecvFDS(currentPID, pipes, pipe_count, name, &pinned_cpu);
     setPipeIndexes();
   } else {
     for (i = 0; (i < argc - 3) && (i < PIPE_COUNT); i++) {

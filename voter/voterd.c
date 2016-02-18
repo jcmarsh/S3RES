@@ -512,8 +512,7 @@ int initVoterD(void) {
   createFDS(&sd, controller_name);
   startReplicas(replicas, rep_count, &sd, controller_name, ext_pipes, pipe_count, replica_priority);
 
-  InitTAS(DEFAULT_CPU, voter_priority); // IMPORTANT: Should be after forking replicas to subvert CoW
-  
+  InitTAS(VOTER_PIN, voter_priority); // IMPORTANT: Should be after forking replicas to subvert CoW
 
   // TODO: I did this to force page faults... but I think there was a different issue.
   // This section may no longer be necessary. Need to check with the page fault tests.

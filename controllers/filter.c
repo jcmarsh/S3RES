@@ -23,6 +23,7 @@ int out_index[PIPE_COUNT - 1];
 
 // TAS related
 int priority;
+int pinned_cpu;
 
 const char* name = "Filter";
 
@@ -50,7 +51,7 @@ int parseArgs(int argc, const char **argv) {
   if (argc < 5) { // Must request fds
     // printf("Usage: Filter <priority> <pipe_num> <pipe_in> <pipe_out_0> <pipe_out_1>\n");
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, pipe_count, name);
+    connectRecvFDS(currentPID, pipes, pipe_count, name, &pinned_cpu);
   } else {
     deserializePipe(argv[3], &pipes[data_index]);
     for (i = 4; i < 4 + pipe_count - 1; i++) {
