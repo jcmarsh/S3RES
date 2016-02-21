@@ -33,7 +33,7 @@ int main(int argc, const char** argv) {
   initReplicas(&rep, 1, controller_name, 10);
   createPipes(&rep, 1, pipes, 2);
   // send new pipe through fd server (should have a request)
-  acceptSendFDS(&sd, &(rep.pid), rep.rep_pipes, rep.pipe_count);
+  acceptSendFDS(&sd, &(rep.pid), rep.rep_pipes, rep.pipe_count, DEFAULT_CPU);
 
   // Should be connected now.
   int loops = 1000001;

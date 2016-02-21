@@ -15,7 +15,7 @@ int voter_priority = 5;
 // FD server
 struct server_data sd;
 
-int rep_count = DMR;
+int rep_count = 2; //DMR;
 const char* controller_name = "Empty";
 
 // pipes to external components (not replicas)
