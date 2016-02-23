@@ -68,8 +68,8 @@ void recvData(void) {
           active_index = p_index;
           break;
         } else {
-          printf("Voter - Controller %s pipe %d\n", controller_name, p_index);
-          perror("Voter - read on external pipe error");
+          printf("VoterM - Controller %s pipe %d\n", controller_name, p_index);
+          perror("VoterM - read on external pipe error");
         }
       }
     }
@@ -84,7 +84,6 @@ void recvData(void) {
 
 void sendCollect(int active_index) {
   int p_index, r_index, retval;
-  struct replicaR *c_rep;
   fd_set select_set;
   struct timeval select_timeout;
 
@@ -104,7 +103,7 @@ void sendCollect(int active_index) {
 
   bool done = false;
   int rep_done = 0;
-  while (!done) {
+  while(!done) {
     // Select, but only over outgoing pipes from the replicas
     FD_ZERO(&select_set);
     for (r_index = 0; r_index < rep_count; r_index++) {
@@ -126,13 +125,12 @@ void sendCollect(int active_index) {
     retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     for (r_index = 0; r_index < rep_count; r_index++) {
       for (p_index = 0; p_index < out_pipe_count; p_index++) {
-        if (FD_ISSET(c_rep->fd_outs[p_index], &select_set)) {
+        if (FD_ISSET(replicas[r_index].fd_outs[p_index], &select_set)) {
           // TODO: Need to deal with different pipes being timed?
-
-          c_rep->buff_counts[p_index] = read(c_rep->fd_outs[p_index], c_rep->buffers[p_index], MAX_PIPE_BUFF);
+          replicas[r_index].buff_counts[p_index] = read(replicas[r_index].fd_outs[p_index], replicas[r_index].buffers[p_index], MAX_PIPE_BUFF);
 
           // If the non-timed pipe outputs multiple times, only the last will be saved.
-          if (c_rep->buff_counts[p_index] <= 1) {
+          if (replicas[r_index].buff_counts[p_index] <= 1) {
             printf("Voter - Controller %s, rep %d, pipe %d\n", controller_name, r_index, p_index);
             perror("Voter - read problem on internal pipe");
           }
@@ -205,7 +203,7 @@ void vote() {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
-int initVoterD(void) {
+int initVoterM(void) {
   replica_priority = voter_priority - VOTER_PRIO_OFFSET;
 
   // Setup fd server
@@ -344,8 +342,8 @@ int parseArgs(int argc, const char **argv) {
     voting_timeout = PERIOD_USEC;
   }
 
-  if (argc < required_args) { 
-    puts("Usage: VoterD <controller_name> <rep_type> <timeout> <priority> <fd_in:fd_out:timed> <...>");
+  if (argc < required_args) {
+    puts("Usage: VoterM <controller_name> <rep_type> <timeout> <priority> <fd_in:fd_out:timed> <...>");
     return -1;
   } else {
     int pipe_count = argc - required_args;
@@ -404,7 +402,7 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
-  if (initVoterD() < 0) {
+  if (initVoterM() < 0) {
     puts("ERROR: failure in setup function.");
     return -1;
   }
