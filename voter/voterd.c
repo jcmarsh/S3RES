@@ -12,7 +12,6 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
-#include <linux/prctl.h>
 
 #include "replicas.h"
  
@@ -341,7 +340,7 @@ void doOneUpdate(void) {
       int read_fd = ext_pipes[p_index].fd_in;
       if (read_fd != 0) {
         if (FD_ISSET(read_fd, &select_set)) {
-          ext_pipes[p_index].buff_count = TEMP_FAILURE_RETRY(read(read_fd, ext_pipes[p_index].buffer, MAX_VOTE_PIPE_BUFF));
+          ext_pipes[p_index].buff_count = read(read_fd, ext_pipes[p_index].buffer, MAX_VOTE_PIPE_BUFF);
           if (ext_pipes[p_index].buff_count > 0) { // TODO: read may still have been interrupted
             processData(&(ext_pipes[p_index]), p_index);
           } else if (ext_pipes[p_index].buff_count < 0) {
@@ -370,7 +369,7 @@ void doOneUpdate(void) {
 }
 
 void writeBuffer(int fd_out, unsigned char* buffer, int buff_count) {
-  int retval = TEMP_FAILURE_RETRY(write(fd_out, buffer, buff_count));
+  int retval = write(fd_out, buffer, buff_count);
   if (retval == buff_count) {
     // success, do nothing
   } else if (retval > 0) { // TODO: resume write? 
@@ -417,7 +416,7 @@ void sendPipe(int pipe_num, int replica_num) {
 
   for (r_index = 0; r_index < rep_count; r_index++) {
     if (replica_num == r_index) {
-      int retval;
+      int retval; // TODO: error?
       retval = buffToPipe(&(replicas[r_index].vot_pipes[pipe_num]), ext_pipes[pipe_num].fd_out, bytes_avail);
     } else {
       fakeToPipe(&(replicas[r_index].vot_pipes[pipe_num]), bytes_avail);
@@ -542,9 +541,20 @@ int initVoterD(void) {
 
 void parsePipe(const char* serial, struct vote_pipe* pipe) {
   char *rep_info;
-  int in, out, timed;
+  int in, out, timed, i, str_length;
 
-  sscanf(serial, "%m[^:]:%d:%d:%d", &rep_info, &in, &out, &timed);
+  for (i = 0; i < 100; i++) {
+    if (serial[i] == ':') {
+      sscanf(&(serial[i]), ":%d:%d:%d", &in, &out, &timed);
+      str_length = i;
+      break;
+    }
+  }
+  rep_info = (char*) malloc(sizeof(char) * str_length);
+  for (i = 0; i < str_length; i++) {
+    rep_info[i] = serial[i];
+  }
+
   pipe->rep_info = rep_info;
   pipe->fd_in = in;
   pipe->fd_out = out;

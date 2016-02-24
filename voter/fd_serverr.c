@@ -107,7 +107,6 @@ int sendFDS(int connection_fd, struct replicaR * rep, char **rep_info_in, char *
   }
 
   int retval = sendmsg(connection_fd, &hdr, 0);
-
   if(retval < 0) {
     perror("FD_ServerR sendmsg() failed");
   }
@@ -139,7 +138,7 @@ int createFDS(struct server_data * sd, const char* name) {
   memset(&(sd->address), 0, sizeof(struct sockaddr_un));
 
   sd->address.sun_family = AF_UNIX;
-  if (strlen(actual_name) < UNIX_PATH_MAX) {
+  if (strlen(actual_name) < 200) { // UNIX_PATH_MAX) {
     memcpy(&(sd->address.sun_path), actual_name, strlen(actual_name));
   } else {
     printf("FD_ServerR server Address length longer than max.\n");

@@ -7,7 +7,7 @@
 #include "commtypes.h"
 
 #include <fcntl.h>
-#include <linux/un.h>
+#include <sys/un.h>
 #include <sys/socket.h>
 #include <stdio.h>
 #include <stdlib.h>

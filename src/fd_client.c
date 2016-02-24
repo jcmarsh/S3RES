@@ -31,7 +31,7 @@ int requestFDS(int sock_fd, struct typed_pipe* pipes, int pipe_count, int *pinne
   hdr.msg_control = cmsg;
   hdr.msg_controllen = CMSG_LEN(sizeof(int) * pipe_count);
 
-  retval = TEMP_FAILURE_RETRY(recvmsg(sock_fd, &hdr, 0));
+  retval = recvmsg(sock_fd, &hdr, 0);
   if (retval < 0) {
     perror("FD_client: RECVMSG error");
     return -1;
@@ -79,7 +79,7 @@ int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const ch
   memset(&address, 0, sizeof(struct sockaddr_un));
  
   address.sun_family = AF_UNIX;
-  if (strlen(actual_name) < UNIX_PATH_MAX) {
+  if (strlen(actual_name) < 100) {
     memcpy(&(address.sun_path), actual_name, strlen(actual_name));
   } else {
     printf("Client Address length longer than max.\n");
@@ -88,7 +88,7 @@ int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const ch
   }
   //snprintf(address.sun_path, UNIX_PATH_MAX, actual_name);
   
-  if(TEMP_FAILURE_RETRY(connect(sock_fd, (struct sockaddr *) &address, sizeof(struct sockaddr_un))) != 0) {
+  if(connect(sock_fd, (struct sockaddr *) &address, sizeof(struct sockaddr_un)) != 0) {
     perror("Replica connect() failed");
     printf("Args: fd %d\t actual_name %s\n", sock_fd, actual_name);
     retval = -1;
@@ -101,7 +101,7 @@ int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const ch
   }
 
   // Send pid
-  if (TEMP_FAILURE_RETRY(write(sock_fd, &pid, sizeof(pid_t))) < 0) {
+  if (write(sock_fd, &pid, sizeof(pid_t)) < 0) {
     perror("FD_client write for pid failed");
     retval = -1;
   }

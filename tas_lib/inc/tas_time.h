@@ -11,16 +11,11 @@ author: James Taylor : jrt@gwu.edu
 //-----------------------------------------------------------------------------
 
 #include <sys/time.h>           // POSIX time
-#include <limits.h>
-#include "cpu.h"
 
 //-----------------------------------------------------------------------------
 
 /// cycle type in clock ticks aliasing rdtsc values dependent on cpu speed.
-typedef cpu_speed_t cycle_t;
-
-/// timestamp type in cycles.
-typedef cycle_t timestamp_t;
+typedef unsigned long long timestamp_t;
 
 //-----------------------------------------------------------------------------
 

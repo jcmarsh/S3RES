@@ -11,7 +11,7 @@
 
 #include "inc/force.h"
 
-int parseLine(char* line, ssize_t length) {
+int parseLine(char* line) {
   char start_s[17]; // I don't think that the address can be longer than 16 (64 bits in hex). One for \0
   char end_s[17];
   char permissions[5]; // read, write, execute, private (copy on write!)
@@ -49,8 +49,7 @@ int parseLine(char* line, ssize_t length) {
   end_s[e_index] = '\0';
   end = strtoul(end_s, NULL, 16);
 
-  //  printf("Start-End: %s - %s\n", start_s, end_s);
-  //  printf("Start-End: %ld - %ld\n", start, end);
+  //printf("Start-End: %s - %s\n", start_s, end_s);
 
   // read permission for just rw to start
   index++; // skip the ' '
@@ -98,7 +97,7 @@ int parseLine(char* line, ssize_t length) {
 
 int forceMaps( ){
   FILE* mapsfile;
-  char* line = NULL;
+  char line[200] = {0}; // 100 was too small
   size_t len = 0;
   ssize_t read;
 
@@ -110,12 +109,9 @@ int forceMaps( ){
   }
 
   // parse line by line
-  while ((read = getline(&line, &len, mapsfile)) != -1) {
-    parseLine(line, read);
-  }
-
-  if (line) { // TODO: necessary?
-    free(line);
+  // while ((read = getline(&line, &len, mapsfile)) != -1) {
+  while (fgets(line, 200, mapsfile) != NULL) {
+    parseLine(line);
   }
 
   fclose(mapsfile);

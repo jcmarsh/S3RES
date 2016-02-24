@@ -84,6 +84,7 @@ void recvData(void) {
 
 void sendCollect(int active_index) {
   int p_index, r_index, retval;
+  bool timeout_occurred = false;
   fd_set select_set;
   struct timeval select_timeout;
 
@@ -117,8 +118,8 @@ void sendCollect(int active_index) {
     if (remaining > 0) {
       select_timeout.tv_sec = 0;
       select_timeout.tv_usec = remaining;
-    } else {
-      // Timeout, should be detected by voting.
+    } else { // Timeout
+      timeout_occurred = true;
       break; // while(!done)
     }
 
@@ -146,17 +147,31 @@ void sendCollect(int active_index) {
     } //for replica
   } // while !done
 
-  vote();
+  vote(timeout_occurred);
 }
 
 // This function will have to deal with some reps having failed (from sdc, or timeout)
-void vote() {
+void vote(bool timeout_occurred) {
   // Should check for all available output, vote on each and send.
   int p_index;
 
   switch (rep_count) {
     case 1: // SMR
-      printf("VoterM Does not handle SMR.\n");
+      if (!timeout_occurred) {
+        for (p_index = 0; p_index < out_pipe_count; p_index++) {
+          if (replicas[0].buff_counts[p_index] != 0) {
+            if (write(ext_out_fds[p_index], replicas[0].buffers[p_index], replicas[0].buff_counts[p_index]) != -1) {
+              replicas[0].buff_counts[p_index] = 0;
+              replicas[1].buff_counts[p_index] = 0;
+              replicas[2].buff_counts[p_index] = 0;
+            } else {
+              perror("VoterM write failed");
+            }
+          }
+        }
+      } else {
+        printf("VoterM Does not handle SMR recovery.\n");
+      }
       return;
     case 2: // DMR
       // Can detect, and check what to do
@@ -342,23 +357,32 @@ int parseArgs(int argc, const char **argv) {
     voting_timeout = PERIOD_USEC;
   }
 
-  if (argc < required_args) {
+  if (argc < required_args) { // TODO: Why isn't this check first?
     puts("Usage: VoterM <controller_name> <rep_type> <timeout> <priority> <fd_in:fd_out:timed> <...>");
     return -1;
   } else {
     int pipe_count = argc - required_args;
+    int *str_lengths;
+
+    str_lengths = (int*)malloc(sizeof(int) * pipe_count);
 
     // This is not efficient, but only done at startup
     for (i = 0; i < pipe_count; i++) {
-      char * rep_info;
-      int in, out, timed;
-      sscanf(argv[i + required_args], "%m[^:]:%d:%d:%d", &rep_info, &in, &out, &timed);
+      char rep_info[100] = {0};
+      int in, out, timed, j;
+      for (j = 0; j < 100; j++) { // dietlibc can't handle:sscanf(argv[i + required_args], "%m[^:]:%d:%d:%d", &rep_info, &in, &out, &timed);
+        if (argv[i + required_args][j] == ':') {
+          sscanf(&(argv[i + required_args][j]), ":%d:%d:%d", &in, &out, &timed);
+          str_lengths[i] = j;
+          break;
+        }
+      }
       if (0 != in) {
         in_pipe_count++;
       } else {
         out_pipe_count++;
       }
-      free(rep_info);
+      //free(rep_info);
     }
 
     // malloc data structures
@@ -372,9 +396,14 @@ int parseArgs(int argc, const char **argv) {
     int c_out_pipe = 0;
     for (i = 0; i < pipe_count; i++) {
       char * rep_info;
-      int in, out, timed;
+      int in, out, timed, j;
 
-      sscanf(argv[i + required_args], "%m[^:]:%d:%d:%d", &rep_info, &in, &out, &timed);
+      rep_info = (char *)malloc(sizeof(char) * str_lengths[i]);
+
+      for (j = 0; j < str_lengths[i]; j++) { // dietlibc can't handle:sscanf(argv[i + required_args], "%m[^:]:%d:%d:%d", &rep_info, &in, &out, &timed);
+        rep_info[j] = argv[i + required_args][j];
+      }
+      sscanf(&(argv[i + required_args][str_lengths[i]]), ":%d:%d:%d", &in, &out, &timed);
       if (0 != in) {
         ext_in_fds[c_in_pipe] = in;
         rep_info_in[c_in_pipe] = rep_info;
@@ -391,6 +420,7 @@ int parseArgs(int argc, const char **argv) {
         c_out_pipe++;
       }
     }
+    free(str_lengths);
   }
 
   return 0;

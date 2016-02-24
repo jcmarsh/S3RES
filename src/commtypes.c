@@ -149,7 +149,7 @@ int commSendWaypoints(struct typed_pipe* pipe,
   msg.n_point[INDEX_Y] = n_way_y;
   msg.n_point[INDEX_A] = n_way_a;
 
-  return TEMP_FAILURE_RETRY(write(pipe->fd_out, &msg, sizeof(struct comm_way_res)));
+  return write(pipe->fd_out, &msg, sizeof(struct comm_way_res));
 }
 
 void commCopyWaypoints(struct comm_way_res* recv_msg, double* waypoints, double* n_waypoints) {
@@ -173,7 +173,7 @@ int commSendWaypointRequest(struct typed_pipe* pipe) {
   struct comm_way_req send_msg;
   memset(&send_msg, 0, sizeof(struct comm_way_req));
 
-  return TEMP_FAILURE_RETRY(write(pipe->fd_out, &send_msg, sizeof(struct comm_way_req)));
+  return write(pipe->fd_out, &send_msg, sizeof(struct comm_way_req));
 }
 
 
@@ -189,7 +189,7 @@ int commSendMoveCommand(struct typed_pipe* pipe, double vel_0, double vel_1) {
   msg.vel_cmd[0] = vel_0;
   msg.vel_cmd[1] = vel_1;
 
-  return TEMP_FAILURE_RETRY(write(pipe->fd_out, &msg, sizeof(struct comm_mov_cmd)));
+  return write(pipe->fd_out, &msg, sizeof(struct comm_mov_cmd));
 }
 
 int commSendMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg) {
@@ -216,7 +216,7 @@ int commSendMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg) {
     }
   }
   
-  int written = TEMP_FAILURE_RETRY(write(pipe->fd_out, buffer, sizeof(int) * buff_count));
+  int written = write(pipe->fd_out, buffer, sizeof(int) * buff_count);
   if (written != buff_count * sizeof(int)) { // TODO: more should check this
     perror("Write for commSendMapUpdate did not complete.\n");
   }
@@ -234,14 +234,14 @@ int commRecvMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg) {
   int header_ints = 3; // pose x, pose y, and obstacle count
   int index = 0;
 
-  int read_ret = TEMP_FAILURE_RETRY(read(pipe->fd_in, &recv_msg_buffer, sizeof(int) * header_ints));
+  int read_ret = read(pipe->fd_in, &recv_msg_buffer, sizeof(int) * header_ints);
   if (read_ret == sizeof(int) * header_ints) { // TODO: Read may still have been interrupted.
     msg->pose_x = recv_msg_buffer[0];
     msg->pose_y = recv_msg_buffer[1];
     msg->obs_count = recv_msg_buffer[2];
 
     if (msg->obs_count > 0) { // read obstacles
-      read_ret = TEMP_FAILURE_RETRY(read(pipe->fd_in, &recv_msg_buffer[header_ints], sizeof(int) * 2 * msg->obs_count));
+      read_ret = read(pipe->fd_in, &recv_msg_buffer[header_ints], sizeof(int) * 2 * msg->obs_count);
       if (read_ret == sizeof(int) * 2 * msg->obs_count) {
         for (index = 0; index < msg->obs_count; index++) {
           msg->obs_x[index] = recv_msg_buffer[header_ints + (index * 2)];
@@ -284,7 +284,7 @@ int commSendRanger(struct typed_pipe* pipe, double* ranger_data, double* pose_da
     msg.pose[index] = pose_data[index];
   }
 
-  int write_ret = TEMP_FAILURE_RETRY(write(pipe->fd_out, &msg, sizeof(struct comm_range_pose_data)));
+  int write_ret = write(pipe->fd_out, &msg, sizeof(struct comm_range_pose_data));
   if (write_ret < sizeof(struct comm_range_pose_data)) {
     if (write_ret < 0) {
       perror("commSendRanger failed");
@@ -307,7 +307,7 @@ int commSendAck(struct typed_pipe* pipe, long state_hash) {
 
   msg.hash = state_hash;
 
-  return TEMP_FAILURE_RETRY(write(pipe->fd_out, &msg, sizeof(struct comm_ack)));
+  return write(pipe->fd_out, &msg, sizeof(struct comm_ack));
 }
 
 void commCopyRanger(struct comm_range_pose_data* recv_msg, double* range_data, double* pose_data) {
@@ -338,7 +338,7 @@ int commSendMsgBuffer(struct typed_pipe* pipe, struct comm_msg_buffer* msg) {
 
   memcpy(&(buffer[4]), msg->message, msg->length);
 
-  int written = TEMP_FAILURE_RETRY(write(pipe->fd_out, &(buffer[0]), msg->length + sizeof(msg->length)));
+  int written = write(pipe->fd_out, &(buffer[0]), msg->length + sizeof(msg->length));
   if (written != msg->length + sizeof(msg->length)) { // TODO: more should check this
     perror("Write for commSendMsgBuffer did not complete.\n");
   }
@@ -352,12 +352,12 @@ int commRecvMsgBuffer(struct typed_pipe* pipe, struct comm_msg_buffer* msg) {
     return 0;
   }
 
-  int read_ret = TEMP_FAILURE_RETRY(read(pipe->fd_in, &(msg->length), sizeof(msg->length)));
+  int read_ret = read(pipe->fd_in, &(msg->length), sizeof(msg->length));
   if (read_ret == sizeof(msg->length)) { // TODO: Read may still have been interrupted.
     msg->message = (char*) malloc(sizeof(char) * msg->length);
 
     if (msg->length > 0) {
-      read_ret = TEMP_FAILURE_RETRY(read(pipe->fd_in, msg->message, sizeof(char) * msg->length));
+      read_ret = read(pipe->fd_in, msg->message, sizeof(char) * msg->length);
       if (read_ret == msg->length) {
         // All good
       } else if (read_ret > 0) {

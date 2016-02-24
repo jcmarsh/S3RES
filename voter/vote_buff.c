@@ -47,7 +47,7 @@ int pipeToBuff(struct vote_pipe* pipe) {
   char temp_buffer[MAX_VOTE_PIPE_BUFF];
   int read_count;
 
-  read_count = TEMP_FAILURE_RETRY(read(pipe->fd_in, temp_buffer, MAX_VOTE_PIPE_BUFF));
+  read_count = read(pipe->fd_in, temp_buffer, MAX_VOTE_PIPE_BUFF);
 
   if (read_count > 0) {
     if (read_count < MAX_VOTE_PIPE_BUFF - pipe->buff_count) {
@@ -88,14 +88,15 @@ void copyBuffer(struct vote_pipe* pipe, char *buffer, int n) {
 
 // write n bytes
 int buffToPipe(struct vote_pipe* pipe, int fd_out, int n) {
-  // Just needs to write out the data! But may need two writes...
+  int retval = 0;
+
   if (n > pipe->buff_count) {
     printf("Vote_buff buffToPipe: requested bigger write than available\n");
     return -1;
   }
 
   if (pipe->buff_index + n < MAX_VOTE_PIPE_BUFF) { // simple case: just write
-    TEMP_FAILURE_RETRY(write(fd_out, &(pipe->buffer[pipe->buff_index]), n));
+    retval = write(fd_out, &(pipe->buffer[pipe->buff_index]), n);
   } else {
     // memcpy to buffer, then write out.
     char temp_buffer[n];
@@ -104,7 +105,7 @@ int buffToPipe(struct vote_pipe* pipe, int fd_out, int n) {
     memcpy(&(temp_buffer[0]), &(pipe->buffer[pipe->buff_index]), part_write);
     memcpy(&(temp_buffer[part_write]), &(pipe->buffer[0]), n - part_write);
 
-    TEMP_FAILURE_RETRY(write(fd_out, temp_buffer, n));
+    retval = write(fd_out, temp_buffer, n);
   }
 
   fakeToPipe(pipe, n);

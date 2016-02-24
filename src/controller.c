@@ -1,6 +1,10 @@
 #include "controller.h"
 #include "taslimited.h"
 
+#ifdef TIME_RESTART_SIGNAL
+#include "system_config.h"
+#endif
+
 // All extern here must be in the controller code (such as art_pot.c)
 extern void setPipeIndexes(void);
 extern void enterLoop(void);

@@ -45,7 +45,7 @@ int sendFDS(int connection_fd, struct vote_pipe* pipes, int pipe_count, int pinn
     }
   }
 
-  int retval = TEMP_FAILURE_RETRY(sendmsg(connection_fd, &hdr, 0));
+  int retval = sendmsg(connection_fd, &hdr, 0);
 
   if(retval < 0) {
     perror("FD_server sendmsg() failed");
@@ -78,7 +78,7 @@ int createFDS(struct server_data * sd, const char* name) {
   memset(&(sd->address), 0, sizeof(struct sockaddr_un));
 
   sd->address.sun_family = AF_UNIX;
-  if (strlen(actual_name) < UNIX_PATH_MAX) {
+  if (strlen(actual_name) < 100) {
     memcpy(&(sd->address.sun_path), actual_name, strlen(actual_name));
   } else {
     printf("Server Address length longer than max.\n");
@@ -108,7 +108,7 @@ int acceptSendFDS(struct server_data * sd, pid_t *pid, struct vote_pipe* pipes, 
   int connection_fd;
   int retval = 0;
 
-  connection_fd = TEMP_FAILURE_RETRY(accept(sd->sock_fd, (struct sockaddr *) &(sd->address), &(sd->address_length)));
+  connection_fd = accept(sd->sock_fd, (struct sockaddr *) &(sd->address), &(sd->address_length));
   if (connection_fd > -1) {
     // send read end to client
     if (sendFDS(connection_fd, pipes, pipe_count, pinned_cpu) < 0) {
@@ -123,7 +123,7 @@ int acceptSendFDS(struct server_data * sd, pid_t *pid, struct vote_pipe* pipes, 
   }
 
   // read pid
-  retval = TEMP_FAILURE_RETRY(read(connection_fd, pid, sizeof(pid_t)));
+  retval = read(connection_fd, pid, sizeof(pid_t));
   if (retval != sizeof(pid_t)) {
     perror("FD_Server failed to read pid");
     retval = -1;

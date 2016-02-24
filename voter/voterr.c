@@ -83,6 +83,7 @@ void recvData(void) {
 
 void sendCollect(int active_index) {
   int p_index, r_index, retval;
+  bool timeout_occurred = false;
   struct replicaR *c_rep;
   fd_set select_set;
   struct timeval select_timeout;
@@ -116,8 +117,8 @@ void sendCollect(int active_index) {
       if (remaining > 0) {
         select_timeout.tv_sec = 0;
         select_timeout.tv_usec = remaining;
-      } else {
-        // Timeout, should be detected by voting.
+      } else { // Timeout
+        timeout_occurred = true;
         break;
       }
       retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
@@ -143,11 +144,11 @@ void sendCollect(int active_index) {
   } // for loop over each rep.
 
   // All voters should be ready to go (even if restarted)
-  vote();
+  vote(timeout_occurred);
 }
 
 // This function will have to deal with some reps having failed (from sdc, or timeout)
-void vote() {
+void vote(bool timeout_occurred) {
   // Should check for all available output, vote on each and send.
   int p_index;
 

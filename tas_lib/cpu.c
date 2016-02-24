@@ -1,9 +1,6 @@
 #define _GNU_SOURCE
 
 #include <sched.h>
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 #include "inc/cpu.h"
 #include "inc/tas_time.h"
