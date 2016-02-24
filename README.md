@@ -5,6 +5,11 @@ Problem Injection Named Thoughtfully
 
 This is likely a temporary repo (thus the terrible name). Meant to simulate Single Event Upsets, and protect against them using triple redundancy.
 
+## Dependencies
+* Player / Stage
+* dietlibc
+* libccv (for Load component).
+
 ## Compiling and Running
 
 PINT currently uses Player / Stage as a simulation environment. One machine will act as the simulator and needs to have Player and Stage installed, while the machines that are acting as the robots only require Player. One machine can be used for everything, which is convenient for testing an development. For experiments dealing with timing, using dedicate machines for each robot is required.
