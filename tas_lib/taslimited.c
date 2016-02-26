@@ -11,7 +11,7 @@ int sched_set_policy(const pid_t pid, const int priority) {
 
   // get the maximum priority allowed by the scheduler
   if (priority >= sched_get_priority_max(SCHED_RR)) { // <= so that the priority can not be 99 (reserved for kernel)
-    printf("Invalid parameter for priority: %d\n", priority);
+    // printf("Invalid parameter for priority: %d\n", priority);
     return -1;
   }
 
@@ -75,25 +75,25 @@ int InitTAS(cpu_id_t cpu, int priority) {
     // Do not bind, this is for the single core case
   } else {
     if( cpu_bind(pid, cpu) != CPU_ERROR_NONE ) {
-      printf("InitTAS() failed calling cpu_bind(pid, cpu), with pid %d, cpu %d\n", pid, cpu);
+      //printf("InitTAS() failed calling cpu_bind(pid, cpu), with pid %d, cpu %d\n", pid, cpu);
     }
   }
 
   // Set Scheduling
   if( sched_set_policy(pid, priority) != 0 ) {
-    printf("InitTAS() failed calling schedule_set_policy(pid %d, priority %d)\n", pid, priority);
-    perror("\tperror");
+    //printf("InitTAS() failed calling schedule_set_policy(pid %d, priority %d)\n", pid, priority);
+    //perror("\tperror");
   }
 
   // Used to be a separate function. Lock memory may not always be desired with above functions.
   // lock current and future memory
   if (lockItUp() != 0) {
-    printf("(voter_d_driver) InitTAS() failed calling lockItUp()\n" );
+    //printf("(voter_d_driver) InitTAS() failed calling lockItUp()\n" );
   }
 
   // Walk current memory to get it paged in
   if (forceMaps() != 0) {
-    printf("(voter_d_driver) InitTAS() failed calling forceMaps()\n" );
+    //printf("(voter_d_driver) InitTAS() failed calling forceMaps()\n" );
   }
 
   return 0;

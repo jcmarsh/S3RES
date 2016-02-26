@@ -21,8 +21,15 @@
 #endif // TEST_IPC_ROUND
 
 // From http://stackoverflow.com/a/1644898
-#define DEBUG_PRINT 1
+//   Had to change... always compiling is exactly what I don't want.
+#define DEBUG_PRINT 0
+
+#ifdef DEBUG_PRINT
 #define debug_print(...) \
-	do { if (DEBUG_PRINT) fprintf(stderr, ##__VA_ARGS__); } while (0)
+	fprintf(stderr, ##__VA_ARGS__);
+#else
+#define debug_print(...) \
+ 	{}
+#endif /* DEBUG_PRINT */
 
 #endif /* BENCH_H */

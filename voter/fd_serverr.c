@@ -108,7 +108,7 @@ int sendFDS(int connection_fd, struct replicaR * rep, char **rep_info_in, char *
 
   int retval = sendmsg(connection_fd, &hdr, 0);
   if(retval < 0) {
-    perror("FD_ServerR sendmsg() failed");
+    debug_print("FD_ServerR sendmsg() failed.\n");
   }
 
   return retval;
@@ -119,15 +119,28 @@ int createFDS(struct server_data * sd, const char* name) {
   // create domain socked
   const char* pre_name = "./";
   const char* post_name = "_fd_server";
+  int index, name_index = 0;
   char* actual_name;
   
-  if (asprintf(&actual_name, "%s%s%s", pre_name, name, post_name) < 0) {
-    perror("FD_ServerR failed to allocate fd_name");
+  actual_name = (char *)malloc(sizeof(char) * (strlen(pre_name) + strlen(name) + strlen(post_name)));
+  for (index = 0; index < strlen(pre_name); index++) {
+    actual_name[name_index++] = pre_name[index];
   }
+  for (index = 0; index < strlen(name); index++) {
+    actual_name[name_index++] = name[index];
+  }
+  for (index = 0; index < strlen(post_name); index++) {
+    actual_name[name_index++] = post_name[index];
+  }
+  actual_name[name_index] = 0;
+
+  //if (asprintf(&actual_name, "%s%s%s", pre_name, name, post_name) < 0) {
+  //  debug_print("FD_ServerR failed to allocate fd_name.\n");
+  //}
 
   sd->sock_fd = socket(PF_UNIX, SOCK_STREAM, 0);
   if (sd->sock_fd < 0) {
-    perror("FD_ServerR socket creation failed.");
+    debug_print("FD_ServerR socket creation failed.\n");
     return 1;
   }
 
@@ -141,20 +154,20 @@ int createFDS(struct server_data * sd, const char* name) {
   if (strlen(actual_name) < 200) { // UNIX_PATH_MAX) {
     memcpy(&(sd->address.sun_path), actual_name, strlen(actual_name));
   } else {
-    printf("FD_ServerR server Address length longer than max.\n");
+    debug_print("FD_ServerR server Address length longer than max.\n");
     return -1;
   }
   free(actual_name);
 
   if(bind(sd->sock_fd, (struct sockaddr *) &(sd->address), sizeof(struct sockaddr_un)) != 0) {
-    printf("FD_ServerR bind() failed\n");
+    debug_print("FD_ServerR bind() failed\n");
     return 1;
   }
 
   // This program will listen to connections on this socket
   // 5 is the backlog: how many pending connections there may be
   if(listen(sd->sock_fd, 5) != 0) {
-    printf("FD_ServerR listen() failed\n");
+    debug_print("FD_ServerR listen() failed\n");
     return 1;
   }
 }
@@ -173,12 +186,12 @@ int acceptSendFDS(struct server_data * sd, struct replicaR * rep, char **rep_inf
   if (connection_fd > -1) {
     // send read end to client
     if (sendFDS(connection_fd, rep, rep_info_in, rep_info_out, pinned_cpu) < 0) {
-      perror("FD_ServerR failed to sendFDS");
+      debug_print("FD_ServerR failed to sendFDS.\n");
       retval = -1;
       goto accept_send_FDS_out;
     }
   } else {
-    perror("FD_ServerR failed to accept");
+    debug_print("FD_ServerR failed to accept.\n");
     retval = -1;
     goto accept_send_FDS_out;
   }
@@ -186,7 +199,7 @@ int acceptSendFDS(struct server_data * sd, struct replicaR * rep, char **rep_inf
   // read pid... but ignore.
   retval = read(connection_fd, &pid, sizeof(pid_t));
   if (retval != sizeof(pid_t)) {
-    perror("FD_ServerR failed to read pid");
+    debug_print("FD_ServerR failed to read pid.\n");
     retval = -1;
   }
 

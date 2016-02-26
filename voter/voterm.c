@@ -68,8 +68,7 @@ void recvData(void) {
           active_index = p_index;
           break;
         } else {
-          printf("VoterM - Controller %s pipe %d\n", controller_name, p_index);
-          perror("VoterM - read on external pipe error");
+          debug_print("VoterM - read on external pipe error - Controller %s pipe %d\n", controller_name, p_index);
         }
       }
     }
@@ -98,7 +97,7 @@ void sendCollect(int active_index) {
   for (r_index = 0; r_index < rep_count; r_index++) {
     retval = write(replicas[r_index].fd_ins[active_index], ext_in_buffer, ext_in_bufcnt);
     if (retval != ext_in_bufcnt) {
-      perror("Voter writeBuffer failed.");
+      debug_print("Voter writeBuffer failed.\n");
     }
   }
 
@@ -132,8 +131,7 @@ void sendCollect(int active_index) {
 
           // If the non-timed pipe outputs multiple times, only the last will be saved.
           if (replicas[r_index].buff_counts[p_index] <= 1) {
-            printf("Voter - Controller %s, rep %d, pipe %d\n", controller_name, r_index, p_index);
-            perror("Voter - read problem on internal pipe");
+            debug_print("Voter - read problem on internal pipe - Controller %s, rep %d, pipe %d\n", controller_name, r_index, p_index);
           }
 
           if (p_index == timer_stop_index) {
@@ -165,12 +163,12 @@ void vote(bool timeout_occurred) {
               replicas[1].buff_counts[p_index] = 0;
               replicas[2].buff_counts[p_index] = 0;
             } else {
-              perror("VoterM write failed");
+              debug_print("VoterM write failed.\n");
             }
           }
         }
       } else {
-        printf("VoterM Does not handle SMR recovery.\n");
+        debug_print("VoterM Does not handle SMR recovery.\n");
       }
       return;
     case 2: // DMR
@@ -178,7 +176,7 @@ void vote(bool timeout_occurred) {
       // if buff counts don't match: timeout or exec error... unless sdc caused one rep to output
 
       // if contents don't match: sdc
-      printf("VoterM Does not handle DMR.\n");
+      debug_print("VoterM Does not handle DMR.\n");
       return;
     case 3: ;// TMR
       // Send the solution that at least two agree on
@@ -205,12 +203,12 @@ void vote(bool timeout_occurred) {
               replicas[1].buff_counts[p_index] = 0;
               replicas[2].buff_counts[p_index] = 0;
             } else {
-              perror("VoterM write failed");
+              debug_print("VoterM write failed.\n");
             }
           }
         }
       } else {
-        printf("VoterM does not handle TMR recovery.\n");
+        debug_print("VoterM does not handle TMR recovery.\n");
       }
     // switch case statement
   }
@@ -260,7 +258,7 @@ int initVoterM(void) {
   for (index = 0; index < rep_count; index++) {
     for (jndex = 0; jndex < in_pipe_count; jndex++) {
       if (pipe(pipe_fds) == -1) {
-        printf("Replica pipe error\n");
+        debug_print("Replica pipe error\n");
       } else {
         replicas[index].fd_ins[jndex] = pipe_fds[1];
         for_reps[index].fd_ins[jndex] = pipe_fds[0];
@@ -270,7 +268,7 @@ int initVoterM(void) {
   for (index = 0; index < rep_count; index++) {
     for (jndex = 0; jndex < out_pipe_count; jndex++) {
       if (pipe(pipe_fds) == -1) {
-        printf("Replica pipe error\n");
+        debug_print("Replica pipe error\n");
       } else {
         replicas[index].fd_outs[jndex] = pipe_fds[0];
         for_reps[index].fd_outs[jndex] = pipe_fds[1];
@@ -283,15 +281,34 @@ int initVoterM(void) {
     // Each replica needs to build up it's argvs
     // 0 is the program name, 1 is the priority, 2 is the pipe count, and 3 is a NULL
     int rep_argc = 4;
+    int str_index;
     char** rep_argv = (char**)malloc(sizeof(char *) * rep_argc);
 
     rep_argv[0] = controller_name;
-    if (asprintf(&(rep_argv[1]), "%d", replica_priority) < 0) {
-      perror("Fork Replica failed arg priority write");
+
+    // rep_priority may be + or -, but less than 3 digits.
+    rep_argv[1] = (char *) malloc(sizeof(char) * 4); // 3 + null?
+    str_index = 0;
+    if (replica_priority < 0) {
+      rep_argv[1][str_index++] = '-';
     }
-    if (asprintf(&(rep_argv[2]), "%d", in_pipe_count + out_pipe_count) < 0) {
-      perror("Fork Replica failed arg pipe_num write");
+    if (replica_priority / 10.0 > 0) {
+      rep_argv[1][str_index++] = 48 + (replica_priority / 10);
     }
+    rep_argv[1][str_index++] = 48 + (replica_priority % 10);
+    rep_argv[1][str_index] = 0;
+    debug_print("CONVERTED %d to %s\n", replica_priority, rep_argv[1]);
+
+
+    // pipe_count will always be positive, and no more than 2 digits.
+    rep_argv[2] = (char *) malloc(sizeof(char) * 3); // 2 + null
+    str_index = 0;
+    if ((in_pipe_count + out_pipe_count) / 10.0 > 0) {
+      rep_argv[2][str_index++] = 48 + ((in_pipe_count + out_pipe_count) / 10);
+    }
+    rep_argv[2][str_index++] = 48 + ((in_pipe_count + out_pipe_count) % 10);
+    rep_argv[2][str_index] = 0;
+    debug_print("CONVERTED %d to %s\n", (in_pipe_count + out_pipe_count), rep_argv[2]);
 
     rep_argv[3] = NULL;
 
@@ -304,13 +321,12 @@ int initVoterM(void) {
     if (currentPID >= 0) { // Successful fork
       if (currentPID == 0) { // Child process
         if (-1 == execv(rep_argv[0], rep_argv)) {
-          printf("argv[0]: %s\n", rep_argv[0]);
-          perror("Replica: EXEC ERROR!");
+          debug_print("Replica: EXEC ERROR! - argv[0]: %s\n", rep_argv[0]);
           return -1;
         }
       }
     } else {
-      printf("Fork error!\n");
+      debug_print("Fork error!\n");
     }
 
 
@@ -323,7 +339,7 @@ int initVoterM(void) {
   // Give the replicas their pipes (same method as restart)
   for (jndex = 0; jndex < rep_count; jndex++) {
     if (acceptSendFDS(&sd, &for_reps[jndex], rep_info_in, rep_info_out, for_reps[jndex].pinned_cpu) < 0) {
-      printf("EmptyRestart acceptSendFDS call failed\n");
+      debug_print("EmptyRestart acceptSendFDS call failed\n");
       exit(-1);
     }
   }
@@ -348,7 +364,7 @@ int parseArgs(int argc, const char **argv) {
     rep_count = 3; // TMR
   } else {
     rep_count = 0;
-    printf("VoterM failed to read rep_count\n");
+    debug_print("VoterM failed to read rep_count\n");
   }
 
   voting_timeout = atoi(argv[3]);
@@ -370,10 +386,21 @@ int parseArgs(int argc, const char **argv) {
     for (i = 0; i < pipe_count; i++) {
       char rep_info[100] = {0};
       int in, out, timed, j;
+      // Format is %s:%d:%d:%d ... but trying to get rid of scanf.
       for (j = 0; j < 100; j++) { // dietlibc can't handle:sscanf(argv[i + required_args], "%m[^:]:%d:%d:%d", &rep_info, &in, &out, &timed);
         if (argv[i + required_args][j] == ':') {
-          sscanf(&(argv[i + required_args][j]), ":%d:%d:%d", &in, &out, &timed);
+          // j should now be the length of the %s.
           str_lengths[i] = j;
+          j++; // move past first ':'
+
+          int int_index = 0;
+          char pipe_fd_string[10] = {0};
+          while(argv[i + required_args][j + int_index] != ':') {
+            pipe_fd_string[int_index] = argv[i + required_args][j + int_index];
+            int_index++;
+          }
+          in = atoi(pipe_fd_string);
+
           break;
         }
       }
@@ -403,7 +430,33 @@ int parseArgs(int argc, const char **argv) {
       for (j = 0; j < str_lengths[i]; j++) { // dietlibc can't handle:sscanf(argv[i + required_args], "%m[^:]:%d:%d:%d", &rep_info, &in, &out, &timed);
         rep_info[j] = argv[i + required_args][j];
       }
-      sscanf(&(argv[i + required_args][str_lengths[i]]), ":%d:%d:%d", &in, &out, &timed);
+
+
+      j++; // move past first ':'
+
+      // parse in
+      int int_index = 0;
+      char pipe_fd_string[10] = {0};
+      while(argv[i + required_args][j + int_index] != ':') {
+        pipe_fd_string[int_index] = argv[i + required_args][j + int_index];
+        int_index++;
+      }
+      in = atoi(pipe_fd_string);
+      j = j + int_index + 1; // move past second ':'
+
+      // parse out
+      int_index = 0;
+      memset(pipe_fd_string, 0, sizeof(pipe_fd_string));
+      while(argv[i + required_args][j + int_index] != ':') {
+        pipe_fd_string[int_index] = argv[i + required_args][j + int_index];
+        int_index++;
+      }
+      out = atoi(pipe_fd_string);
+      j = j + int_index + 1; // move past final ':'
+
+      // parse timed (should be a 1 or 0)
+      timed = atoi(&(argv[i + required_args][j]));
+
       if (0 != in) {
         ext_in_fds[c_in_pipe] = in;
         rep_info_in[c_in_pipe] = rep_info;

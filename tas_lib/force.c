@@ -104,7 +104,7 @@ int forceMaps( ){
   // open /proc/self/maps
   mapsfile = fopen("/proc/self/maps", "r");
   if (mapsfile == NULL) {
-    printf("Failed to open /proc/self/maps\n");
+    // printf("Failed to open /proc/self/maps\n");
     return -1;
   }
 
