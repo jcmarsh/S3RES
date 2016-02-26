@@ -454,7 +454,7 @@ void checkSDC(int pipe_num) {
             int restartee = (r_index + 2) % rep_count;
             
             debug_print("Caught SDC: %s : %d\n", controller_name, replicas[restartee].pid);
-            if (DEBUG_PRINT) {
+            #ifdef DEBUG_PRINT
               // print all three or just two?
 
               // Create typed pipes for meta data
@@ -475,7 +475,7 @@ void checkSDC(int pipe_num) {
 
               free(buffer_A);
               free(buffer_B);
-            }
+            #endif /* DEBUG_PRINT */
             restart_prep(restartee, r_index);
           } else {
             // If all agree, send and be happy. Otherwise the send is done as part of the restart process

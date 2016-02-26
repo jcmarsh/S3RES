@@ -22,7 +22,7 @@
 
 // From http://stackoverflow.com/a/1644898
 //   Had to change... always compiling is exactly what I don't want.
-#define DEBUG_PRINT 0
+//#define DEBUG_PRINT
 
 #ifdef DEBUG_PRINT
 #define debug_print(...) \

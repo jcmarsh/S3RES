@@ -5,7 +5,7 @@
  * Author - James Marshall
  */
 
-#include "voterr.h"
+#include "voterm.h"
 
 long voting_timeout;
 int timer_start_index; // TODO: Should be per pipe...

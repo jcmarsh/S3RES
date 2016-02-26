@@ -1,12 +1,12 @@
 /*
- * fd_serverr.c
+ * fd_serverm.c
  *
- * Modified from fd_server.c to accomodate the simplified VoterR.
+ * Modified from fd_server.c to accomodate the simplified VoterM.
  *
  * James Marshall Feb 9 2016
  */
 
-#include "voterr.h"
+#include "voterm.h"
 
 // Copied from commtypes
 typedef enum {
