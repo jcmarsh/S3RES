@@ -222,7 +222,6 @@ int initVoterM(void) {
   // Setup fd server
   createFDS(&sd, controller_name);
 
-  // TODO: This is the last piece to convert! And likely the hardest.
   //startReplicas(replicas, rep_count, &sd, controller_name, ext_pipes, pipe_count, replica_priority);
   //initReplicas(reps, num, name, default_priority);
   int index, jndex;

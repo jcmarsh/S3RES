@@ -67,7 +67,7 @@ void enterLoop(void) {
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
       if (FD_ISSET(pipes[read_in_index].fd_in, &select_set)) {
-        read_ret = TEMP_FAILURE_RETRY(read(pipes[read_in_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data)));
+        read_ret = read(pipes[read_in_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
         if (read_ret == sizeof(struct comm_range_pose_data)) {
           if (insertSDC) {
             insertSDC = false;
@@ -76,11 +76,11 @@ void enterLoop(void) {
             commSendMoveCommand(&pipes[write_out_index], 0.1, 0.0);
           }
         } else if (read_ret > 0) {
-          printf("Empty read read_in_index did not match expected size.\n");
+          debug_print("Empty read read_in_index did not match expected size.\n");
         } else if (read_ret < 0) {
-          perror("Empty - read read_in_index problems");
+          debug_print("Empty - read read_in_index problems.\n");
         } else {
-          perror("Empty read_ret == 0 on read_in_index");
+          debug_print("Empty read_ret == 0 on read_in_index.\n");
         } 
       }
     }

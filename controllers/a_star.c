@@ -5,6 +5,7 @@
  */
 
 #include "controller.h"
+#include <sys/mman.h>
 #include <malloc.h>
 #include <math.h>
 #include "./inc/mapping.h" // TODO: fix
@@ -290,7 +291,7 @@ void enterLoop(void) {
         }
       }
       if (FD_ISSET(pipes[way_req_index].fd_in, &select_set)) {
-        read_ret = TEMP_FAILURE_RETRY(read(pipes[way_req_index].fd_in, &recv_msg_req, sizeof(struct comm_way_req)));
+        read_ret = read(pipes[way_req_index].fd_in, &recv_msg_req, sizeof(struct comm_way_req));
         if (read_ret > 0) { // TODO: Do these calls stack up?
           if (goal_path->head == NULL) {
             commSendWaypoints(&pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
@@ -334,6 +335,7 @@ int main(int argc, const char **argv) {
     }
   }
 
+#ifdef __GLIBC__ // musl does not support mallopt. May set as environment variables.
   if (mallopt(M_TRIM_THRESHOLD, -1) != 1) {
     printf("AStar mallopt error, M_TRIM_THRESHOLD\n");
   }
@@ -341,8 +343,10 @@ int main(int argc, const char **argv) {
     printf("AStar mallopt error, M_MMAP_MAX\n");
   }
 
+  // TODO: check if this would prevent page faults in musl builds.
   char *heap_reserve = malloc(sizeof(char) * 1024 * 300); // page in 300K to heap
   free(heap_reserve); // give it back (but reserved for process thanks to mallopt calls)
+#endif /* __GLIBC__ */
 
   enterLoop();
 

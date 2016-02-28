@@ -25,6 +25,7 @@
 //#define DEBUG_PRINT
 
 #ifdef DEBUG_PRINT
+#include <stdio.h>
 #define debug_print(...) \
 	fprintf(stderr, ##__VA_ARGS__);
 #else

@@ -10,8 +10,8 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <unistd.h>
-#include <stdio.h>
 #include <string.h>
+#include "bench_config.h"
 
 // Max number of bytes
 #define MAX_VOTE_PIPE_BUFF 4096
@@ -55,5 +55,7 @@ void fakeToPipe(struct vote_pipe* pipe, int n); // Advances buffer, but no need 
 int compareBuffs(struct vote_pipe *pipeA, struct vote_pipe *pipeB, int n);
 void copyPipe(struct vote_pipe *dest_pipe, struct vote_pipe *src_pipe);
 
+#ifdef DEBUG_PRINT
 void printVoteBuff(struct vote_pipe *vp);
+#endif /* DEBUG_PRINT */
 #endif // _VOTE_BUFF_H_

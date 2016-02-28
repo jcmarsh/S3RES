@@ -36,7 +36,7 @@ int initController(void) {
   sigemptyset(&sa.sa_mask);
   sa.sa_sigaction = restartHandler;
   if (sigaction(RESTART_SIGNAL, &sa, NULL) == -1) {
-    perror("Failed to register the restart handler");
+    debug_print("Failed to register the restart handler.\n");
     return -1;
   }
 
@@ -44,7 +44,7 @@ int initController(void) {
   sigemptyset(&sa.sa_mask);
   sa.sa_sigaction = testSDCHandler;
   if (sigaction(SDC_SIM_SIGNAL, &sa, NULL) == -1) {
-    perror("Failed to register the simulate sdc handler");
+    debug_print("Failed to register the simulate sdc handler.\n");
     return -1;
   }
 
@@ -52,7 +52,7 @@ int initController(void) {
   sigemptyset(&sa.sa_mask);
   sa.sa_sigaction = testCFEHandler;
   if (sigaction(CFE_SIM_SIGNAL, &sa, NULL) == -1) {
-    perror("Failed to register the simulate sdc handler");
+    debug_print("Failed to register the simulate sdc handler.\n");
     return -1;
   }
 
@@ -90,13 +90,13 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
       sigaddset(&signal_set, SDC_SIM_SIGNAL);
       sigaddset(&signal_set, CFE_SIM_SIGNAL);
       if (sigprocmask(SIG_UNBLOCK, &signal_set, NULL) < 0) {
-        perror("Controller signal unblock error");
+        debug_print("Controller signal unblock error.\n");
       }
 
       // Get own pid, send to voter
       currentPID = getpid();
       if (connectRecvFDS(currentPID, pipes, pipe_count, name, &pinned_cpu) < 0) {
-        printf("Error in %s: failed connectRecvFDS call.\n", name);
+        debug_print("Error in %s: failed connectRecvFDS call.\n", name);
         return;
       }
 
@@ -110,8 +110,7 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
       return;
     }
   } else {
-    printf("%s ", name); 
-    perror("Fork error\n");
+    debug_print("Fork error - %s ", name);
     return;
   }
 }

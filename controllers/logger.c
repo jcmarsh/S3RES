@@ -10,6 +10,7 @@
 #include "system_config.h"
 #include <math.h>
 #include <time.h>
+#include <stdio.h>
 
 #define GOAL_X      7.0
 #define GOAL_Y      7.0
@@ -57,7 +58,7 @@ int parseArgs(int argc, const char **argv) {
     pipe_count = 1;
     for (i = 4; i < argc; i++) {
       if (pipe_count >= PIPE_COUNT) {
-        printf("ERROR: Logger needs to raise pipe limit.\n");
+        debug_print("ERROR: Logger needs to raise pipe limit.\n");
         return -1;
       }
       deserializePipe(argv[i], &pipes[pipe_count]);
@@ -139,7 +140,7 @@ void enterLoop(void) {
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
       if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
-        read_ret = TEMP_FAILURE_RETRY(read(pipes[data_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data)));
+        read_ret = read(pipes[data_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
         if (read_ret == sizeof(struct comm_range_pose_data)) {
           commCopyRanger(&recv_msg, ranges, pose);
           // Calculates and sends the new command

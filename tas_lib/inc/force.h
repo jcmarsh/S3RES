@@ -4,7 +4,6 @@
 #include <sys/mman.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 int lockItUp( );
 int forceMaps( );

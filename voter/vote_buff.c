@@ -64,11 +64,11 @@ int pipeToBuff(struct vote_pipe* pipe) {
       }
       pipe->buff_count += read_count;
     } else {
-      printf("Vote_buff overflow!!!\n");
+      debug_print("Vote_buff overflow!!!\n");
       return -1;
     }
   } else {
-    printf("Vote_buff read error.\n");
+    debug_print("Vote_buff read error.\n");
     return -1;
   }
 
@@ -91,7 +91,7 @@ int buffToPipe(struct vote_pipe* pipe, int fd_out, int n) {
   int retval = 0;
 
   if (n > pipe->buff_count) {
-    printf("Vote_buff buffToPipe: requested bigger write than available\n");
+    debug_print("Vote_buff buffToPipe: requested bigger write than available\n");
     return -1;
   }
 
@@ -121,7 +121,7 @@ void fakeToPipe(struct vote_pipe* pipe, int n) {
 // checks if n bytes match (wrappes memcmp, so same returns... kinda)
 int compareBuffs(struct vote_pipe *pipeA, struct vote_pipe *pipeB, int n) {
   if (pipeA->buff_index != pipeB->buff_index) {
-    printf("Vote_buff compareBuffs: buffers do not have the same index!\n");
+    debug_print("Vote_buff compareBuffs: buffers do not have the same index!\n");
     return -1;
   }
   // have to deal with wrapping again!
@@ -152,6 +152,7 @@ void copyPipe(struct vote_pipe *dest_pipe, struct vote_pipe *src_pipe) {
   }
 }
 
+#ifdef DEBUG_PRINT
 void printVoteBuff(struct vote_pipe *vp) {
   printf("VOTE PIPE:\n");
   printf("\tindex: %d\tcount: %d\nBuffer: ", vp->buff_index, vp->buff_count);
@@ -171,3 +172,4 @@ void printVoteBuff(struct vote_pipe *vp) {
   }
   printf("\n");
 }
+#endif /* DEBUG_PRINT */

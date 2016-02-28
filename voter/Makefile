@@ -1,6 +1,6 @@
 include ../directory_paths
 
-LIB=-lrt -lTASLimitedDiet
+LIB=-lrt -lTASLimited
 INC=-I../include/ -I../tas_lib/inc/
 COMPILE=diet -Os gcc -O3 -nostdinc -Werror -static
 #COMPILE=gcc -O3 -Werror -static

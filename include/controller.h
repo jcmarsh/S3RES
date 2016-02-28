@@ -1,6 +1,7 @@
 #include "commtypes.h"
 
 #include <signal.h>
+#include <sys/select.h>
 
 #include "bench_config.h"
 #include "fd_client.h"

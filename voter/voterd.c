@@ -344,11 +344,9 @@ void doOneUpdate(void) {
           if (ext_pipes[p_index].buff_count > 0) { // TODO: read may still have been interrupted
             processData(&(ext_pipes[p_index]), p_index);
           } else if (ext_pipes[p_index].buff_count < 0) {
-            printf("Voter - Controller %s pipe %d\n", controller_name, p_index);
-            perror("Voter - read error on external pipe");
+            debug_print("Voter - read error on external pipe - Controller %s pipe %d\n", controller_name, p_index);
           } else {
-            printf("Voter - Controller %s pipe %d\n", controller_name, p_index);
-            perror("Voter - read == 0 on external pipe");
+            debug_print("Voter - read == 0 on external pipe - Controller %s pipe %d\n", controller_name, p_index);
           }
         }
       }
@@ -373,13 +371,11 @@ void writeBuffer(int fd_out, unsigned char* buffer, int buff_count) {
   if (retval == buff_count) {
     // success, do nothing
   } else if (retval > 0) { // TODO: resume write? 
-    printf("Voter for %s, pipe %d, bytes written: %d\texpected: %d\n", controller_name, fd_out, retval, buff_count);
-    perror("Voter wrote partial message");
+    debug_print("Voter wrote partial message for %s, pipe %d, bytes written: %d\texpected: %d\n", controller_name, fd_out, retval, buff_count);
   } else if (retval < 0) {
-    printf("Voter for %s failed write fd: %d\n", controller_name, fd_out);
-    perror("Voter write");
+    debug_print("Voter for %s failed write fd: %d\n", controller_name, fd_out);
   } else {
-    printf("Voter wrote == 0 for %s fd: %d\n", controller_name, fd_out);
+    debug_print("Voter wrote == 0 for %s fd: %d\n", controller_name, fd_out);
   }
 }
 
@@ -439,7 +435,7 @@ void checkSDC(int pipe_num) {
     case DMR:
       // Can detect, and check what to do
       if (compareBuffs(&(replicas[0].vot_pipes[pipe_num]), &(replicas[1].vot_pipes[pipe_num]), bytes_avail) != 0) {
-        printf("Voting disagreement: caught SDC in DMR but can't do anything about it.\n");
+        debug_print("Voting disagreement: caught SDC in DMR but can't do anything about it.\n");
       }
 
       sendPipe(pipe_num, 0);
@@ -485,7 +481,7 @@ void checkSDC(int pipe_num) {
         } 
       }
 
-      printf("VoterD: TMR no two replicas agreed.\n");
+      debug_print("VoterD: TMR no two replicas agreed.\n");
   }
 }
 
@@ -497,8 +493,7 @@ void processFromRep(int replica_num, int pipe_num) {
     balanceReps(replicas, rep_count, replica_priority);
     checkSDC(pipe_num);
   } else {
-    printf("Voter - Controller %s, rep %d, pipe %d\n", controller_name, replica_num, pipe_num);
-    perror("Voter - read problem on internal pipe");
+    debug_print("Voter - read problem on internal pipe - Controller %s, rep %d, pipe %d\n", controller_name, replica_num, pipe_num);
   }
 }
 
@@ -582,7 +577,7 @@ int parseArgs(int argc, const char **argv) {
       pipe_count++;
     }
     if (pipe_count >= PIPE_LIMIT) {
-      printf("VoterD: Raise pipe limit.\n");
+      debug_print("VoterD: Raise pipe limit.\n");
     }
   
     // Need to have a similar setup to associate vote pipe with input?

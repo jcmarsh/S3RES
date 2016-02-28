@@ -1,7 +1,8 @@
 #include "../include/commtypes.h"
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#ifdef DEBUG_PRINT
+#include <stdio.h>
+#endif /* DEBUG_PRINT */
 
 #define MAX_TYPED_PIPE_BUFF 4096 // This should be the limit kernel on pipes... or something reasonable.
 
@@ -27,26 +28,94 @@ comm_message_t commToEnum(char* name) {
 
 char* serializePipe(struct typed_pipe pipe) {
   char* serial;
+  int length, num_len, index, temp;
+
   if (pipe.fd_in == 0) {
-    if (asprintf(&serial, "%s:%d:%d", MESSAGE_T[pipe.type], 0, pipe.fd_out) < 0) {
-      perror("serializePipe failed");
-    }
+    temp = pipe.fd_out;
   } else {
-    if (asprintf(&serial, "%s:%d:%d", MESSAGE_T[pipe.type], pipe.fd_in, 0) < 0) {
-      perror("serializePipe failed");
-    }
+    temp = pipe.fd_in;
+  }
+
+  num_len = 0;
+  do {
+    num_len++;
+    temp = temp / 10;
+  } while (temp % 10 > 0);
+
+  length = strlen(MESSAGE_T[pipe.type]) + 4 + num_len; // 4: 2 ':', 1 '0', 1 '\0'
+  serial = (char *)malloc(sizeof(char) * length);
+
+  for (index = 0; index < strlen(MESSAGE_T[pipe.type]); index++) {
+    serial[index] = MESSAGE_T[pipe.type][index];
+  }
+
+  if (pipe.fd_in == 0) {
+    serial[index++] = ':';
+    serial[index++] = '0';
+    serial[index++] = ':';
+
+    temp = pipe.fd_out;
+
+    num_len--;
+    do {
+      serial[index + num_len] = 48 + (temp % 10);
+      temp = temp / 10;
+      num_len = num_len - 2;
+      index++;
+    } while (temp > 0);
+
+    serial[index] = 0;
+  } else {
+    serial[index++] = ':';
+
+    temp = pipe.fd_in;
+
+    num_len--;
+    do {
+      serial[index + num_len] = 48 + (temp % 10);
+      temp = temp / 10;
+      num_len = num_len - 2;
+      index++;
+    } while (temp > 0);
+
+    serial[index++] = ':';
+    serial[index++] = '0';
+
+    serial[index] = 0;
   }
   return serial;  
 }
 
 void deserializePipe(const char* serial, struct typed_pipe* pipe) {
   char *type;
-  int in = 0, out = 0;
+  char digit[10] = {0};
+  int index, length = 0;
 
-  // TODO: check allocation and scan for errors
-  sscanf(serial, "%m[^:]:%d:%d", &type, &in, &out);
-  pipe->fd_in = in;
-  pipe->fd_out = out;
+  index = 0;
+  while(serial[index] != ':') {
+    length++;
+    index++;
+  }
+  type = (char *)malloc((sizeof(char) * length) + 1);
+  index = 0;
+  while(serial[index] != ':') {
+    type[index] = serial[index];
+    index++;
+  }
+  type[index] = 0;
+
+  index++; // skip ':'
+
+  length = 0;
+  while(serial[index] != ':') {
+    digit[length] = serial[index];;
+    length++;
+    index++;
+  }
+  pipe->fd_in = atoi(digit);
+
+  index++; // skip ':'
+  pipe->fd_out = atoi(&(serial[index]));
 
   pipe->type = commToEnum(type);
   free(type);
@@ -82,6 +151,7 @@ void convertVoteToTyped(struct vote_pipe ext_pipes[], int pipe_count, struct typ
   }
 }
 
+#ifdef DEBUG_PRINT
 void printBuffer(struct typed_pipe* pipe, char *buffer, int buff_count) {
   printf("Print Buffer type %s, buff_count %d\n", MESSAGE_T[pipe->type], buff_count);
 
@@ -129,12 +199,13 @@ void printBuffer(struct typed_pipe* pipe, char *buffer, int buff_count) {
       break;
   }
 }
+#endif /* DEBUG_PRINT */
 
 int commSendWaypoints(struct typed_pipe* pipe, 
                       double way_x, double way_y, double way_a,
                       double n_way_x, double n_way_y, double n_way_a) {
   if (pipe->fd_out == 0 || pipe->type != WAY_RES) {
-    printf("commSendWaypoints Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
+    debug_print("commSendWaypoints Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
     return 0;
   }
 
@@ -166,7 +237,7 @@ void commCopyWaypoints(struct comm_way_res* recv_msg, double* waypoints, double*
 
 int commSendWaypointRequest(struct typed_pipe* pipe) {
   if (pipe->fd_out == 0 || pipe->type != WAY_REQ) {
-    printf("commSendWaypointsRequest Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
+    debug_print("commSendWaypointsRequest Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
     return 0;
   }
 
@@ -179,7 +250,7 @@ int commSendWaypointRequest(struct typed_pipe* pipe) {
 
 int commSendMoveCommand(struct typed_pipe* pipe, double vel_0, double vel_1) {
   if (pipe->fd_out == 0 || pipe->type != MOV_CMD) {
-    printf("commSendMoveCommand Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
+    debug_print("commSendMoveCommand Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
     return 0;
   }
 
@@ -194,7 +265,7 @@ int commSendMoveCommand(struct typed_pipe* pipe, double vel_0, double vel_1) {
 
 int commSendMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg) {
   if (pipe->fd_out == 0 || pipe->type != MAP_UPDATE) {
-    printf("commSendMapUpdate Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
+    debug_print("commSendMapUpdate Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
     return 0;
   }
 
@@ -211,14 +282,14 @@ int commSendMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg) {
     buffer[buff_count++] = msg->obs_y[index];
     
     if (buff_count * sizeof(int) > MAX_TYPED_PIPE_BUFF) {
-      printf("ERROR: Commtypes:commSendMapUpdate attempting to surpase MAX_TYPED_PIPE_BUFF\n");
+      debug_print("ERROR: Commtypes:commSendMapUpdate attempting to surpase MAX_TYPED_PIPE_BUFF\n");
       break;
     }
   }
   
   int written = write(pipe->fd_out, buffer, sizeof(int) * buff_count);
   if (written != buff_count * sizeof(int)) { // TODO: more should check this
-    perror("Write for commSendMapUpdate did not complete.\n");
+    debug_print("Write for commSendMapUpdate did not complete.\n");
   }
 
   return written;
@@ -227,7 +298,7 @@ int commSendMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg) {
 // Needs to read messages one at a time, no compacting
 int commRecvMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg) {
   if (pipe->fd_in == 0 || pipe->type != MAP_UPDATE) {
-    printf("commRecvMapUpdate Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_in);
+    debug_print("commRecvMapUpdate Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_in);
     return 0;
   }
   int recv_msg_buffer[MAX_TYPED_PIPE_BUFF / sizeof(int)] = {0};
@@ -248,19 +319,19 @@ int commRecvMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg) {
           msg->obs_y[index] = recv_msg_buffer[header_ints + (index * 2 + 1)];
         }
       } else if (read_ret > 0) {
-        printf("commRecvMapUpdate read obstacles did not match expected size: %d\n", read_ret); 
+        debug_print("commRecvMapUpdate read obstacles did not match expected size: %d\n", read_ret); 
       } else if (read_ret < 0) {
-        perror("commRecvMapUpdate read obstacles problems");
+        debug_print("commRecvMapUpdate read obstacles problems.\n");
       } else {
-        perror("commRecvMapUpdate inner read obstacles == 0");
+        debug_print("commRecvMapUpdate inner read obstacles == 0.\n");
       }   
     }
   } else if (read_ret > 0) {
-    printf("commRecvMapUpdate read header did not match expected size: %d\n", read_ret); 
+    debug_print("commRecvMapUpdate read header did not match expected size: %d\n", read_ret); 
   } else if (read_ret < 0) {
-    perror("commRecvMapUpdate read obstacles problems");
+    debug_print("commRecvMapUpdate read obstacles problems.\n");
   } else {
-    perror("commRecvMapUpdate outer read obstacles == 0");
+    debug_print("commRecvMapUpdate outer read obstacles == 0.\n");
   }
 
   return read_ret;
@@ -268,7 +339,7 @@ int commRecvMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg) {
 
 int commSendRanger(struct typed_pipe* pipe, double* ranger_data, double* pose_data) {
   if (pipe->fd_out == 0 || pipe->type != RANGE_POSE_DATA) {
-    printf("commSendRanger Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
+    debug_print("commSendRanger Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
     return 0;
   }
 
@@ -287,9 +358,9 @@ int commSendRanger(struct typed_pipe* pipe, double* ranger_data, double* pose_da
   int write_ret = write(pipe->fd_out, &msg, sizeof(struct comm_range_pose_data));
   if (write_ret < sizeof(struct comm_range_pose_data)) {
     if (write_ret < 0) {
-      perror("commSendRanger failed");
+      debug_print("commSendRanger failed.\n");
     } else {
-      printf("commSendRange did not write expected bytes to fd %d, bytes %d\n", pipe->fd_out, write_ret);
+      debug_print("commSendRange did not write expected bytes to fd %d, bytes %d\n", pipe->fd_out, write_ret);
     }
   }
 
@@ -298,7 +369,7 @@ int commSendRanger(struct typed_pipe* pipe, double* ranger_data, double* pose_da
 
 int commSendAck(struct typed_pipe* pipe, long state_hash) {
   if (pipe->fd_out == 0 || pipe->type != COMM_ACK) {
-    printf("commSendAck Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
+    debug_print("commSendAck Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
     return 0;
   }
 
@@ -326,7 +397,7 @@ void commCopyRanger(struct comm_range_pose_data* recv_msg, double* range_data, d
 // TODO: Consider making this smarter so that the sender doesn't have to do as much work.
 int commSendMsgBuffer(struct typed_pipe* pipe, struct comm_msg_buffer* msg) {
   if (pipe->fd_out == 0 || pipe->type != MSG_BUFFER) {
-    printf("commSendMsgBuffer Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
+    debug_print("commSendMsgBuffer Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
     return 0;
   }
   
@@ -340,7 +411,7 @@ int commSendMsgBuffer(struct typed_pipe* pipe, struct comm_msg_buffer* msg) {
 
   int written = write(pipe->fd_out, &(buffer[0]), msg->length + sizeof(msg->length));
   if (written != msg->length + sizeof(msg->length)) { // TODO: more should check this
-    perror("Write for commSendMsgBuffer did not complete.\n");
+    debug_print("Write for commSendMsgBuffer did not complete.\n");
   }
 
   return written;
@@ -348,7 +419,7 @@ int commSendMsgBuffer(struct typed_pipe* pipe, struct comm_msg_buffer* msg) {
 
 int commRecvMsgBuffer(struct typed_pipe* pipe, struct comm_msg_buffer* msg) {
   if (pipe->fd_in == 0 || pipe->type != MSG_BUFFER) {
-    printf("commRecvMsgBuffer Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_in);
+    debug_print("commRecvMsgBuffer Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_in);
     return 0;
   }
 
@@ -361,19 +432,19 @@ int commRecvMsgBuffer(struct typed_pipe* pipe, struct comm_msg_buffer* msg) {
       if (read_ret == msg->length) {
         // All good
       } else if (read_ret > 0) {
-        printf("commRecvMsgBuffer read buffer count (%d) did not match expected size (%d)\n", read_ret, msg->length); 
+        debug_print("commRecvMsgBuffer read buffer count (%d) did not match expected size (%d)\n", read_ret, msg->length); 
       } else if (read_ret < 0) {
-        perror("commRecvMsgBuffer read buffer problems");
+        debug_print("commRecvMsgBuffer read buffer problems.\n");
       } else {
-        perror("commRecvMsgBuffer inner read buffer == 0");
+        debug_print("commRecvMsgBuffer inner read buffer == 0.\n");
       }   
     }
   } else if (read_ret > 0) {
-    printf("commRecvMsgBuffer read length did not match expected size: %d\n", read_ret); 
+    debug_print("commRecvMsgBuffer read length did not match expected size: %d\n", read_ret); 
   } else if (read_ret < 0) {
-    perror("commRecvMsgBuffer outer read buffer problems");
+    debug_print("commRecvMsgBuffer outer read buffer problems.\n");
   } else {
-    perror("commRecvMsgBuffer outer read buffer == 0");
+    debug_print("commRecvMsgBuffer outer read buffer == 0.\n");
   }
 
   return read_ret;

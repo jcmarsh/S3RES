@@ -90,7 +90,7 @@ int parseArgs(int argc, const char **argv) {
   if (argc < 5) { // Must request fds
     pid_t currentPID = getpid();
     if (connectRecvFDS(currentPID, pipes, pipe_count, name, &pinned_cpu) < 0) {
-      printf("Error in %s: failed on connectRecvFDS call. Exiting.\n", name);
+      debug_print("Error in %s: failed on connectRecvFDS call. Exiting.\n", name);
       exit(-1);
     }
   } else {
@@ -112,7 +112,7 @@ void command(void) {
   pid_t currentPID = getpid(); // TODO: left over from debugging?
 
   // Head towards the goal! odom_pose: 0-x, 1-y, 2-theta
-  dist = sqrt(pow(goal[INDEX_X] - pos[INDEX_X], 2)  + pow(goal[INDEX_Y] - pos[INDEX_Y], 2));
+  dist = sqrt(pow(goal[INDEX_X] - pos[INDEX_X], 2) + pow(goal[INDEX_Y] - pos[INDEX_Y], 2));
   theta = atan2(goal[INDEX_Y] - pos[INDEX_Y], goal[INDEX_X] - pos[INDEX_X]) - pos[INDEX_A];
 
   if (dist <= DIST_EPSILON) { // Try next goal
@@ -216,30 +216,30 @@ void enterLoop(void) {
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
       if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
-        read_ret = TEMP_FAILURE_RETRY(read(pipes[data_index].fd_in, &recv_msg_data, sizeof(struct comm_range_pose_data)));
+        read_ret = read(pipes[data_index].fd_in, &recv_msg_data, sizeof(struct comm_range_pose_data));
         if (read_ret == sizeof(struct comm_range_pose_data)) {
           commCopyRanger(&recv_msg_data, ranges, pos);
           // Calculates and sends the new command
           command();
         } else if (read_ret > 0) {
-          printf("ArtPot read data_index did not match expected size.\n");
+          debug_print("ArtPot read data_index did not match expected size.\n");
         } else if (read_ret < 0) {
-          perror("ArtPot - read data_index problems");
+          debug_print("ArtPot - read data_index problems.\n");
         } else {
-          perror("ArtPot read_ret == 0 on data_index");
+          debug_print("ArtPot read_ret == 0 on data_index.\n");
         }
       }
       if (PIPE_COUNT == pipe_count) {
         if (FD_ISSET(pipes[way_res_index].fd_in, &select_set)) {
-          read_ret = TEMP_FAILURE_RETRY(read(pipes[way_res_index].fd_in, &recv_msg_way, sizeof(struct comm_way_res)));
+          read_ret = read(pipes[way_res_index].fd_in, &recv_msg_way, sizeof(struct comm_way_res));
           if (read_ret == sizeof(struct comm_way_res)) {
             commCopyWaypoints(&recv_msg_way, goal, next_goal);
           } else if (read_ret > 0) {
-            printf("ArtPot read way_res_index did not match expected size.\n");
+            debug_print("ArtPot read way_res_index did not match expected size.\n");
           } else if (read_ret < 0) {
-            perror("ArtPot - read way_res_index problems");
+            debug_print("ArtPot - read way_res_index problems.\n");
           } else {
-            perror("ArtPot read_ret == 0 on way_res_index");
+            debug_print("ArtPot read_ret == 0 on way_res_index.\n");
           } 
         }
       }

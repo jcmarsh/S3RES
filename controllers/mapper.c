@@ -54,7 +54,7 @@ int parseArgs(int argc, const char **argv) {
   int i;
 
   if (argc < 3) {
-    printf("Usage: Mapper <priority> <pipe_count> <pipes...>\n");
+    puts("Usage: Mapper <priority> <pipe_count> <pipes...>\n");
     exit(0);
   }
   // TODO: error checking
@@ -163,27 +163,27 @@ void enterLoop(void) {
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
       if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
-        read_ret = TEMP_FAILURE_RETRY(read(pipes[data_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data)));
+        read_ret = read(pipes[data_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
         if (read_ret == sizeof(struct comm_range_pose_data)) {
           updateMap(&recv_msg);
         } else if (read_ret > 0) {
-          printf("Mapper read data_index did not match expected size: %d\n", read_ret);
+          debug_print("Mapper read data_index did not match expected size: %d\n", read_ret);
         } else if (read_ret < 0) {
-          perror("Mapper - read data_index problems");
+          debug_print("Mapper - read data_index problems.\n");
         } else {
-          perror("Mapper read_ret == 0 on data_index");
+          debug_print("Mapper read_ret == 0 on data_index.\n");
         }
       }
       if (FD_ISSET(pipes[ack_index].fd_in, &select_set)) {
-        read_ret = TEMP_FAILURE_RETRY(read(pipes[ack_index].fd_in, &ack_msg, sizeof(struct comm_ack)));
+        read_ret = read(pipes[ack_index].fd_in, &ack_msg, sizeof(struct comm_ack));
         if (read_ret == sizeof(struct comm_ack)) {
           // Do nothing
         } else if (read_ret > 0) {
-          printf("Mapper read ack_index did not match expected size: %d\n", read_ret);
+          debug_print("Mapper read ack_index did not match expected size: %d\n", read_ret);
         } else if (read_ret < 0) {
-          perror("Mapper - read ack_index problems");
+          debug_print("Mapper - read ack_index problems.\n");
         } else {
-          perror("Mapper read_ret == 0 on ack_index");
+          debug_print("Mapper read_ret == 0 on ack_index.\n");
         }
       }
     }
