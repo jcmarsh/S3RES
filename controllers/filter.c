@@ -71,7 +71,7 @@ void command(void) {
   }
 
   // Write out averaged range data (with pose)
-  for (i = 1; i < pipe_count; i++) {
+  for (i = pipe_count - 1; i > 0; i--) {
     commSendRanger(&pipes[out_index[i - 1]], ranges, pose);
   }
 }
