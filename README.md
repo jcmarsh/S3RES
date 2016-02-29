@@ -7,8 +7,40 @@ This is likely a temporary repo (thus the terrible name). Meant to simulate Sing
 
 ## Dependencies
 * Player / Stage
-* dietlibc
+* dietlibc (Just for Voters, makes them 40% smaller than musl)
+* musl (Needed for Voters, recommended for components)
 * libccv (for Load component).
+
+Everything can be compiled just fine with glibc, but you will need to edit the Makefiles.
+
+### musl
+
+Project URL: http://www.musl-libc.org/
+
+    wget http://www.musl-libc.org/releases/musl-1.1.14.tar.gz
+    tar -xvf musl-1.1.14.tar.gz 
+    cd musl-1.1.14
+    ./configure 
+    make
+    sudo make install
+
+You can test that this worked by going into the `tas_lib` directory and running `make`.
+
+### Dietlibc
+
+Project URL: https://www.fefe.de/dietlibc/
+
+Version 0.33 does not support ARM7, so you must download from their repo (which is the recommended method anyways).
+
+    cvs -d :pserver:cvs@cvs.fefe.de:/cvs -z9 co dietlibc
+    cd dietlibc
+    make
+
+Unfortunately I got a bunch of errors here on the BeagleBone Black, dealing with libcrypt. So I edited the Makefile and removed all references to libcrypt, which did the trick.
+
+Once built, the libraries will be in a directory `bin-ARCH/`, which can be installed like this:
+
+    sudo install bin-arm/diet /usr/local/bin
 
 ## Compiling and Running
 
