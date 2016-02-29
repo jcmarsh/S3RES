@@ -7,6 +7,10 @@
 
 #include "voterm.h"
 
+// TODO: Duplicated from controller.h
+#define TIMEOUT_SIGNAL SIGRTMIN + 0 // The voter's watchdog timer
+#define RESTART_SIGNAL SIGRTMIN + 1 // Voter to replica signal to fork itself
+
 long voting_timeout;
 int timer_start_index; // TODO: Should be per pipe...
 int timer_stop_index;
@@ -39,7 +43,7 @@ unsigned char ext_in_buffer[MAX_PIPE_BUFF];
 unsigned int * ext_out_fds; // should out_pipe_count of these
 char **rep_info_out;
 
-void startReplicas(int rep_index, int rep_count);
+void startReplicas(bool forking, int rep_index, int rep_count);
 
 void recvData(void) {
   int p_index;
@@ -173,7 +177,7 @@ void vote(bool timeout_occurred) {
           replicas[0].buff_counts[p_index] = 0;
         }
 
-        startReplicas(0, rep_count);
+        startReplicas(true, 0, rep_count);
       }
       return;
     case 2: // DMR
@@ -184,19 +188,37 @@ void vote(bool timeout_occurred) {
       debug_print("VoterM Does not handle DMR.\n");
       return;
     case 3: ;// TMR
+      int restarter, restartee;
       // Send the solution that at least two agree on
+      // TODO: Should stop searching for faults once one is found
       bool fault = false;
       for (p_index = 0; p_index < out_pipe_count; p_index++) {
-        if ((replicas[0].buff_counts[p_index] != replicas[1].buff_counts[p_index])
-          || (replicas[0].buff_counts[p_index] != replicas[2].buff_counts[p_index])) {
+        if (replicas[0].buff_counts[p_index] != replicas[1].buff_counts[p_index]) {
+          if (replicas[0].buff_counts[p_index] != replicas[2].buff_counts[p_index]) {
+            fault = true;
+            restartee = 0;
+          } else {
+            fault = true;
+            restartee = 1;
+          }
+        } else if(replicas[0].buff_counts[p_index] != replicas[2].buff_counts[p_index]) {
           fault = true;
+          restartee = 2;
         }
       }
 
       for (p_index = 0; p_index < out_pipe_count; p_index++) {
-        if ((memcmp(replicas[0].buffers[p_index], replicas[1].buffers[p_index], replicas[0].buff_counts[p_index]) != 0)
-          || (memcmp(replicas[0].buffers[p_index], replicas[2].buffers[p_index], replicas[0].buff_counts[p_index]) != 0)) {
+        if (memcmp(replicas[0].buffers[p_index], replicas[1].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
+          if (memcmp(replicas[0].buffers[p_index], replicas[2].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
+            fault = true;
+            restartee = 0;
+          } else {
+            fault = true;
+            restartee = 1;
+          }
+        } else if (memcmp(replicas[0].buffers[p_index], replicas[2].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
           fault = true;
+          restartee = 2;
         }
       }
 
@@ -204,48 +226,40 @@ void vote(bool timeout_occurred) {
         for (p_index = 0; p_index < out_pipe_count; p_index++) {
           if (replicas[0].buff_counts[p_index] != 0) {
             if (write(ext_out_fds[p_index], replicas[0].buffers[p_index], replicas[0].buff_counts[p_index]) != -1) {
-              replicas[0].buff_counts[p_index] = 0;
-              replicas[1].buff_counts[p_index] = 0;
-              replicas[2].buff_counts[p_index] = 0;
             } else {
               debug_print("VoterM write failed.\n");
             }
           }
         }
       } else {
-        debug_print("VoterM does not handle TMR recovery.\n");
+        debug_print("VoterM trying to handle TMR recovery.\n");
+        restarter = (restartee + (rep_count - 1)) % rep_count;
+        debug_print("\tRestartee: %d - %d\t Restarter: %d - %d\n", restartee, replicas[restartee].pid, restarter, replicas[restarter].pid);
+
+        // kill restartee
+        kill(replicas[restartee].pid, SIGKILL);
+
+        // kill (signal) restarter
+        kill(replicas[restarter].pid, RESTART_SIGNAL);
+
+        // start restartee
+        startReplicas(false, restartee, 1);
+        //if (acceptSendFDS(&sd, &replicas[restartee], rep_info_in, rep_info_out) < 0) {
+        //  debug_print("TMR recovery acceptSendFDS call failed\n");
+        //}
+      }
+      for (p_index = 0; p_index < out_pipe_count; p_index++) {
+        replicas[0].buff_counts[p_index] = 0;
+        replicas[1].buff_counts[p_index] = 0;
+        replicas[2].buff_counts[p_index] = 0;
       }
     // switch case statement
   }
 }
 
-// Start all replicas (or just restart one)
-void startReplicas(int rep_index, int rep_count) {
+void forkReplicas(int rep_index, int rep_count) {
   int index, jndex;
-  //createPipes(reps, num, ext_pipes, pipe_count);
-  int pipe_fds[2];
-  for (index = rep_index; index < rep_count; index++) {
-    for (jndex = 0; jndex < in_pipe_count; jndex++) {
-      if (pipe(pipe_fds) == -1) {
-        debug_print("Replica pipe error\n");
-      } else {
-        replicas[index].fd_ins[jndex] = pipe_fds[1];
-        for_reps[index].fd_ins[jndex] = pipe_fds[0];
-      }
-    }
-  }
-  for (index = rep_index; index < rep_count; index++) {
-    for (jndex = 0; jndex < out_pipe_count; jndex++) {
-      if (pipe(pipe_fds) == -1) {
-        debug_print("Replica pipe error\n");
-      } else {
-        replicas[index].fd_outs[jndex] = pipe_fds[0];
-        for_reps[index].fd_outs[jndex] = pipe_fds[1];
-      }
-    }
-  }
 
-  //forkReplicas(reps, num, 0, NULL);
   for (index = rep_index; index < rep_count; index++) {
     // Each replica needs to build up it's argvs
     // 0 is the program name, 1 is the priority, 2 is the pipe count, and 3 is a NULL
@@ -268,7 +282,6 @@ void startReplicas(int rep_index, int rep_count) {
     rep_argv[1][str_index++] = 48 + (replica_priority % 10);
     rep_argv[1][str_index] = 0;
     debug_print("CONVERTED %d to %s\n", replica_priority, rep_argv[1]);
-
 
     // pipe_count will always be positive, and no more than 2 digits.
     rep_argv[2] = (char *) malloc(sizeof(char) * 3); // 2 + null
@@ -298,18 +311,52 @@ void startReplicas(int rep_index, int rep_count) {
       debug_print("Fork error!\n");
     }
 
-
     for (jndex = 1; jndex < rep_argc; jndex++) {
       free(rep_argv[jndex]);
     }
     free(rep_argv);
   }
+}
+
+// Start all replicas (or just restart one)
+void startReplicas(bool forking, int rep_index, int rep_count) {
+  int index, jndex;
+  //createPipes(reps, num, ext_pipes, pipe_count);
+  int pipe_fds[2];
+  for (index = rep_index; index < rep_count; index++) {
+    for (jndex = 0; jndex < in_pipe_count; jndex++) {
+      if (pipe(pipe_fds) == -1) {
+        debug_print("Replica pipe error\n");
+      } else {
+        replicas[index].fd_ins[jndex] = pipe_fds[1];
+        for_reps[index].fd_ins[jndex] = pipe_fds[0];
+      }
+    }
+  }
+  for (index = rep_index; index < rep_count; index++) {
+    for (jndex = 0; jndex < out_pipe_count; jndex++) {
+      if (pipe(pipe_fds) == -1) {
+        debug_print("Replica pipe error\n");
+      } else {
+        replicas[index].fd_outs[jndex] = pipe_fds[0];
+        for_reps[index].fd_outs[jndex] = pipe_fds[1];
+      }
+    }
+  }
+
+  //forkReplicas(reps, num, 0, NULL);
+  if (forking) {
+    forkReplicas(rep_index, rep_count);
+  }
 
   // Give the replicas their pipes (same method as restart)
   for (index = rep_index; index < rep_count; index++) {
-    if (acceptSendFDS(&sd, &for_reps[index], rep_info_in, rep_info_out, for_reps[index].pinned_cpu) < 0) {
-      debug_print("Initial acceptSendFDS call failed\n");
+    int pid = acceptSendFDS(&sd, &for_reps[index], rep_info_in, rep_info_out);
+    if (pid < 0) {
+      debug_print("VoterM's acceptSendFDS call failed\n");
       exit(-1);
+    } else {
+      replicas[index].pid = pid;
     }
   }
 }
@@ -350,7 +397,7 @@ int initVoterM(void) {
     }
   }
 
-  startReplicas(0, rep_count);
+  startReplicas(true, 0, rep_count);
 
   InitTAS(VOTER_PIN, voter_priority); // IMPORTANT: Should be after forking replicas to subvert CoW
 

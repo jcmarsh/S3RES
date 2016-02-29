@@ -30,6 +30,7 @@ struct server_data {
 // Represents one redundant execution, implemented as a process
 struct replicaR {
   int pinned_cpu;
+  pid_t pid;
   // list of connections
   // Uses the same format as the plumber
   // The following all have in_pipe_count members
@@ -44,7 +45,7 @@ struct replicaR {
 
 // fd_server functions
 int createFDS(struct server_data * sd, const char* name);
-int acceptSendFDS(struct server_data * sd, struct replicaR * rep, char **rep_info_in, char **rep_info_out, int pinned_cpu);
+int acceptSendFDS(struct server_data * sd, struct replicaR * rep, char **rep_info_in, char **rep_info_out);
 
 // VoterR Functions
 // int -> recv -> sendCollect -> vote -> output -> recv

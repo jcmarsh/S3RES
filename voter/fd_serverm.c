@@ -177,15 +177,14 @@ int createFDS(struct server_data * sd, const char* name) {
  * Blocks on accept: You better know a client is about to connect!
  * Returns 0 upon success, <0 otherwise.
  */
-int acceptSendFDS(struct server_data * sd, struct replicaR * rep, char **rep_info_in, char **rep_info_out, int pinned_cpu) {
+int acceptSendFDS(struct server_data * sd, struct replicaR * rep, char **rep_info_in, char **rep_info_out) {
   int connection_fd;
-  int retval = 0;
-  int pid;
+  int read_ret, retval = 0;
 
   connection_fd = accept(sd->sock_fd, (struct sockaddr *) &(sd->address), &(sd->address_length));
   if (connection_fd > -1) {
     // send read end to client
-    if (sendFDS(connection_fd, rep, rep_info_in, rep_info_out, pinned_cpu) < 0) {
+    if (sendFDS(connection_fd, rep, rep_info_in, rep_info_out, rep->pinned_cpu) < 0) {
       debug_print("FD_ServerR failed to sendFDS.\n");
       retval = -1;
       goto accept_send_FDS_out;
@@ -196,9 +195,9 @@ int acceptSendFDS(struct server_data * sd, struct replicaR * rep, char **rep_inf
     goto accept_send_FDS_out;
   }
 
-  // read pid... but ignore.
-  retval = read(connection_fd, &pid, sizeof(pid_t));
-  if (retval != sizeof(pid_t)) {
+  // read pid
+  read_ret = read(connection_fd, &retval, sizeof(pid_t));
+  if (read_ret != sizeof(pid_t)) {
     debug_print("FD_ServerR failed to read pid.\n");
     retval = -1;
   }
