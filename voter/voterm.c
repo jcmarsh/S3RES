@@ -39,6 +39,8 @@ unsigned char ext_in_buffer[MAX_PIPE_BUFF];
 unsigned int * ext_out_fds; // should out_pipe_count of these
 char **rep_info_out;
 
+void startReplicas(int rep_index, int rep_count);
+
 void recvData(void) {
   int p_index;
   int retval = 0;
@@ -160,15 +162,18 @@ void vote(bool timeout_occurred) {
           if (replicas[0].buff_counts[p_index] != 0) {
             if (write(ext_out_fds[p_index], replicas[0].buffers[p_index], replicas[0].buff_counts[p_index]) != -1) {
               replicas[0].buff_counts[p_index] = 0;
-              replicas[1].buff_counts[p_index] = 0;
-              replicas[2].buff_counts[p_index] = 0;
             } else {
               debug_print("VoterM write failed.\n");
             }
           }
         }
       } else {
-        debug_print("VoterM Does not handle SMR recovery.\n");
+        debug_print("Restarting SMR component: %s\n", controller_name);
+        for (p_index = 0; p_index < out_pipe_count; p_index++) {
+          replicas[0].buff_counts[p_index] = 0;
+        }
+
+        startReplicas(0, rep_count);
       }
       return;
     case 2: // DMR
@@ -214,47 +219,12 @@ void vote(bool timeout_occurred) {
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Set up the device.  Return 0 if things go well, and -1 otherwise.
-int initVoterM(void) {
-  replica_priority = voter_priority - VOTER_PRIO_OFFSET;
-
-  // Setup fd server
-  createFDS(&sd, controller_name);
-
-  //startReplicas(replicas, rep_count, &sd, controller_name, ext_pipes, pipe_count, replica_priority);
-  //initReplicas(reps, num, name, default_priority);
+// Start all replicas (or just restart one)
+void startReplicas(int rep_index, int rep_count) {
   int index, jndex;
-  replicas = (struct replicaR *) malloc(sizeof(struct replicaR) * rep_count);
-  for_reps = (struct replicaR *) malloc(sizeof(struct replicaR) * rep_count);
-  for (index = 0; index < rep_count; index++) {
-    if (CONTROLLER_PIN == QUAD_PIN_POLICY) {
-      replicas[index].pinned_cpu = index + 1; // TODO: don't need both
-      for_reps[index].pinned_cpu = index + 1;
-    } else {
-      replicas[index].pinned_cpu = CONTROLLER_PIN; // TODO: don't need both
-      for_reps[index].pinned_cpu = CONTROLLER_PIN;
-    }
-
-    replicas[index].in_pipe_count = in_pipe_count; // Duplicated to make fds data passing easier
-    for_reps[index].in_pipe_count = in_pipe_count;
-    replicas[index].fd_ins = (unsigned int *) malloc(sizeof(int) * in_pipe_count);
-    for_reps[index].fd_ins = (unsigned int *) malloc(sizeof(int) * in_pipe_count);
-    replicas[index].out_pipe_count = out_pipe_count; // Duplicated to make fds data passing easier
-    for_reps[index].out_pipe_count = out_pipe_count;
-    replicas[index].fd_outs = (unsigned int *) malloc(sizeof(int) * out_pipe_count);
-    for_reps[index].fd_outs = (unsigned int *) malloc(sizeof(int) * out_pipe_count);
-    replicas[index].buff_counts = (unsigned int *) malloc(sizeof(int) * out_pipe_count);
-    replicas[index].buffers = (unsigned char **) malloc(sizeof(char*) * out_pipe_count);
-    for (jndex = 0; jndex < out_pipe_count; jndex++) {
-      replicas[index].buffers[jndex] = (unsigned char *) malloc(sizeof(char) * MAX_PIPE_BUFF);
-    }
-  }
-
-
   //createPipes(reps, num, ext_pipes, pipe_count);
   int pipe_fds[2];
-  for (index = 0; index < rep_count; index++) {
+  for (index = rep_index; index < rep_count; index++) {
     for (jndex = 0; jndex < in_pipe_count; jndex++) {
       if (pipe(pipe_fds) == -1) {
         debug_print("Replica pipe error\n");
@@ -264,7 +234,7 @@ int initVoterM(void) {
       }
     }
   }
-  for (index = 0; index < rep_count; index++) {
+  for (index = rep_index; index < rep_count; index++) {
     for (jndex = 0; jndex < out_pipe_count; jndex++) {
       if (pipe(pipe_fds) == -1) {
         debug_print("Replica pipe error\n");
@@ -276,9 +246,10 @@ int initVoterM(void) {
   }
 
   //forkReplicas(reps, num, 0, NULL);
-  for (index = 0; index < rep_count; index++) {
+  for (index = rep_index; index < rep_count; index++) {
     // Each replica needs to build up it's argvs
     // 0 is the program name, 1 is the priority, 2 is the pipe count, and 3 is a NULL
+    // TODO: No need to rebuild this for SMR restarts
     int rep_argc = 4;
     int str_index;
     char** rep_argv = (char**)malloc(sizeof(char *) * rep_argc);
@@ -321,7 +292,6 @@ int initVoterM(void) {
       if (currentPID == 0) { // Child process
         if (-1 == execv(rep_argv[0], rep_argv)) {
           debug_print("Replica: EXEC ERROR! - argv[0]: %s\n", rep_argv[0]);
-          return -1;
         }
       }
     } else {
@@ -336,12 +306,51 @@ int initVoterM(void) {
   }
 
   // Give the replicas their pipes (same method as restart)
-  for (jndex = 0; jndex < rep_count; jndex++) {
-    if (acceptSendFDS(&sd, &for_reps[jndex], rep_info_in, rep_info_out, for_reps[jndex].pinned_cpu) < 0) {
-      debug_print("EmptyRestart acceptSendFDS call failed\n");
+  for (index = rep_index; index < rep_count; index++) {
+    if (acceptSendFDS(&sd, &for_reps[index], rep_info_in, rep_info_out, for_reps[index].pinned_cpu) < 0) {
+      debug_print("Initial acceptSendFDS call failed\n");
       exit(-1);
     }
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Set up the device.  Return 0 if things go well, and -1 otherwise.
+int initVoterM(void) {
+  replica_priority = voter_priority - VOTER_PRIO_OFFSET;
+
+  // Setup fd server
+  createFDS(&sd, controller_name);
+
+  //initReplicas(reps, num, name, default_priority);
+  int index, jndex;
+  replicas = (struct replicaR *) malloc(sizeof(struct replicaR) * rep_count);
+  for_reps = (struct replicaR *) malloc(sizeof(struct replicaR) * rep_count);
+  for (index = 0; index < rep_count; index++) {
+    if (CONTROLLER_PIN == QUAD_PIN_POLICY) {
+      replicas[index].pinned_cpu = index + 1; // TODO: don't need both
+      for_reps[index].pinned_cpu = index + 1;
+    } else {
+      replicas[index].pinned_cpu = CONTROLLER_PIN; // TODO: don't need both
+      for_reps[index].pinned_cpu = CONTROLLER_PIN;
+    }
+
+    replicas[index].in_pipe_count = in_pipe_count; // Duplicated to make fds data passing easier
+    for_reps[index].in_pipe_count = in_pipe_count;
+    replicas[index].fd_ins = (unsigned int *) malloc(sizeof(int) * in_pipe_count);
+    for_reps[index].fd_ins = (unsigned int *) malloc(sizeof(int) * in_pipe_count);
+    replicas[index].out_pipe_count = out_pipe_count; // Duplicated to make fds data passing easier
+    for_reps[index].out_pipe_count = out_pipe_count;
+    replicas[index].fd_outs = (unsigned int *) malloc(sizeof(int) * out_pipe_count);
+    for_reps[index].fd_outs = (unsigned int *) malloc(sizeof(int) * out_pipe_count);
+    replicas[index].buff_counts = (unsigned int *) malloc(sizeof(int) * out_pipe_count);
+    replicas[index].buffers = (unsigned char **) malloc(sizeof(char*) * out_pipe_count);
+    for (jndex = 0; jndex < out_pipe_count; jndex++) {
+      replicas[index].buffers[jndex] = (unsigned char *) malloc(sizeof(char) * MAX_PIPE_BUFF);
+    }
+  }
+
+  startReplicas(0, rep_count);
 
   InitTAS(VOTER_PIN, voter_priority); // IMPORTANT: Should be after forking replicas to subvert CoW
 
