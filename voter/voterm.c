@@ -243,10 +243,18 @@ void vote(bool timeout_occurred) {
 
         // start restartee
         startReplicas(false, restartee, 1);
-        //if (acceptSendFDS(&sd, &replicas[restartee], rep_info_in, rep_info_out) < 0) {
-        //  debug_print("TMR recovery acceptSendFDS call failed\n");
-        //}
+
+        // Recovery should be done. Send data.
+        for (p_index = 0; p_index < out_pipe_count; p_index++) {
+          if (replicas[restarter].buff_counts[p_index] != 0) {
+            if (write(ext_out_fds[p_index], replicas[restarter].buffers[p_index], replicas[restarter].buff_counts[p_index]) != -1) {
+            } else {
+              debug_print("VoterM write failed.\n");
+            }
+          }
+        }
       }
+
       for (p_index = 0; p_index < out_pipe_count; p_index++) {
         replicas[0].buff_counts[p_index] = 0;
         replicas[1].buff_counts[p_index] = 0;
