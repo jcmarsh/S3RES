@@ -60,15 +60,16 @@ int createFDS(struct server_data * sd, const char* name) {
   const char* pre_name = "./";
   const char* post_name = "_fd_server";
   char* actual_name;
-  
+
   if (asprintf(&actual_name, "%s%s%s", pre_name, name, post_name) < 0) {
     perror("fd_server failed to allocate fd_name");
+    return -1;
   }
 
   sd->sock_fd = socket(PF_UNIX, SOCK_STREAM, 0);
   if (sd->sock_fd < 0) {
     perror("Socket creation failed.");
-    return 1;
+    return -1;
   }
 
   // should delete previous remnants
@@ -88,15 +89,16 @@ int createFDS(struct server_data * sd, const char* name) {
 
   if(bind(sd->sock_fd, (struct sockaddr *) &(sd->address), sizeof(struct sockaddr_un)) != 0) {
     printf("bind() failed\n");
-    return 1;
+    return -1;
   }
 
   // This program will listen to connections on this socket
   // 5 is the backlog: how many pending connections there may be
   if(listen(sd->sock_fd, 5) != 0) {
     printf("listen() failed\n");
-    return 1;
+    return -1;
   }
+  return 1;
 }
 
 /*
@@ -111,6 +113,7 @@ int acceptSendFDS(struct server_data * sd, pid_t *pid, struct vote_pipe* pipes, 
   connection_fd = accept(sd->sock_fd, (struct sockaddr *) &(sd->address), &(sd->address_length));
   if (connection_fd > -1) {
     // send read end to client
+    printf("\t\tSendFDS\n");
     if (sendFDS(connection_fd, pipes, pipe_count, pinned_cpu) < 0) {
       perror("FD_Server failed to sendFDS");
       retval = -1;

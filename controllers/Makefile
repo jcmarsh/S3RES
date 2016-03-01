@@ -5,6 +5,7 @@ DEP=../include/*.h ../tas_lib/inc/*.h
 INC=-I../include/ -I../tas_lib/inc/
 LIB=-L/usr/local/lib -lrt -lTASLimited -pthread
 COMPILE=/usr/local/musl/bin/musl-gcc -Werror -static
+#COMPILE=gcc -O3 -Werror -static
 FLAGS=-O3 -Werror -static
 #FLAGS=-g -O0 -Werror -static
 

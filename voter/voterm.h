@@ -4,13 +4,14 @@
  * Author - James Marshall
  */
 
-#include <stdbool.h>
 #include <fcntl.h>
-#include <sys/un.h>
-#include <sys/socket.h>
+#include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/un.h>
+#include <sys/socket.h>
 
 #include "bench_config.h"
 #include "system_config.h"

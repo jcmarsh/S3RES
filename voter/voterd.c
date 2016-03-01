@@ -503,7 +503,9 @@ int initVoterD(void) {
   replica_priority = voter_priority - VOTER_PRIO_OFFSET;
 
   // Setup fd server
-  createFDS(&sd, controller_name);
+  if (createFDS(&sd, controller_name) < 0) {
+    printf("Failed to create FD server\n");
+  }
   startReplicas(replicas, rep_count, &sd, controller_name, ext_pipes, pipe_count, replica_priority);
 
   InitTAS(VOTER_PIN, voter_priority); // IMPORTANT: Should be after forking replicas to subvert CoW

@@ -8,8 +8,8 @@
 #include "voterm.h"
 
 // TODO: Duplicated from controller.h
-#define TIMEOUT_SIGNAL SIGRTMIN + 0 // The voter's watchdog timer
-#define RESTART_SIGNAL SIGRTMIN + 1 // Voter to replica signal to fork itself
+#define TIMEOUT_SIGNAL 35 // The voter's watchdog timer
+#define RESTART_SIGNAL 36 // Voter to replica signal to fork itself
 
 long voting_timeout;
 int timer_start_index; // TODO: Should be per pipe...

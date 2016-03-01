@@ -1,6 +1,6 @@
 #COMPILE=diet gcc -nostdinc -O3 -fPIC -c
 COMPILE=/usr/local/musl/bin/musl-gcc -fPIC -c -O3
-#COMPILE=gcc -O3 -fPIC -c
+#COMPILE=gcc -O3 -fPIC -c -D NO_PTHREAD
 FLAGS= -O3 -fPIC -c
 #-g -O0 -fPIC -c
 
