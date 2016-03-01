@@ -3,7 +3,7 @@ include ../directory_paths
 SRC=../src/commtypes.c ../src/fd_client.c ../src/controller.c
 DEP=../include/*.h ../tas_lib/inc/*.h
 INC=-I../include/ -I../tas_lib/inc/
-LIB=-L/usr/local/lib -lrt -lTASLimited
+LIB=-L/usr/local/lib -lrt -lTASLimited -pthread
 COMPILE=/usr/local/musl/bin/musl-gcc -Werror -static
 FLAGS=-O3 -Werror -static
 #FLAGS=-g -O0 -Werror -static

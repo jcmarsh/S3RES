@@ -1,7 +1,7 @@
 SRC=../src/commtypes.c ../src/replicas.c ../src/fd_server.c ../voter/vote_buff.c
 INC=-I../include/
 
-all: Controllers MapperTest FilterTest ArtPotTest AStarTest EmptyTest #LoadTest
+all: Controllers MapperTest FilterTest FilterVoteTest ArtPotTest AStarTest EmptyTest #LoadTest
 
 %.o: %.c
 	gcc -c -o $@ $< $(INC)
@@ -19,6 +19,14 @@ MapperTest: mapper_test.o $(SRC)
 FilterTest: filter_test.o $(SRC)
 	gcc -o FilterTest filter_test.o $(SRC) -lrt -lTASLimited
 	cp ../controllers/Filter ./
+
+FilterVoteTest: filter_vote_test.o $(SRC)
+	make -C ../voter
+	cp ../voter/VoterM ./
+	cp ../voter/VoterD ./
+	gcc -o FilterVoteTest filter_vote_test.o $(SRC) -lrt -lTASLimited
+	cp ../controllers/Filter ./
+
 
 ArtPotTest: art_pot_test.o $(SRC)
 	gcc -o ArtPotTest art_pot_test.o $(SRC) -lrt -lTASLimited
@@ -46,6 +54,7 @@ clean:
 	rm -rf MapperTest_fd_server
 	rm -rf Mapper
 	rm -rf FilterTest
+	rm -rf FilterVoteTest
 	rm -rf FilterTest_fd_server
 	rm -rf Filter
 	rm -rf ArtPotTest
@@ -61,3 +70,5 @@ clean:
 	rm -rf LoadTest_fd_server
 	rm -rf Load
 	rm -rf GenericEmptyTest
+	rm -rf VoterD
+	rm -rf VoterM

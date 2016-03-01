@@ -232,13 +232,12 @@ void vote(bool timeout_occurred) {
           }
         }
       } else {
-        debug_print("VoterM trying to handle TMR recovery.\n");
+        debug_print("VoterM trying to handle TMR recovery. Timeout? %d\n", timeout_occurred);
         restarter = (restartee + (rep_count - 1)) % rep_count;
         debug_print("\tRestartee: %d - %d\t Restarter: %d - %d\n", restartee, replicas[restartee].pid, restarter, replicas[restarter].pid);
 
         // kill restartee
         kill(replicas[restartee].pid, SIGKILL);
-
         // kill (signal) restarter
         kill(replicas[restarter].pid, RESTART_SIGNAL);
 
@@ -260,7 +259,7 @@ void vote(bool timeout_occurred) {
 void forkReplicas(int rep_index, int rep_count) {
   int index, jndex;
 
-  for (index = rep_index; index < rep_count; index++) {
+  for (index = rep_index; index < rep_index + rep_count; index++) {
     // Each replica needs to build up it's argvs
     // 0 is the program name, 1 is the priority, 2 is the pipe count, and 3 is a NULL
     // TODO: No need to rebuild this for SMR restarts
@@ -323,7 +322,7 @@ void startReplicas(bool forking, int rep_index, int rep_count) {
   int index, jndex;
   //createPipes(reps, num, ext_pipes, pipe_count);
   int pipe_fds[2];
-  for (index = rep_index; index < rep_count; index++) {
+  for (index = rep_index; index < rep_index + rep_count; index++) {
     for (jndex = 0; jndex < in_pipe_count; jndex++) {
       if (pipe(pipe_fds) == -1) {
         debug_print("Replica pipe error\n");
@@ -333,7 +332,7 @@ void startReplicas(bool forking, int rep_index, int rep_count) {
       }
     }
   }
-  for (index = rep_index; index < rep_count; index++) {
+  for (index = rep_index; index < rep_index + rep_count; index++) {
     for (jndex = 0; jndex < out_pipe_count; jndex++) {
       if (pipe(pipe_fds) == -1) {
         debug_print("Replica pipe error\n");
@@ -350,7 +349,7 @@ void startReplicas(bool forking, int rep_index, int rep_count) {
   }
 
   // Give the replicas their pipes (same method as restart)
-  for (index = rep_index; index < rep_count; index++) {
+  for (index = rep_index; index < rep_index + rep_count; index++) {
     int pid = acceptSendFDS(&sd, &for_reps[index], rep_info_in, rep_info_out);
     if (pid < 0) {
       debug_print("VoterM's acceptSendFDS call failed\n");
