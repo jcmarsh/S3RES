@@ -40,6 +40,7 @@ unsigned int * ext_in_fds; // should in_pipe_count of these
 char **rep_info_in;
 int ext_in_bufcnt = 0;
 unsigned char ext_in_buffer[MAX_PIPE_BUFF];
+int active_index;
 unsigned int * ext_out_fds; // should out_pipe_count of these
 char **rep_info_out;
 
@@ -64,7 +65,7 @@ void recvData(void) {
   // This will wait at least timeout until return. Returns earlier if something has data.
   retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
 
-  int active_index = -1;
+  active_index = -1;
   if (retval > 0) {    
     // Check for data from external sources
     for (p_index = 0; p_index < in_pipe_count; p_index++) {
@@ -83,11 +84,11 @@ void recvData(void) {
   if (-1 == active_index) {
     return; // Will loop back to start of function
   } else {
-    sendCollect(active_index);
+    sendCollect();
   }
 }
 
-void sendCollect(int active_index) {
+void sendCollect() {
   int p_index, r_index, retval;
   bool timeout_occurred = false;
   fd_set select_set;
@@ -158,9 +159,11 @@ void sendCollect(int active_index) {
 void vote(bool timeout_occurred) {
   // Should check for all available output, vote on each and send.
   int p_index;
+  int restarter, restartee;
+  bool fault = false;
 
   switch (rep_count) {
-    case 1: // SMR
+    case 1: ; // SMR
       if (!timeout_occurred) {
         for (p_index = 0; p_index < out_pipe_count; p_index++) {
           if (replicas[0].buff_counts[p_index] != 0) {
@@ -178,20 +181,75 @@ void vote(bool timeout_occurred) {
         }
 
         startReplicas(true, 0, rep_count);
+
+        // Send old data to the new replica
+        sendCollect();
       }
       return;
-    case 2: // DMR
+    case 2: ; // DMR
       // Can detect, and check what to do
       // if buff counts don't match: timeout or exec error... unless sdc caused one rep to output
+      for (p_index = 0; p_index < out_pipe_count; p_index++) {
+        if (replicas[0].buff_counts[p_index] != replicas[1].buff_counts[p_index]) {
+          if (replicas[0].buff_counts[p_index] > replicas[1].buff_counts[p_index]) {
+            fault = true;
+            restartee = 1;
+          } else {
+            fault = true;
+            restartee = 0;
+          }
+        }
+      }
 
-      // if contents don't match: sdc
-      debug_print("VoterM Does not handle DMR.\n");
+      // Should skipped if already found
+      /*
+      for (p_index = 0; p_index < out_pipe_count; p_index++) {
+        if (memcmp(replicas[0].buffers[p_index], replicas[1].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
+          // SDC found... but what to do?
+        }
+      } */
+
+      if (!fault) {
+        for (p_index = 0; p_index < out_pipe_count; p_index++) {
+          if (replicas[0].buff_counts[p_index] != 0) {
+            if (write(ext_out_fds[p_index], replicas[0].buffers[p_index], replicas[0].buff_counts[p_index]) != -1) {
+            } else {
+              debug_print("VoterM write failed.\n");
+            }
+          }
+        }
+      } else {
+        debug_print("VoterM trying to handle DMR recovery. Timeout? %d\n", timeout_occurred);
+        restarter = (restartee + (rep_count - 1)) % rep_count;
+        debug_print("\tRestartee: %d - %d\t Restarter: %d - %d\n", restartee, replicas[restartee].pid, restarter, replicas[restarter].pid);
+
+        // kill restartee
+        kill(replicas[restartee].pid, SIGKILL);
+        // kill (signal) restarter
+        kill(replicas[restarter].pid, RESTART_SIGNAL);
+
+        // start restartee
+        startReplicas(false, restartee, 1);
+
+        // Recovery should be done. Send data.
+        for (p_index = 0; p_index < out_pipe_count; p_index++) {
+          if (replicas[restarter].buff_counts[p_index] != 0) {
+            if (write(ext_out_fds[p_index], replicas[restarter].buffers[p_index], replicas[restarter].buff_counts[p_index]) != -1) {
+            } else {
+              debug_print("VoterM write failed.\n");
+            }
+          }
+        }
+      }
+
+      for (p_index = 0; p_index < out_pipe_count; p_index++) {
+        replicas[0].buff_counts[p_index] = 0;
+        replicas[1].buff_counts[p_index] = 0;
+      }
       return;
     case 3: ;// TMR
-      int restarter, restartee;
       // Send the solution that at least two agree on
       // TODO: Should stop searching for faults once one is found
-      bool fault = false;
       for (p_index = 0; p_index < out_pipe_count; p_index++) {
         if (replicas[0].buff_counts[p_index] != replicas[1].buff_counts[p_index]) {
           if (replicas[0].buff_counts[p_index] != replicas[2].buff_counts[p_index]) {
