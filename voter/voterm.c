@@ -54,7 +54,7 @@ void recvData(void) {
   fd_set select_set;
 
   select_timeout.tv_sec = 0;
-  select_timeout.tv_usec = 50000;
+  select_timeout.tv_usec = 500000;
 
   // See if any of the read pipes have anything
   FD_ZERO(&select_set);
@@ -94,11 +94,9 @@ void sendCollect() {
   fd_set select_set;
   struct timeval select_timeout;
 
-  // Start timer for the individual replica.
-  // TODO: This should be a pipe specific timer
-  if (active_index == timer_start_index) {
-    watchdog = generate_timestamp();
-  }
+  // Timers are once again for ALL replicas... sigh.
+  // All input / outputs are timed now.
+  watchdog = generate_timestamp();
 
   // send data to all replicas
   for (r_index = 0; r_index < rep_count; r_index++) {
@@ -141,10 +139,27 @@ void sendCollect() {
             debug_print("Voter - read problem on internal pipe - Controller %s, rep %d, pipe %d\n", controller_name, r_index, p_index);
           }
 
-          if (p_index == timer_stop_index) {
-            rep_done++;
-            if (rep_done == rep_count) {
-              done = true; // All timed pipe calls are in. Off to voting.
+          // Okay, this is getting confusing.
+          // All in / out relationships are timed... by the timer set for the timed pipe
+          // The if else here so that if a component has multiple outputs for a single input:
+          // the last output should be on the "timed" pipe.
+          // All other relationships are assummed to be 1 to 1. This doesn't fit every case, but the best I can do right now.
+          if (active_index == timer_start_index) {
+            // Input came on the timed in pipe, output stops when all reps send output on the timed out pipe
+            if (p_index == timer_stop_index) {
+              rep_done++;
+              if (rep_done == rep_count) {
+                done = true; // All timed pipe calls are in. Off to voting.
+              }
+            }
+          } else {
+            // Input came on a non-timed in pipe, output stops when all replicas have the same # of output bytes
+            int index;
+            done = true;
+            for (index = 1; index < rep_count; index++) {
+              if (replicas[0].buff_counts[p_index] != replicas[index].buff_counts[p_index]) {
+                done = false;
+              }
             }
           }
         } // if FD_ISSET
@@ -609,8 +624,6 @@ int main(int argc, const char **argv) {
     puts("ERROR: failure in setup function.");
     return -1;
   }
-
-  sleep(1); // TODO: Needed?
 
   while(1) {
     recvData();

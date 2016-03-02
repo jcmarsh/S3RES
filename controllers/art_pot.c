@@ -258,12 +258,9 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
-  if (PIPE_COUNT == pipe_count) {
-    commSendWaypointRequest(&pipes[way_req_index]);
-  } else {
-    goal[0] = 7.0;
-    goal[1] = 7.0;
-  }
+  // Set goal to initial start position (to force request).
+  goal[0] = -7.0;
+  goal[1] = -7.0;
 
   enterLoop();
 

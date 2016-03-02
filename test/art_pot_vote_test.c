@@ -38,38 +38,28 @@ int main(int argc, const char** argv) {
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
       if (-1 == execv(rep_argv[0], rep_argv)) {
-	printf("Exec ERROR!\n");
+        printf("Exec ERROR!\n");
       }
     }
   }
 
   sleep(2);
 
-  printf("Waiting for Voter to forward waypoint request.\n");
-  // First need to read the waypoint request
   struct comm_way_req way_req;
-  read(way_out[0], &way_req, sizeof(way_req));
-  printf("Got waypoint req\n");
-
-  // Send response
   struct comm_way_res way_res;
-  way_res.point[0] = 8.0;
-  way_res.point[1] = 8.0;
-  way_res.point[2] = 0.0;
-  write(way_in[1], &way_res, sizeof(way_res));
 
   int loops = 100;
   while (loops--) {
     // Create and send some ranger data
     struct comm_range_pose_data sim_range_data;
-    sim_range_data.pose[0] = -2.0;
-    sim_range_data.pose[1] = -2.0;
+    sim_range_data.pose[0] = -7.0;
+    sim_range_data.pose[1] = -7.0;
     sim_range_data.pose[2] = 1.0;
     int i = 0;
     for (i = 0; i < 16; i++) {
       sim_range_data.ranges[i] = i * 1.5;
     }
-    printf("Writing data to pipes\n");
+
     write(ranger_in[1], &sim_range_data, sizeof(struct comm_range_pose_data));
 
     // check for command out or a new waypoint request
@@ -86,7 +76,6 @@ int main(int argc, const char** argv) {
     FD_SET(way_out[0], &select_set);
     FD_SET(move_out[0], &select_set);
 
-    printf("The select.\n");
     retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
 
     if (retval > 0) {
@@ -96,7 +85,7 @@ int main(int argc, const char** argv) {
         way_res.point[0] = 8.0;
         way_res.point[1] = 8.0;
         way_res.point[2] = 0.0;
-        write(rep.vot_pipes[2].fd_out, &way_res, sizeof(way_res));
+        write(way_in[1], &way_res, sizeof(way_res));
       }
       if (FD_ISSET(move_out[0], &select_set)) {
         // read the command out
