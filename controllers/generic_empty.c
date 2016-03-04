@@ -16,7 +16,7 @@ int read_in_index, write_out_index;
 int priority;
 int pinned_cpu;
 
-const char* name = "Empty";
+const char* name = "GenericEmpty";
 
 bool insertSDC = false;
 bool insertCFE = false;
@@ -30,17 +30,17 @@ int parseArgs(int argc, const char **argv) {
   setPipeIndexes();
 
   if (argc < 2) {
-    printf("Usage: Empty <priority> <optional pipes...>\n");
+    printf("Usage: GenericEmpty <priority> <optional pipes...>\n");
   }
   // TODO: error checking
   priority = atoi(argv[1]);
   pipe_count = 2; // For now always 2
-  if (argc < 5) { // Must request fds
+  if (argc < 4) { // Must request fds
     pid_t pid = getpid();
-    connectRecvFDS(pid, pipes, pipe_count, "Empty", &pinned_cpu);
+    connectRecvFDS(pid, pipes, pipe_count, "GenericEmpty", &pinned_cpu);
   } else {
-    deserializePipe(argv[3], &pipes[read_in_index]);
-    deserializePipe(argv[4], &pipes[write_out_index]);
+    deserializePipe(argv[2], &pipes[read_in_index]);
+    deserializePipe(argv[3], &pipes[write_out_index]);
   }
 
   return 0;
@@ -72,7 +72,7 @@ void enterLoop(void) {
         if (read_ret > 0) {
           write_ret = write(pipes[write_out_index].fd_out, buffer, sizeof(char) * read_ret);
           if (read_ret != write_ret) {
-            printf("Generic Empty failed to write as much as it read: %d read to %d write.\n", read_ret, write_ret);
+            printf("GenericEmpty failed to write as much as it read: %d read to %d write.\n", read_ret, write_ret);
           }
         }
       }

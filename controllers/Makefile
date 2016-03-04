@@ -9,7 +9,7 @@ COMPILE=/usr/local/musl/bin/musl-gcc -Werror -static
 FLAGS=-O3 -Werror -static
 #FLAGS=-g -O0 -Werror -static
 
-all: ArtPot AStar BenchMarker Empty Filter Logger Mapper Load
+all: ArtPot AStar BenchMarker Empty GenericEmpty Filter Logger Mapper Load
 
 %.o: %.c
 	$(COMPILE) -c -o $@ $< -I../include/ -I../tas_lib/inc/
@@ -40,7 +40,7 @@ Load: load.c $(SRC) $(DEP)
 	gcc -O3 -Werror -L"~/research/ccv/lib" -I"~/research/ccv/lib" -I"/usr/include" -o Load load.o $(SRC) $(INC) $(LIB) -lccv `cat ~/research/ccv/lib/.deps`
 
 GenericEmpty: generic_empty.o $(SRC) $(DEP)
-	$(COMPILE) -o Empty generic_empty.o $(SRC) $(INC) $(LIB)
+	$(COMPILE) -o GenericEmpty generic_empty.o $(SRC) $(INC) $(LIB)
 
 copy:
 	cp ArtPot $(INSTALL_DIR)
@@ -58,6 +58,7 @@ clean:
 	rm -f AStar
 	rm -f BenchMarker
 	rm -f Empty
+	rm -f GenericEmpty
 	rm -f Filter
 	rm -f Logger
 	rm -f Mapper

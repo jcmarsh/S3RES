@@ -3,9 +3,9 @@ INC=-I../include/
 
 all: comp vote
 
-comp: Controllers MapperTest FilterTest ArtPotTest AStarTest EmptyTest #LoadTest
+comp: Controllers MapperTest ArtPotTest AStarTest #LoadTest
 
-vote: Controllers Voters FilterVoteTest ArtPotVoteTest
+vote: Controllers Voters FilterVoteTest ArtPotVoteTest GenericEmptyVoteTest
 
 %.o: %.c
 	gcc -c -o $@ $< $(INC)
@@ -25,10 +25,6 @@ MapperTest: mapper_test.o $(SRC)
 	gcc -o MapperTest mapper_test.o $(SRC) -lrt -lTASLimited
 	cp ../controllers/Mapper ./
 
-FilterTest: filter_test.o $(SRC)
-	gcc -o FilterTest filter_test.o $(SRC) -lrt -lTASLimited
-	cp ../controllers/Filter ./
-
 FilterVoteTest: filter_vote_test.o $(SRC)
 	gcc -o FilterVoteTest filter_vote_test.o $(SRC) -lrt -lTASLimited
 	cp ../controllers/Filter ./
@@ -41,13 +37,13 @@ ArtPotVoteTest: art_pot_vote_test.o $(SRC)
 	gcc -o ArtPotVoteTest art_pot_vote_test.o $(SRC) -lrt -lTASLimited
 	cp ../controllers/ArtPot ./
 
+GenericEmptyVoteTest: generic_empty_vote_test.o $(SRC)
+	gcc -o GenericEmptyVoteTest generic_empty_vote_test.o $(SRC) -lrt -lTASLimited
+	cp ../controllers/GenericEmpty ./
+
 AStarTest: a_star_test.o $(SRC)
 	gcc -o AStarTest a_star_test.o $(SRC) -lrt -lTASLimited
 	cp ../controllers/AStar ./
-
-EmptyTest: empty_test.o $(SRC)
-	gcc -o EmptyTest empty_test.o $(SRC) -lrt -lTASLimited
-	cp ../controllers/Empty ./
 
 LoadTest: load_test.o $(SRC)
 	gcc -o LoadTest load_test.o $(SRC) -lrt -lTASLimited
@@ -62,7 +58,6 @@ clean:
 	rm -rf MapperTest
 	rm -rf MapperTest_fd_server
 	rm -rf Mapper
-	rm -rf FilterTest
 	rm -rf FilterVoteTest
 	rm -rf FilterTest_fd_server
 	rm -rf Filter_fd_server
@@ -81,6 +76,7 @@ clean:
 	rm -rf LoadTest
 	rm -rf LoadTest_fd_server
 	rm -rf Load
-	rm -rf GenericEmptyTest
+	rm -rf GenericEmptyVoteTest
+	rm -rf GenericEmpty
 	rm -rf VoterD
 	rm -rf VoterM

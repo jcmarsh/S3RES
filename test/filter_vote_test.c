@@ -5,7 +5,8 @@
 const char* controller_name = "Filter";
 
 int main(int argc, const char** argv) {
-  // VoterM Filter TMR 400 80 RANGE_POSE_DATA:3:0:1 RANGE_POSE_DATA:0:19:1 RANGE_POSE_DATA:0:21:0 RANGE_POSE_DATA:0:23:0
+  printf("Usage: No voter -> FilterVoteTest\n");
+  printf("       Voter -> FilterVoteTest <Voter_Name> <Redundancy_Level>\n");
 
   pid_t currentPID = 0;
   char** rep_argv;
@@ -16,28 +17,38 @@ int main(int argc, const char** argv) {
   pipe(pipe_out1);
   pipe(pipe_out2);
 
-  rep_argv = malloc(sizeof(char *) * 10);
-  rep_argv[0] = "VoterM";
-  //  rep_argv[0] = "VoterD";
-  rep_argv[1] = "Filter";
-  rep_argv[2] = "TMR";
-  rep_argv[3] = "800"; // Timeout
-  rep_argv[4] = "80";  // priority
-  //  rep_argv[3] = "1800";
-  //  rep_argv[4] = "1";
-  asprintf(&rep_argv[5], "%s:%d:%d:%d", "RANGE_POSE_DATA", pipe_in[0], 0, 1);
-  asprintf(&rep_argv[6], "%s:%d:%d:%d", "RANGE_POSE_DATA", 0, pipe_out0[1], 0);
-  asprintf(&rep_argv[7], "%s:%d:%d:%d", "RANGE_POSE_DATA", 0, pipe_out1[1], 0);
-  asprintf(&rep_argv[8], "%s:%d:%d:%d", "RANGE_POSE_DATA", 0, pipe_out2[1], 1);
-  rep_argv[9] = NULL;
+  if (argc == 1) {
+    // No Voter
+    rep_argv = malloc(sizeof(char *) * 8);
+    rep_argv[0] = "Filter";
+    rep_argv[1] = "80"; // priority
+    rep_argv[2] = "4"; // Pipe Count
+    asprintf(&rep_argv[3], "%s:%d:%d", "RANGE_POSE_DATA", pipe_in[0], 0);
+    asprintf(&rep_argv[4], "%s:%d:%d", "RANGE_POSE_DATA", 0, pipe_out0[1]);
+    asprintf(&rep_argv[5], "%s:%d:%d", "RANGE_POSE_DATA", 0, pipe_out1[1]);
+    asprintf(&rep_argv[6], "%s:%d:%d", "RANGE_POSE_DATA", 0, pipe_out2[1]);
+    rep_argv[7] = NULL;
+  } else {
+    // With Voter
+    rep_argv = malloc(sizeof(char *) * 10);
+    rep_argv[0] = argv[1]; // VoterM or Voterd
+    rep_argv[1] = "Filter";
+    rep_argv[2] = argv[2]; // SMR, DMR, or TMR
+    rep_argv[3] = "800"; // Timeout
+    rep_argv[4] = "80";  // priority
+    asprintf(&rep_argv[5], "%s:%d:%d:%d", "RANGE_POSE_DATA", pipe_in[0], 0, 1);
+    asprintf(&rep_argv[6], "%s:%d:%d:%d", "RANGE_POSE_DATA", 0, pipe_out0[1], 0);
+    asprintf(&rep_argv[7], "%s:%d:%d:%d", "RANGE_POSE_DATA", 0, pipe_out1[1], 0);
+    asprintf(&rep_argv[8], "%s:%d:%d:%d", "RANGE_POSE_DATA", 0, pipe_out2[1], 1);
+    rep_argv[9] = NULL;
+  }
 
-  // Need to fork exec VoterM, but first need a pipe in and two outs.
   currentPID = fork();
 
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
       if (-1 == execv(rep_argv[0], rep_argv)) {
-	printf("Exec ERROR!\n");
+        printf("Exec ERROR!\n");
       }
     }
   }
