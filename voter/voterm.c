@@ -400,6 +400,9 @@ void forkReplicas(int rep_index, int rep_count) {
 
 // Start all replicas (or just restart one)
 void startReplicas(bool forking, int rep_index, int rep_count) {
+  #ifdef TIME_RESTART_REPLICA
+    timestamp_t last = generate_timestamp();
+  #endif /* TIME_RESTART_REPLICA */
   int index, jndex;
   //createPipes(reps, num, ext_pipes, pipe_count);
   int pipe_fds[2];
@@ -439,6 +442,10 @@ void startReplicas(bool forking, int rep_index, int rep_count) {
       replicas[index].pid = pid;
     }
   }
+  #ifdef TIME_RESTART_REPLICA
+    timestamp_t current = generate_timestamp();
+    printf("voterm_usec (%lf)\n", diff_time(current, last, CPU_MHZ));
+  #endif /* TIME_RESTART_REPLICA */
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -11,9 +11,6 @@ vote: Controllers Voters FilterVoteTest ArtPotVoteTest GenericEmptyVoteTest
 %.o: %.c
 	gcc -c -o $@ $< $(INC)
 
-Micro:
-	make -C ./micro_test
-
 Controllers:
 	make -C ../controllers
 
@@ -39,8 +36,9 @@ ArtPotVoteTest: art_pot_vote_test.o $(SRC)
 	cp ../controllers/ArtPot ./
 
 GenericEmptyVoteTest: generic_empty_vote_test.o $(SRC)
-	gcc -o GenericEmptyVoteTest generic_empty_vote_test.o $(SRC) $(LIB)
+	gcc -o GEVoteTest generic_empty_vote_test.o $(SRC) $(LIB)
 	cp ../controllers/GenericEmpty ./
+	cp ../fault_injection/injector.py ./
 
 AStarTest: a_star_test.o $(SRC)
 	gcc -o AStarTest a_star_test.o $(SRC) -lrt -lTASLimited
@@ -54,31 +52,31 @@ GenericEmptyTest: generic_empty_test.o $(SRC)
 	gcc -o GenericEmptyTest generic_empty_test.o $(SRC) -lrt -lTASLimited
 
 clean:
-	make -C ./micro_test clean
+	rm -f injector.py
 	rm -f *.o
-	rm -rf MapperTest
-	rm -rf MapperTest_fd_server
-	rm -rf Mapper
-	rm -rf FilterVoteTest
-	rm -rf FilterTest_fd_server
-	rm -rf Filter_fd_server
-	rm -rf Filter
-	rm -rf ArtPotTest
-	rm -rf ArtPotVoteTest
-	rm -rf ArtPotTest_fd_server
-	rm -rf ArtPot_fd_server
-	rm -rf ArtPot
-	rm -rf AStarTest
-	rm -rf AStarTest_fd_server
-	rm -rf AStar
-	rm -rf EmptyTest
-	rm -rf EmptyTest_fd_server
-	rm -rf Empty
-	rm -rf LoadTest
-	rm -rf LoadTest_fd_server
-	rm -rf Load
-	rm -rf GenericEmptyVoteTest
-	rm -rf GenericEmpty
-	rm -rf GenericEmpty_fd_server
-	rm -rf VoterD
-	rm -rf VoterM
+	rm -f MapperTest
+	rm -f MapperTest_fd_server
+	rm -f Mapper
+	rm -f FilterVoteTest
+	rm -f FilterTest_fd_server
+	rm -f Filter_fd_server
+	rm -f Filter
+	rm -f ArtPotTest
+	rm -f ArtPotVoteTest
+	rm -f ArtPotTest_fd_server
+	rm -f ArtPot_fd_server
+	rm -f ArtPot
+	rm -f AStarTest
+	rm -f AStarTest_fd_server
+	rm -f AStar
+	rm -f EmptyTest
+	rm -f EmptyTest_fd_server
+	rm -f Empty
+	rm -f LoadTest
+	rm -f LoadTest_fd_server
+	rm -f Load
+	rm -f GEVoteTest
+	rm -f GenericEmpty
+	rm -f GenericEmpty_fd_server
+	rm -f VoterD
+	rm -f VoterM

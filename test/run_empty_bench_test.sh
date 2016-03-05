@@ -16,27 +16,27 @@ ls -lh >> $1_comments.txt
 echo "Running NMR case" >> $1_comments.txt
 echo "Running NMR case"
 date
-timeout $BASIC_TIME ./GenericEmptyVoteTest > $1_NMR.txt &
+timeout $BASIC_TIME ./GEVoteTest > $1_NMR.txt &
 ps -Ao pid,cpuid,maj_flt,min_flt,rtprio,pri,nice,pcpu,stat,wchan:20,comm >> $1_comments.txt
 sleep $SLEEP_TIME
 
 echo "Running SMR case" >> $1_comments.txt
 echo "Running SMR case"
 date
-timeout $BASIC_TIME ./GenericEmptyVoteTest VoterM SMR > $1_SMR.txt &
+timeout $BASIC_TIME ./GEVoteTest VoterM SMR > $1_SMR.txt &
 ps -Ao pid,cpuid,maj_flt,min_flt,rtprio,pri,nice,pcpu,stat,wchan:20,comm >> $1_comments.txt
 sleep $SLEEP_TIME
 
 echo "Running DMR case" >> $1_comments.txt
 echo "Running DMR case"
 date
-timeout $BASIC_TIME ./GenericEmptyVoteTest VoterM DMR > $1_DMR.txt &
+timeout $BASIC_TIME ./GEVoteTest VoterM DMR > $1_DMR.txt &
 ps -Ao pid,cpuid,maj_flt,min_flt,rtprio,pri,nice,pcpu,stat,wchan:20,comm >> $1_comments.txt
 sleep $SLEEP_TIME
 
 echo "Running TMR case" >> $1_comments.txt
 echo "Running TMR case"
 date
-timeout $BASIC_TIME ./GenericEmptyVoteTest VoterM TMR > $1_TMR.txt &
+timeout $BASIC_TIME ./GEVoteTest VoterM TMR > $1_TMR.txt &
 ps -Ao pid,cpuid,maj_flt,min_flt,rtprio,pri,nice,pcpu,stat,wchan:20,comm >> $1_comments.txt
 sleep $SLEEP_TIME

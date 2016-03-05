@@ -1,26 +1,49 @@
 #!/bin/bash
 
-PLAYER_TIME=2720s
-BASIC_TIME=2710s
-ANOTHER_TIME=2700s
+# Make sure that VoterM is built with #define TIME_RESTART_REPLICA
+# Basic idea is that the generic_empty test starts everything,
+# writes / reads data, while injector.py kills and VoterM times.
 
-if [ $# -lt 1 ]
+BASIC_TIME=300
+ANOTHER_TIME=290
+SLEEP_TIME=310
+
+if [ $# -lt 2 ]
 then
-    echo "Supply and argument for the command to pass to injector.py. Perhaps 'kill -9'"
+    echo "First arg: prepend file name"
+    echo "Second arg: argument for to pass to injector.py. Perhaps 'kill -9'"
     exit
 fi
 
-echo "Using command: " "${1}"
+echo "Comments for Run:" > $1_comments.txt
+echo "Using command: ${1}" >> $1_comments.txt
+cpufreq-info >> $1_comments.txt
+ls -lh >> $1_comments.txt
 
-# All Tri restart -9 Filter tests
-for index in `seq 0 0`; do
-	timeout $PLAYER_TIME ./EmptyTest &
-	sleep 5
-	timeout $BASIC_TIME ./VoterD Empty TMR 120000 60  > empty_restart_test_$index.txt &
-	sleep 5
-	ps -ao pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm > empty_restart_test_injector_$index.txt
-	timeout $ANOTHER_TIME python injector.py "${1}" "Empty" >> empty_restart_test_injector_$index.txt &
-	sleep $ANOTHER_TIME
-	ps -ao pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm >> empty_restart_test_injector_$index.txt
-	sleep 30
-done
+echo "Running SMR case" >> $1_comments.txt
+echo "Running SMR case"
+date
+timeout $BASIC_TIME ./GEVoteTest VoterM SMR > $1_SMR.txt &
+ps -Ao pid,cpuid,maj_flt,min_flt,rtprio,pri,nice,pcpu,stat,wchan:20,comm >> $1_comments.txt
+sleep 2
+timeout $ANOTHER_TIME python injector.py "False" "${2}" "GenericEmpty" >> $1_SMR_injector.txt &
+sleep $SLEEP_TIME
+
+echo "Running DMR case" >> $1_comments.txt
+echo "Running DMR case"
+date
+timeout $BASIC_TIME ./GEVoteTest VoterM SMR > $1_DMR.txt &
+ps -Ao pid,cpuid,maj_flt,min_flt,rtprio,pri,nice,pcpu,stat,wchan:20,comm >> $1_comments.txt
+sleep 2
+timeout $ANOTHER_TIME python injector.py "False" "${2}" "GenericEmpty" >> $1_DMR_injector.txt &
+sleep $SLEEP_TIME
+
+
+echo "Running TMR case" >> $1_comments.txt
+echo "Running TMR case"
+date
+timeout $BASIC_TIME ./GEVoteTest VoterM TMR > $1_TMR.txt &
+ps -Ao pid,cpuid,maj_flt,min_flt,rtprio,pri,nice,pcpu,stat,wchan:20,comm >> $1_comments.txt
+sleep 2
+timeout $ANOTHER_TIME python injector.py "False" "${2}" "GenericEmpty" >> $1_TMR_injector.txt &
+sleep $SLEEP_TIME

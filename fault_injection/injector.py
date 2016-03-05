@@ -23,20 +23,28 @@ def getPIDs(pids, weights, names, cmd):
 		except ValueError:
 			pass
 
-if len(sys.argv) < 2:
-	print "Usage: python injector.py <command_to_execute> [controller_name_0 ... controller_name_n]"
+if len(sys.argv) < 3:
+	print "Usage: python injector.py <weight?> <command_to_execute> [controller_name_0 ... controller_name_n]"
 	print "\t'kill -9'\tsend SIGTERM"
 	print "\t'/bin/kill -s SIGRTMIN+2'\tSimulate Silent Data Corruption"
 	print "\t'/bin/kill -s SIGRTMIN+3'\tSimulate Control Flow Error"
 	print "If controllers are not specified, assumes: AStar ArtPot Filter Mapper"
 	sys.exit()
 
+# check if using weights
+if (sys.argv[1] == "true" or sys.argv[1] == "True"):
+        weighted = True
+else:
+        weighted = False
+
+print "Using weights? ", weighted
+
 # This should be checked before running, but hey we are kill processes here
-cmd_start = sys.argv[1]
+cmd_start = sys.argv[2]
 
 victim_programs = []
-if len(sys.argv) > 2: # victim name supplied
-	for i in range(2, len(sys.argv)):
+if len(sys.argv) > 3: # victim name supplied
+	for i in range(3, len(sys.argv)):
 		print "Victim name is ", sys.argv[i]
 		victim_programs.append(sys.argv[i])
 else:
@@ -67,17 +75,22 @@ while True:
 		print "Error: One of the controllers did not successfully restart"
 		#sys.exit()
 	else:
-		# The vicitm is selected based on victim cpu load, so the fault
-		# may not be injected if load is low.
-		kill_index = random.random() * 100 # * 100 to convert to percent
-		psum = 0.0
-		for index in range(0, len(victim_pids)):
-			psum = psum + victim_weights[index]
-			if psum > kill_index:
-				print "Executing ", cmd_start, " on a ", victim_names[index], ": ", victim_pids[index]
-				Popen(cmd_start + " " + str(victim_pids[index]), shell=True)
-				break
-		print "\tInjection done.\t", psum, " - ", kill_index
+                if (weighted):
+                        # The vicitm is selected based on victim cpu load, so the fault
+                        # may not be injected if load is low.
+                        kill_index = random.random() * 100 # * 100 to convert to percent
+                        psum = 0.0
+                        for index in range(0, len(victim_pids)):
+                                psum = psum + victim_weights[index]
+                                if psum > kill_index:
+                                        print "Executing ", cmd_start, " on a ", victim_names[index], ": ", victim_pids[index]
+                                        Popen(cmd_start + " " + str(victim_pids[index]), shell=True)
+                                        break
+                                        print "\tInjection done.\t", psum, " - ", kill_index
+                else:
+                        kill_index = random.randint(0, len(victim_pids)-1)
+                        print "Executing ", cmd_start, " on a ", victim_names[kill_index], ": ", victim_pids[kill_index]
+                        Popen(cmd_start + " " + str(victim_pids[kill_index]), shell=True)
 
 
 # These lines are only needed if there is no voter (testing) (now defunct, need update)
