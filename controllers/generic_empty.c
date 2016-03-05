@@ -30,7 +30,7 @@ int parseArgs(int argc, const char **argv) {
   setPipeIndexes();
 
   if (argc < 2) {
-    printf("Usage: GenericEmpty <priority> <optional pipes...>\n");
+    puts("Usage: GenericEmpty <priority> <optional pipes...>\n");
   }
   // TODO: error checking
   priority = atoi(argv[1]);
@@ -72,7 +72,7 @@ void enterLoop(void) {
         if (read_ret > 0) {
           write_ret = write(pipes[write_out_index].fd_out, buffer, sizeof(char) * read_ret);
           if (read_ret != write_ret) {
-            printf("GenericEmpty failed to write as much as it read: %d read to %d write.\n", read_ret, write_ret);
+            debug_print("GenericEmpty failed to write as much as it read: %d read to %d write.\n", read_ret, write_ret);
           }
         }
       }

@@ -1,5 +1,6 @@
 SRC=../src/commtypes.c ../src/replicas.c ../src/fd_server.c ../voter/vote_buff.c
-INC=-I../include/
+INC=-I../include/ -I../tas_lib/inc/
+LIB=-lpthread -lrt -lTASLimited
 
 all: comp vote
 
@@ -38,7 +39,7 @@ ArtPotVoteTest: art_pot_vote_test.o $(SRC)
 	cp ../controllers/ArtPot ./
 
 GenericEmptyVoteTest: generic_empty_vote_test.o $(SRC)
-	gcc -o GenericEmptyVoteTest generic_empty_vote_test.o $(SRC) -lrt -lTASLimited
+	gcc -o GenericEmptyVoteTest generic_empty_vote_test.o $(SRC) $(LIB)
 	cp ../controllers/GenericEmpty ./
 
 AStarTest: a_star_test.o $(SRC)
@@ -78,5 +79,6 @@ clean:
 	rm -rf Load
 	rm -rf GenericEmptyVoteTest
 	rm -rf GenericEmpty
+	rm -rf GenericEmpty_fd_server
 	rm -rf VoterD
 	rm -rf VoterM

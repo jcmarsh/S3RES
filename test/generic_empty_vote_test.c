@@ -1,6 +1,9 @@
 // Test GenericEmpty
 
+#include <time.h>
 #include "test.h"
+
+#include "taslimited.h"
 
 const char* controller_name = "GenericEmpty";
 
@@ -8,6 +11,8 @@ int main(int argc, const char** argv) {
   printf("Usage: No voter -> GenericEmptyVoteTest\n");
   printf("       Voter -> GenericEmptyVoteTest <Voter_Name> <Redundancy_Level>\n");
   
+  InitTAS(VOTER_PIN, 50); // run on CPU 0 (reps should either be spread out on 1,2,3 or all on 0)
+
   pid_t currentPID = 0;
   char** rep_argv;
   int pipe_in[2], pipe_out[2];
@@ -45,6 +50,8 @@ int main(int argc, const char** argv) {
       if (-1 == execv(rep_argv[0], rep_argv)) {
         printf("Exec ERROR!\n");
       }
+    } else {
+      InitTAS(VOTER_PIN, 50);
     }
   }
 
@@ -53,13 +60,20 @@ int main(int argc, const char** argv) {
   char snd_buffer[16] = {1};
   char rcv_buffer[16] = {0};
   int retval;
+  timestamp_t last;
   while (1) {
-  	write(pipe_in[1], snd_buffer, sizeof(snd_buffer));
+
+    last = generate_timestamp();
+    write(pipe_in[1], snd_buffer, sizeof(snd_buffer));
 
     retval = read(pipe_out[0], rcv_buffer, sizeof(rcv_buffer));
 
-    printf("Read %d bytes %x\n", retval, rcv_buffer[0]);
+    timestamp_t current = generate_timestamp();
 
-  	sleep(1);
+    printf("usec (%lf)\n", diff_time(current, last, CPU_MHZ));
+
+    // printf("Read %d bytes %x\n", retval, rcv_buffer[0]);
+
+    usleep(100000); //  10 Hz ish
   }
 }

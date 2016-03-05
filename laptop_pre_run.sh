@@ -14,3 +14,7 @@ cpufreq-set -c 1 -f 2300Mhz
 cpufreq-set -c 2 -f 2300Mhz
 cpufreq-set -c 3 -f 2300Mhz
 
+#cpufreq-set -c 0 -f 1200Mhz
+#cpufreq-set -c 1 -f 1200Mhz
+#cpufreq-set -c 2 -f 1200Mhz
+#cpufreq-set -c 3 -f 1200Mhz
