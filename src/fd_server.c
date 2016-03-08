@@ -113,7 +113,6 @@ int acceptSendFDS(struct server_data * sd, pid_t *pid, struct vote_pipe* pipes, 
   connection_fd = accept(sd->sock_fd, (struct sockaddr *) &(sd->address), &(sd->address_length));
   if (connection_fd > -1) {
     // send read end to client
-    printf("\t\tSendFDS\n");
     if (sendFDS(connection_fd, pipes, pipe_count, pinned_cpu) < 0) {
       perror("FD_Server failed to sendFDS");
       retval = -1;

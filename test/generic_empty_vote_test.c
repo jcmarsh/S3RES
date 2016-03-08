@@ -20,13 +20,11 @@ int main(int argc, const char** argv) {
   pipe(pipe_in);
   pipe(pipe_out);
 
-  rep_argv = malloc(sizeof(char *) * 10);
-
   if (argc == 1) {
     // No Voter
     rep_argv = malloc(sizeof(char *) * 5);
     rep_argv[0] = "GenericEmpty";
-    rep_argv[1] = "80"; // priority
+    rep_argv[1] = "40"; // priority
     asprintf(&rep_argv[2], "%s:%d:%d", "MSG_BUFFER", pipe_in[0], 0);
     asprintf(&rep_argv[3], "%s:%d:%d", "MSG_BUFFER", 0, pipe_out[1]);
     rep_argv[4] = NULL;

@@ -56,7 +56,7 @@ int sched_set_policy(const pid_t pid, const int priority) {
     // Set niceness
     int nice = priority + (priority * -2) - 20;
     if (setpriority(PRIO_PROCESS, pid, nice) < 0) {
-      perror("setpriority");
+      // perror("setpriority");
       return -1;
     }
   }

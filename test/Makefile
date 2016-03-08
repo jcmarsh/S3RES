@@ -32,7 +32,7 @@ ArtPotTest: art_pot_test.o $(SRC)
 	cp ../controllers/ArtPot ./
 
 ArtPotVoteTest: art_pot_vote_test.o $(SRC)
-	gcc -o ArtPotVoteTest art_pot_vote_test.o $(SRC) -lrt -lTASLimited
+	gcc -o ArtPotVoteTest art_pot_vote_test.o $(SRC) $(LIB)
 	cp ../controllers/ArtPot ./
 
 GenericEmptyVoteTest: generic_empty_vote_test.o $(SRC)

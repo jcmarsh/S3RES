@@ -106,6 +106,11 @@ void sendCollect() {
     }
   }
 
+  // Only the timed pipe is assumed to have a response. (ArtPot recieves a update with waypoints, does not respond)
+  if (active_index != timer_start_index) {
+    return;
+  }
+
   bool done = false;
   int rep_done = 0;
   while(!done) {
@@ -139,27 +144,10 @@ void sendCollect() {
             debug_print("Voter - read problem on internal pipe - Controller %s, rep %d, pipe %d\n", controller_name, r_index, p_index);
           }
 
-          // Okay, this is getting confusing.
-          // All in / out relationships are timed... by the timer set for the timed pipe
-          // The if else here so that if a component has multiple outputs for a single input:
-          // the last output should be on the "timed" pipe.
-          // All other relationships are assummed to be 1 to 1. This doesn't fit every case, but the best I can do right now.
-          if (active_index == timer_start_index) {
-            // Input came on the timed in pipe, output stops when all reps send output on the timed out pipe
-            if (p_index == timer_stop_index) {
-              rep_done++;
-              if (rep_done == rep_count) {
-                done = true; // All timed pipe calls are in. Off to voting.
-              }
-            }
-          } else {
-            // Input came on a non-timed in pipe, output stops when all replicas have the same # of output bytes
-            int index;
-            done = true;
-            for (index = 1; index < rep_count; index++) {
-              if (replicas[0].buff_counts[p_index] != replicas[index].buff_counts[p_index]) {
-                done = false;
-              }
+          if (p_index == timer_stop_index) {
+            rep_done++;
+            if (rep_done == rep_count) {
+              done = true; // All timed pipe calls are in. Off to voting.
             }
           }
         } // if FD_ISSET
@@ -268,13 +256,16 @@ void vote(bool timeout_occurred) {
       for (p_index = 0; p_index < out_pipe_count; p_index++) {
         if (replicas[0].buff_counts[p_index] != replicas[1].buff_counts[p_index]) {
           if (replicas[0].buff_counts[p_index] != replicas[2].buff_counts[p_index]) {
+            // debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[0].pid, replicas[0].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
             fault = true;
             restartee = 0;
           } else {
+            // debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[0].pid, replicas[0].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
             fault = true;
             restartee = 1;
           }
         } else if(replicas[0].buff_counts[p_index] != replicas[2].buff_counts[p_index]) {
+          // debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[2].pid, replicas[2].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
           fault = true;
           restartee = 2;
         }
@@ -305,7 +296,7 @@ void vote(bool timeout_occurred) {
           }
         }
       } else {
-        debug_print("VoterM trying to handle TMR recovery. Timeout? %d\n", timeout_occurred);
+        debug_print("VoterM trying to handle TMR recovery. Timeout? %d, Component %s\n", timeout_occurred, controller_name);
         restarter = (restartee + (rep_count - 1)) % rep_count;
         debug_print("\tRestartee: %d - %d\t Restarter: %d - %d\n", restartee, replicas[restartee].pid, restarter, replicas[restarter].pid);
 

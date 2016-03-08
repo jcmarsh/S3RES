@@ -1,6 +1,7 @@
 // Test filter
 
 #include "test.h"
+#include "taslimited.h"
 
 const char* controller_name = "Filter";
 
@@ -58,6 +59,7 @@ int main(int argc, const char** argv) {
   // Should be connected now.
   double pose_add = 0.0;
   int loops = 10000000;
+  timestamp_t last;
   while (loops--) {
     // Create and send some ranger data
     struct comm_range_pose_data sim_range_data;
@@ -71,11 +73,18 @@ int main(int argc, const char** argv) {
 
     write(pipe_in[1], &sim_range_data, sizeof(struct comm_range_pose_data));
 
+    last = generate_timestamp();
+    write(pipe_in[1], &sim_range_data, sizeof(struct comm_range_pose_data));
+
     // read filtered data
     read(pipe_out0[0], &sim_range_data, sizeof(sim_range_data));
     read(pipe_out1[0], &sim_range_data, sizeof(sim_range_data));
     read(pipe_out2[0], &sim_range_data, sizeof(sim_range_data));
-    printf("Pose returned %f, %f\n", sim_range_data.pose[0], sim_range_data.pose[1]);
+
+    timestamp_t current = generate_timestamp();
+
+    printf("fil_test_usec (%lf)\n", diff_time(current, last, CPU_MHZ));
+    //printf("Pose returned %f, %f\n", sim_range_data.pose[0], sim_range_data.pose[1]);
 
     //usleep(1000000);
     sleep(1);
