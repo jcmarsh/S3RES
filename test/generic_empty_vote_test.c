@@ -8,8 +8,8 @@
 const char* controller_name = "GenericEmpty";
 
 int main(int argc, const char** argv) {
-  printf("Usage: No voter -> GenericEmptyVoteTest\n");
-  printf("       Voter -> GenericEmptyVoteTest <Voter_Name> <Redundancy_Level>\n");
+  printf("Usage: No voter -> GEVoteTest\n");
+  printf("       Voter -> GEVoteTest <Voter_Name> <Redundancy_Level>\n");
   
   InitTAS(VOTER_PIN, 50); // run on CPU 0 (reps should either be spread out on 1,2,3 or all on 0)
 

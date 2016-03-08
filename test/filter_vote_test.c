@@ -1,6 +1,8 @@
 // Test filter
 
-#include "test.h"
+#include "commtypes.h"
+#include "replicas.h"
+#include "system_config.h"
 #include "taslimited.h"
 
 const char* controller_name = "Filter";
@@ -56,7 +58,6 @@ int main(int argc, const char** argv) {
 
   sleep(2);
 
-  // Should be connected now.
   double pose_add = 0.0;
   int loops = 10000000;
   timestamp_t last;
@@ -70,8 +71,6 @@ int main(int argc, const char** argv) {
     for (i = 0; i < 16; i++) {
       sim_range_data.ranges[i] = i * 1.5;
     }
-
-    write(pipe_in[1], &sim_range_data, sizeof(struct comm_range_pose_data));
 
     last = generate_timestamp();
     write(pipe_in[1], &sim_range_data, sizeof(struct comm_range_pose_data));

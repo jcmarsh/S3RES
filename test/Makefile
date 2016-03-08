@@ -4,9 +4,9 @@ LIB=-lpthread -lrt -lTASLimited
 
 all: comp vote
 
-comp: Controllers MapperTest ArtPotTest AStarTest #LoadTest
+comp: Controllers AStarTest #LoadTest
 
-vote: Controllers Voters FilterVoteTest ArtPotVoteTest GenericEmptyVoteTest
+vote: Controllers Voters MapperVoteTest FilterVoteTest ArtPotVoteTest GenericEmptyVoteTest
 
 %.o: %.c
 	gcc -c -o $@ $< $(INC)
@@ -19,17 +19,13 @@ Voters:
 	cp ../voter/VoterM ./
 	cp ../voter/VoterD ./
 
-MapperTest: mapper_test.o $(SRC)
-	gcc -o MapperTest mapper_test.o $(SRC) -lrt -lTASLimited
+MapperVoteTest: mapper_vote_test.o $(SRC)
+	gcc -o MapperVoteTest mapper_vote_test.o $(SRC) $(LIB)
 	cp ../controllers/Mapper ./
 
 FilterVoteTest: filter_vote_test.o $(SRC)
-	gcc -o FilterVoteTest filter_vote_test.o $(SRC) -lrt -lTASLimited
+	gcc -o FilterVoteTest filter_vote_test.o $(SRC) $(LIB)
 	cp ../controllers/Filter ./
-
-ArtPotTest: art_pot_test.o $(SRC)
-	gcc -o ArtPotTest art_pot_test.o $(SRC) -lrt -lTASLimited
-	cp ../controllers/ArtPot ./
 
 ArtPotVoteTest: art_pot_vote_test.o $(SRC)
 	gcc -o ArtPotVoteTest art_pot_vote_test.o $(SRC) $(LIB)
@@ -48,20 +44,16 @@ LoadTest: load_test.o $(SRC)
 	gcc -o LoadTest load_test.o $(SRC) -lrt -lTASLimited
 	cp ../controllers/Load ./
 
-GenericEmptyTest: generic_empty_test.o $(SRC)
-	gcc -o GenericEmptyTest generic_empty_test.o $(SRC) -lrt -lTASLimited
-
 clean:
 	rm -f injector.py
 	rm -f *.o
-	rm -f MapperTest
-	rm -f MapperTest_fd_server
+	rm -f MapperVoteTest
+	rm -f Mapper_fd_server
 	rm -f Mapper
 	rm -f FilterVoteTest
 	rm -f FilterTest_fd_server
 	rm -f Filter_fd_server
 	rm -f Filter
-	rm -f ArtPotTest
 	rm -f ArtPotVoteTest
 	rm -f ArtPotTest_fd_server
 	rm -f ArtPot_fd_server
