@@ -36,7 +36,7 @@ long fake_hash = 42;
 const char* name = "AStar";
 
 void enterLoop(void);
-void command(void);
+bool command(void);
 void sendWaypoints(void);
 
 // Set indexes based on pipe types
@@ -131,7 +131,7 @@ void eraseAllButList(struct l_list_t** kill_list, struct l_list_t* save_list) {
   free(*kill_list);
 }
 
-void command(void) {
+bool command(void) {
   struct l_list_t* closed_set = newList();
   struct l_list_t* open_set = newList();
 
@@ -203,10 +203,12 @@ void command(void) {
     if (nodeEqauls(node_a, current_goal) && nodeEqauls(node_b, n_current_goal)) {
       // don't send
     } else {
-      sendWaypoints();
+      return true;
+      //sendWaypoints();
       //printMap(obstacle_map, goal_path);
     }
   }
+  return false;
 }
 
 void sendWaypoints(void) {
@@ -230,7 +232,7 @@ void sendWaypoints(void) {
     n_current_goal = pop(&goal_path);
     if (n_current_goal == NULL) {
       // At goal! (Err... right next to it) Just hang out I suppose. By sending same goal twice.
-      // commSendWaypoints(pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
+      commSendWaypoints(&pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
     } else{
       n_goal_p = degridify(n_current_goal->x, n_current_goal->y);
       commSendWaypoints(&pipes[way_res_index], goal_p->x, goal_p->y, 0.0, n_goal_p->x, n_goal_p->y, 0.0);
@@ -265,8 +267,25 @@ void enterLoop(void) {
     FD_SET(pipes[updates_index].fd_in, &select_set);
     FD_SET(pipes[way_req_index].fd_in, &select_set);
 
+    bool send_waypoints = false;
+    bool send_ack = false;
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
+      if (FD_ISSET(pipes[way_req_index].fd_in, &select_set)) {
+        read_ret = read(pipes[way_req_index].fd_in, &recv_msg_req, sizeof(struct comm_way_req));
+        if (read_ret > 0) { // TODO: Do these calls stack up?
+          //if (goal_path->head == NULL) {
+          //  // commSendWaypoints(&pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
+          //} else {
+            // sendWaypoints();
+            send_waypoints = true;
+          //}
+        } else if (read_ret < 0) {
+          perror("AStar - read error on way_req_index");
+        } else if (read_ret == 0) {
+          perror("AStar read_ret == 0 on way_req_index");
+        }
+      }
       if (FD_ISSET(pipes[updates_index].fd_in, &select_set)) {
         read_ret = commRecvMapUpdate(&pipes[updates_index], &recv_map_update);
         if (read_ret > 0) {
@@ -279,10 +298,10 @@ void enterLoop(void) {
             insertSDC = false;
             fake_hash++;
           }
-          commSendAck(&pipes[ack_index], fake_hash);
+          send_ack = true;
           if (recv_map_update.obs_count > 0) { // New obstacle arrived
             // TODO: Also command if waypoint requested
-            command();
+            send_waypoints = command();
           }
         } else if (read_ret < 0) {
           perror("AStar - read error on updates_index");
@@ -290,20 +309,14 @@ void enterLoop(void) {
           perror("AStar read_ret == 0 on updates_index");
         }
       }
-      if (FD_ISSET(pipes[way_req_index].fd_in, &select_set)) {
-        read_ret = read(pipes[way_req_index].fd_in, &recv_msg_req, sizeof(struct comm_way_req));
-        if (read_ret > 0) { // TODO: Do these calls stack up?
-          if (goal_path->head == NULL) {
-            commSendWaypoints(&pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
-          } else {
-            sendWaypoints();
-          }
-        } else if (read_ret < 0) {
-          perror("AStar - read error on way_req_index");
-        } else if (read_ret == 0) {
-          perror("AStar read_ret == 0 on way_req_index");
-        }
-      }  
+      if (send_waypoints) {
+        sendWaypoints();
+        send_waypoints = false;
+      }
+      if (send_ack) {
+        commSendAck(&pipes[ack_index], fake_hash);
+        send_ack = false;
+      }
     }
   }
 }

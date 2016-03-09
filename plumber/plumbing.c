@@ -69,7 +69,7 @@ void link_bench(struct node* n, comm_message_t type, int fd_in, int fd_out, bool
 	n->pipe_count++;
 }
 
-void link_node(comm_message_t type, struct node* fromNode, bool fromTimed, struct node* toNode, bool toTimed) {
+void link_node(comm_message_t type, struct node* fromNode, int fromTimed, struct node* toNode, int toTimed) {
 	// create pipe
 	int pipe_fds[2];
 	if (pipe(pipe_fds) == -1) {

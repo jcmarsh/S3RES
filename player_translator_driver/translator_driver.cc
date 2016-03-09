@@ -250,6 +250,7 @@ void TranslatorDriver::SendWaypoints() {
 }
 
 void TranslatorDriver::Main() {
+  sleep(1);
   for(;;) {
     this->DoOneUpdate();
   }
@@ -259,6 +260,8 @@ void TranslatorDriver::Main() {
 void TranslatorDriver::DoOneUpdate() {
   int retval;
   struct comm_mov_cmd recv_msg;
+
+  usleep(50000);
 
   if (!this->InQueue->Empty()) {
     this->ProcessMessages();

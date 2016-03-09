@@ -34,7 +34,7 @@ bool add_node(struct nodelist* nodes, char* Name, char* Value, replication_t rep
 struct node* get_node(struct nodelist* nodes, char* Name);
 
 void link_bench(struct node* n, comm_message_t type, int fd_in, int fd_out, bool timed);
-void link_node(comm_message_t type, struct node* fromName, bool fromTimed, struct node* toName, bool toTimed);
+void link_node(comm_message_t type, struct node* fromName, int fromTimed, struct node* toName, int toTimed);
 
 void print_nodes(struct nodelist* nodes);
 

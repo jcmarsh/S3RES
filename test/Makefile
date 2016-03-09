@@ -2,11 +2,9 @@ SRC=../src/commtypes.c ../src/replicas.c ../src/fd_server.c ../voter/vote_buff.c
 INC=-I../include/ -I../tas_lib/inc/
 LIB=-lpthread -lrt -lTASLimited
 
-all: comp vote
+all: vote
 
-comp: Controllers AStarTest #LoadTest
-
-vote: Controllers Voters MapperVoteTest FilterVoteTest ArtPotVoteTest GenericEmptyVoteTest
+vote: Controllers Voters AStarVoteTest MapperVoteTest FilterVoteTest ArtPotVoteTest GenericEmptyVoteTest
 
 %.o: %.c
 	gcc -c -o $@ $< $(INC)
@@ -15,6 +13,7 @@ Controllers:
 	make -C ../controllers
 
 Voters:
+	cp ../fault_injection/injector.py ./
 	make -C ../voter
 	cp ../voter/VoterM ./
 	cp ../voter/VoterD ./
@@ -34,10 +33,9 @@ ArtPotVoteTest: art_pot_vote_test.o $(SRC)
 GenericEmptyVoteTest: generic_empty_vote_test.o $(SRC)
 	gcc -o GEVoteTest generic_empty_vote_test.o $(SRC) $(LIB)
 	cp ../controllers/GenericEmpty ./
-	cp ../fault_injection/injector.py ./
 
-AStarTest: a_star_test.o $(SRC)
-	gcc -o AStarTest a_star_test.o $(SRC) -lrt -lTASLimited
+AStarVoteTest: a_star_vote_test.o $(SRC)
+	gcc -o AStarVoteTest a_star_vote_test.o $(SRC) $(LIB)
 	cp ../controllers/AStar ./
 
 LoadTest: load_test.o $(SRC)
@@ -55,11 +53,10 @@ clean:
 	rm -f Filter_fd_server
 	rm -f Filter
 	rm -f ArtPotVoteTest
-	rm -f ArtPotTest_fd_server
 	rm -f ArtPot_fd_server
 	rm -f ArtPot
-	rm -f AStarTest
-	rm -f AStarTest_fd_server
+	rm -f AStarVoteTest
+	rm -f AStar_fd_server
 	rm -f AStar
 	rm -f EmptyTest
 	rm -f EmptyTest_fd_server

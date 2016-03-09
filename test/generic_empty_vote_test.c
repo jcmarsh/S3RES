@@ -1,8 +1,8 @@
 // Test GenericEmpty
 
-#include <time.h>
-#include "test.h"
-
+#include "commtypes.h"
+#include "replicas.h"
+#include "system_config.h"
 #include "taslimited.h"
 
 const char* controller_name = "GenericEmpty";

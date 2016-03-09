@@ -14,6 +14,8 @@
 "->"			{ return END_PIPE; }
 "("				{ return START_VOTE; }
 ")"				{ return END_VOTE; }
+"["				{ return START_I2; }
+"]"				{ return END_I2; }
 ":="			{ return ASSIGN; }
 ","				{ return DELIM; }
 [a-z][a-zA-Z_]+	{ yylval.str = strdup(yytext); return VAR_NAME; }

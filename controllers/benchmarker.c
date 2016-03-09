@@ -95,7 +95,7 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
-  sleep(2);
+  sleep(3);
 
   int retval, i = 50;
   while (i > 0) {

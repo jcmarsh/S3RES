@@ -12,8 +12,11 @@
 #define RESTART_SIGNAL 36 // Voter to replica signal to fork itself
 
 long voting_timeout;
-int timer_start_index; // TODO: Should be per pipe...
-int timer_stop_index;
+// A pair of pipes can be associated (and timed)
+int indexed_pipes = 0;
+// These hold the indexes into rep_info_in... etc.
+int timer_start_index[2]; // Should have a higher max than two...
+int timer_stop_index[2];
 timestamp_t watchdog;
 
 // Replica related data
@@ -107,7 +110,18 @@ void sendCollect() {
   }
 
   // Only the timed pipe is assumed to have a response. (ArtPot recieves a update with waypoints, does not respond)
-  if (active_index != timer_start_index) {
+  // This is not the case for AStar waypoint requests / responses. Fucks.
+  // (Map Update) -> ASTAR -> (Comm Ack)
+  //                   |--> Sometimes waypoints
+  //
+  // [Way Request]  -> ASTAR --> [Way Response]
+  bool waiting = false;
+  for (p_index = 0; p_index < indexed_pipes; p_index++) {
+    if (active_index == timer_start_index[p_index]) {
+      waiting = true;
+    }
+  }
+  if (!waiting) {
     return;
   }
 
@@ -144,7 +158,7 @@ void sendCollect() {
             debug_print("Voter - read problem on internal pipe - Controller %s, rep %d, pipe %d\n", controller_name, r_index, p_index);
           }
 
-          if (p_index == timer_stop_index) {
+          if (p_index == timer_stop_index[active_index]) {
             rep_done++;
             if (rep_done == rep_count) {
               done = true; // All timed pipe calls are in. Off to voting.
@@ -256,16 +270,16 @@ void vote(bool timeout_occurred) {
       for (p_index = 0; p_index < out_pipe_count; p_index++) {
         if (replicas[0].buff_counts[p_index] != replicas[1].buff_counts[p_index]) {
           if (replicas[0].buff_counts[p_index] != replicas[2].buff_counts[p_index]) {
-            // debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[0].pid, replicas[0].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
+            debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[0].pid, replicas[0].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
             fault = true;
             restartee = 0;
           } else {
-            // debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[0].pid, replicas[0].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
+            debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[0].pid, replicas[0].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
             fault = true;
             restartee = 1;
           }
         } else if(replicas[0].buff_counts[p_index] != replicas[2].buff_counts[p_index]) {
-          // debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[2].pid, replicas[2].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
+          debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[2].pid, replicas[2].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
           fault = true;
           restartee = 2;
         }
@@ -587,21 +601,22 @@ int parseArgs(int argc, const char **argv) {
       out = atoi(pipe_fd_string);
       j = j + int_index + 1; // move past final ':'
 
-      // parse timed (should be a 1 or 0)
+      // parse timed (should be 0 if not timed, index of pair otherwise (usually 1, except for A_Star))
       timed = atoi(&(argv[i + required_args][j]));
 
       if (0 != in) {
         ext_in_fds[c_in_pipe] = in;
         rep_info_in[c_in_pipe] = rep_info;
         if (timed) {
-          timer_start_index = c_in_pipe;
+          indexed_pipes++;
+          timer_start_index[timed - 1] = c_in_pipe;
         }
         c_in_pipe++;
       } else {
         ext_out_fds[c_out_pipe] = out;
         rep_info_out[c_out_pipe] = rep_info;
         if (timed) {
-          timer_stop_index = c_out_pipe;
+          timer_stop_index[timed - 1] = c_out_pipe;
         }
         c_out_pipe++;
       }
