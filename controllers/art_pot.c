@@ -41,6 +41,8 @@ double pos[3];
 int ranger_count = 16; // TODO: used what's in commtypes... already included I think
 double ranges[16]; // 16 is the size in commtypes.h
 
+bool way_pending = false;
+
 int pipe_count = PIPE_COUNT; // 4 with a planner, 2 otherwise
 struct typed_pipe pipes[PIPE_COUNT]; // 0 is data_in, 1 is cmd_out
 int data_index, out_index, way_req_index, way_res_index;
@@ -183,7 +185,13 @@ void command(void) {
     vel_cmd[0] += 1;
   }
 
-  if (request_way) {
+  if (vel_cmd[0] < 0.1) {
+    // Detect if robot is "stuck"
+    request_way = true;
+  }
+
+  if (request_way && !way_pending) {
+    way_pending = true;
     commSendWaypointRequest(&pipes[way_req_index]);
   }
 
@@ -233,6 +241,7 @@ void enterLoop(void) {
         if (FD_ISSET(pipes[way_res_index].fd_in, &select_set)) {
           read_ret = read(pipes[way_res_index].fd_in, &recv_msg_way, sizeof(struct comm_way_res));
           if (read_ret == sizeof(struct comm_way_res)) {
+            way_pending = false;
             commCopyWaypoints(&recv_msg_way, goal, next_goal);
           } else if (read_ret > 0) {
             debug_print("ArtPot read way_res_index did not match expected size.\n");

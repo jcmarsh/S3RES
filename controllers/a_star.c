@@ -36,7 +36,7 @@ long fake_hash = 42;
 const char* name = "AStar";
 
 void enterLoop(void);
-bool command(void);
+void command(void);
 void sendWaypoints(void);
 
 // Set indexes based on pipe types
@@ -131,7 +131,7 @@ void eraseAllButList(struct l_list_t** kill_list, struct l_list_t* save_list) {
   free(*kill_list);
 }
 
-bool command(void) {
+void command(void) {
   struct l_list_t* closed_set = newList();
   struct l_list_t* open_set = newList();
 
@@ -192,23 +192,6 @@ bool command(void) {
     }
     free(neighbors);
   }
-
-  if (!solution) {
-    //printf("You have failed, as expected.\n");
-    // Not sure what to do in this case
-  } else {
-    // check if new path is different then old
-    struct node_t *node_a = peek(goal_path, 0);
-    struct node_t *node_b = peek(goal_path, 1);
-    if (nodeEqauls(node_a, current_goal) && nodeEqauls(node_b, n_current_goal)) {
-      // don't send
-    } else {
-      return true;
-      //sendWaypoints();
-      //printMap(obstacle_map, goal_path);
-    }
-  }
-  return false;
 }
 
 void sendWaypoints(void) {
@@ -267,26 +250,18 @@ void enterLoop(void) {
     FD_SET(pipes[updates_index].fd_in, &select_set);
     FD_SET(pipes[way_req_index].fd_in, &select_set);
 
-    bool send_waypoints = false;
-    bool send_ack = false;
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
       if (FD_ISSET(pipes[way_req_index].fd_in, &select_set)) {
         read_ret = read(pipes[way_req_index].fd_in, &recv_msg_req, sizeof(struct comm_way_req));
         if (read_ret > 0) { // TODO: Do these calls stack up?
-          //if (goal_path->head == NULL) {
-          //  // commSendWaypoints(&pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
-          //} else {
-            // sendWaypoints();
-            send_waypoints = true;
-          //}
+          sendWaypoints();
         } else if (read_ret < 0) {
           perror("AStar - read error on way_req_index");
         } else if (read_ret == 0) {
           perror("AStar read_ret == 0 on way_req_index");
         }
-      }
-      if (FD_ISSET(pipes[updates_index].fd_in, &select_set)) {
+      } else if (FD_ISSET(pipes[updates_index].fd_in, &select_set)) {
         read_ret = commRecvMapUpdate(&pipes[updates_index], &recv_map_update);
         if (read_ret > 0) {
           pose->x = recv_map_update.pose_x;
@@ -298,24 +273,15 @@ void enterLoop(void) {
             insertSDC = false;
             fake_hash++;
           }
-          send_ack = true;
           if (recv_map_update.obs_count > 0) { // New obstacle arrived
-            // TODO: Also command if waypoint requested
-            send_waypoints = command();
+            command();
           }
+          commSendAck(&pipes[ack_index], fake_hash);
         } else if (read_ret < 0) {
           perror("AStar - read error on updates_index");
         } else {
           perror("AStar read_ret == 0 on updates_index");
         }
-      }
-      if (send_waypoints) {
-        sendWaypoints();
-        send_waypoints = false;
-      }
-      if (send_ack) {
-        commSendAck(&pipes[ack_index], fake_hash);
-        send_ack = false;
       }
     }
   }
