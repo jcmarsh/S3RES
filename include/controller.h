@@ -1,5 +1,3 @@
-#include "commtypes.h"
-
 #include <signal.h>
 #include <sys/select.h>
 

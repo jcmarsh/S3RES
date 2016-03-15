@@ -10,8 +10,8 @@ all: VoterD VoterM
 %.o: %.c ../include/*.h ../tas_lib/inc/*.h
 	$(COMPILE) -c -o $@ $< $(INC)
 
-VoterD: voterd.o vote_buff.c ../src/commtypes.c ../src/replicas.c ../src/fd_server.c ../src/fd_client.c
-	$(COMPILE) -o VoterD voterd.o vote_buff.c ../src/commtypes.c ../src/replicas.c ../src/fd_server.c ../src/fd_client.c $(INC) $(LIB)
+VoterD: voterd.o vote_buff.c ../src/commtypes.c ../src/replicas.c ../src/fd_server.c
+	$(COMPILE) -o VoterD voterd.o vote_buff.c ../src/commtypes.c ../src/replicas.c ../src/fd_server.c $(INC) $(LIB) # -Wl,-Map=DMapFile.map
 
 VoterM: voterm.o fd_serverm.c voterm.h
 	$(COMPILE) -o VoterM voterm.o fd_serverm.c $(INC) $(LIB)

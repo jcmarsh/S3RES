@@ -1,7 +1,5 @@
 #include "../include/replicas.h"
 #include "../include/controller.h"
-#include <string.h>
-#include <stdlib.h>
 
 #ifdef TIME_RESTART_SIGNAL
 #include "../tas_lib/inc/tas_time.h"
@@ -162,7 +160,7 @@ void restartReplica(struct replica reps[], int num, struct server_data *sd, stru
         priority = default_priority;
       }
       if (sched_set_policy(reps[i].pid, priority) < 0) {
-        printf("Voter error call sched_set_policy in restartReplica for %s, priority %d\n", reps[i].name, priority);
+        debug_print("Voter error call sched_set_policy in restartReplica for %s, priority %d\n", reps[i].name, priority);
         perror("\tperror");        
       } else {
         reps[i].priority = priority;
@@ -200,7 +198,7 @@ void createPipes(struct replica reps[], int num, struct vote_pipe ext_pipes[], i
       int pipe_fds[2];
       if (pipe(pipe_fds) == -1) {
       //if (pipe2(pipe_fds, O_CLOEXEC) == -1) { // Need to check on the number of open file descriptors if this line is removed.
-        printf("Replica pipe error\n");
+        perror("Replica pipe error\n");
       } else {
         struct replica* rep = &reps[index];
         struct vote_pipe ext_pipe = ext_pipes[p_index];
@@ -236,7 +234,7 @@ void startReplicas(struct replica reps[], int num, struct server_data *sd, const
   forkReplicas(reps, num, 0, NULL);
   for (i = 0; i < num; i++) {
     if (acceptSendFDS(sd, &(reps[i].pid), reps[i].rep_pipes, reps[i].pipe_count,  reps[i].pinned_cpu) < 0) {
-      printf("EmptyRestart acceptSendFDS call failed\n");
+      puts("EmptyRestart acceptSendFDS call failed\n");
       exit(-1);
     }
   }
@@ -255,7 +253,7 @@ int forkSingle(char** argv) {
   if (currentPID >= 0) { // Successful fork
     if (currentPID == 0) { // Child process
       if (-1 == execv(argv[0], argv)) {
-        printf("argv[0]: %s\n", argv[0]);
+        debug_print("argv[0]: %s\n", argv[0]);
         perror("Replica: EXEC ERROR!");
         return -1;
       }
@@ -263,7 +261,7 @@ int forkSingle(char** argv) {
       return currentPID;
     }
   } else {
-    printf("Fork error!\n");
+    perror("Fork error!\n");
     return -1;
   }
 }

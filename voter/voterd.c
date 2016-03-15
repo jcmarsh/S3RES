@@ -487,7 +487,7 @@ int initVoterD(void) {
 
   // Setup fd server
   if (createFDS(&sd, controller_name) < 0) {
-    printf("Failed to create FD server\n");
+    debug_print("Failed to create FD server\n");
   }
   startReplicas(replicas, rep_count, &sd, controller_name, ext_pipes, pipe_count, replica_priority);
 

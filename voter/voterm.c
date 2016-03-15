@@ -109,12 +109,6 @@ void sendCollect() {
     }
   }
 
-  // Only the timed pipe is assumed to have a response. (ArtPot recieves a update with waypoints, does not respond)
-  // This is not the case for AStar waypoint requests / responses. Fucks.
-  // (Map Update) -> ASTAR -> (Comm Ack)
-  //                   |--> Sometimes waypoints
-  //
-  // [Way Request]  -> ASTAR --> [Way Response]
   bool waiting = false;
   for (p_index = 0; p_index < indexed_pipes; p_index++) {
     if (active_index == timer_start_index[p_index]) {
