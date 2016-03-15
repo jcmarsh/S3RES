@@ -25,7 +25,6 @@ void initReplicas(struct replica reps[], int rep_num, const char* name, int prio
       new_rep->pinned_cpu = CONTROLLER_PIN;
     }
 
-
     // clean up pipes if this replica is not fresh
     for (jndex = 0; jndex < new_rep->pipe_count; jndex++) {
       // new_rep->voted[jndex] = 0;
@@ -112,39 +111,6 @@ int rep_gap(struct replica reps[], int num, int rep_num) {
   return gap;
 }
 
-void balanceReps(struct replica reps[], int num, int default_priority) {
-  int starting = 0; // most behind rep gets data first
-  int second = 1; // the most behind might be dead, so second to go is up next
-  int index = 0;
-
-  for (index = 0; index < num; index++) {
-    if (rep_gap(reps, num, index) > rep_gap(reps, num, starting)) {
-      starting = index;
-    } else if (rep_gap(reps, num, index) > rep_gap(reps, num, second)) {
-      if (index != starting) {
-        second = index;
-      }
-    }
-  }
-
-  for (index = 0; index < num; index++) {    
-    int priority;
-    if (index == starting) {
-      priority = default_priority + 2;
-    } else if (index == second) {
-      priority = default_priority + 1;
-    } else {
-      priority = default_priority;
-    }
-    if (sched_set_policy(reps[index].pid, priority) < 0) {
-      // Will fail when the replica is already dead.
-      //printf("Voter error call sched_set_policy for %s, priority %d, retval: %d\n", reps[index].name, priority);
-    } else {
-      reps[index].priority = priority;
-    }
-  }
-}
-
 void restartReplica(struct replica reps[], int num, struct server_data *sd, struct vote_pipe ext_pipes[], int restarter, int restartee, int default_priority) {
   int i, retval, fd_in_c = 0, fd_out_c = 0;
 
@@ -185,8 +151,6 @@ void restartReplica(struct replica reps[], int num, struct server_data *sd, stru
   createPipes(&(reps[restartee]), 1, ext_pipes, reps[restarter].pipe_count);
   // send new pipe through fd server (should have a request)
   acceptSendFDS(sd, &(reps[restartee].pid), reps[restartee].rep_pipes, reps[restartee].pipe_count, reps[restartee].pinned_cpu);
-
-  balanceReps(reps, num, default_priority);
 }
 
 void createPipes(struct replica reps[], int num, struct vote_pipe ext_pipes[], int pipe_count){

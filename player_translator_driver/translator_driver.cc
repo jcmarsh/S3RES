@@ -143,6 +143,10 @@ int TranslatorDriver::MainSetup() {
   pose[INDEX_Y] = -7.0;
   pose[INDEX_A] = 0.0;
 
+  int pipe_count = 2;
+  rep.vot_pipes = (struct vote_pipe *) malloc(sizeof(struct vote_pipe) * pipe_count);
+  rep.voter_rep_in_copy = (int *) malloc(sizeof(int) * pipe_count);
+  rep.rep_pipes = (struct vote_pipe *) malloc(sizeof(struct vote_pipe) * pipe_count);
   struct replica* r_p = (struct replica *) &rep;
   initReplicas(r_p, 1, "BenchMarker", 98);
 

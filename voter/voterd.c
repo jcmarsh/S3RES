@@ -27,7 +27,7 @@ timestamp_t watchdog;
 pid_t last_dead = -1;
 
 // Replica related data
-struct replica replicas[REP_MAX];
+struct replica replicas[REP_MAX]; // TODO: malloc
 
 // TAS Stuff
 int voter_priority;
@@ -41,7 +41,7 @@ int rep_count;
 char* controller_name;
 // pipes to external components (not replicas)
 int pipe_count = 0;
-struct vote_pipe ext_pipes[PIPE_LIMIT];
+struct vote_pipe *ext_pipes;
 
 // Functions!
 int initVoterD(void);
@@ -289,8 +289,8 @@ void doOneUpdate(void) {
 
   // See if any of the read pipes have anything
   FD_ZERO(&select_set);
-  // Check external in pipes
 
+  // Check external in pipes
   if (!timer_started) { // Every pipe must be timed now.
     for (p_index = 0; p_index < pipe_count; p_index++) {
       if (ext_pipes[p_index].fd_in != 0) {
@@ -374,8 +374,6 @@ void processData(struct vote_pipe *pipe, int pipe_index) {
     }
   }
 
-  balanceReps(replicas, rep_count, replica_priority);
-
   for (r_index = 0; r_index < rep_count; r_index++) {
     writeBuffer(replicas[r_index].vot_pipes[pipe_index].fd_out, pipe->buffer, pipe->buff_count);
   }
@@ -411,7 +409,7 @@ void checkSDC(int pipe_num) {
   }
 
   switch (rep_type) {
-    case SMR: 
+    case SMR:
       // Only one rep, so pretty much have to trust it
       sendPipe(pipe_num, 0);
       return;
@@ -473,7 +471,6 @@ void checkSDC(int pipe_num) {
 void processFromRep(int replica_num, int pipe_num) {
   // read from pipe
   if (pipeToBuff(&(replicas[replica_num].vot_pipes[pipe_num])) == 0) {
-    balanceReps(replicas, rep_count, replica_priority);
     checkSDC(pipe_num);
   } else {
     debug_print("Voter - read problem on internal pipe - Controller %s, rep %d, pipe %d\n", controller_name, replica_num, pipe_num);
@@ -554,17 +551,27 @@ int parseArgs(int argc, const char **argv) {
   }
 
   if (argc < required_args) { 
-    puts("Usage: VoterD <controller_name> <rep_type> <timeout> <priority> <fd_in:fd_out:time> <...>");
+    puts("Usage: VoterD <controller_name> <rep_type> <timeout> <priority> <rep_info:fd_in:fd_out:time> <...>");
     return -1;
   } else {
     for (i = 0; (i < argc - required_args && i < PIPE_LIMIT); i++) {
-      parsePipe(argv[i + required_args], &ext_pipes[pipe_count]); // TODO: WRONG! Maybe. Should ignore non-numbers to deserialize?
       pipe_count++;
     }
     if (pipe_count >= PIPE_LIMIT) {
       debug_print("VoterD: Raise pipe limit.\n");
     }
-  
+
+    ext_pipes = (struct vote_pipe *) malloc(sizeof(struct vote_pipe) * pipe_count);
+    for (i = 0; (i < argc - required_args && i < PIPE_LIMIT); i++) {
+      parsePipe(argv[i + required_args], &ext_pipes[i]); // TODO: WRONG! Maybe. Should ignore non-numbers to deserialize?
+    }
+
+    for (i = 0; i < rep_count; i++) {
+      replicas[i].vot_pipes = (struct vote_pipe *) malloc(sizeof(struct vote_pipe) * pipe_count);
+      replicas[i].voter_rep_in_copy = (int *) malloc(sizeof(int) * pipe_count);
+      replicas[i].rep_pipes = (struct vote_pipe *) malloc(sizeof(struct vote_pipe) * pipe_count);
+    }
+
     // Need to have a similar setup to associate vote pipe with input?
     for (i = 0; i < pipe_count; i++) {
       if (ext_pipes[i].timed) {

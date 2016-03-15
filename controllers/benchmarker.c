@@ -77,6 +77,10 @@ int parseArgs(int argc, const char **argv) {
   }
 
   priority = atoi(argv[1]);
+  int pipe_count = 2;
+  replica.vot_pipes = (struct vote_pipe *) malloc(sizeof(struct vote_pipe) * pipe_count);
+  replica.voter_rep_in_copy = (int *) malloc(sizeof(int) * pipe_count);
+  replica.rep_pipes = (struct vote_pipe *) malloc(sizeof(struct vote_pipe) * pipe_count);
 
   deserializePipe(argv[3], &trans_pipes[0]);
   deserializePipe(argv[4], &trans_pipes[1]);
