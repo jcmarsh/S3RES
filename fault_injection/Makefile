@@ -1,12 +1,14 @@
 include ../directory_paths
 
+COMPILE=diet -Os gcc -O3 -nostdinc -Werror -static
+
 all: c_injector
 
 %.o: %.c
 	gcc -c -o $@ $<
 
 c_injector: c_injector.c
-	gcc -Werror -o c_injector c_injector.c
+	$(COMPILE) -o c_injector c_injector.c -I../tas_lib/inc -lTASLimitedDiet
 
 # bit_flipper only works on x86_64 right now.
 bit_flipper: register_util.o print_registers.h

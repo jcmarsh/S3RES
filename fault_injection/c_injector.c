@@ -22,6 +22,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "taslimited.h"
+
 void printUsage(void) {
 	printf("Usage: ./c_injector <ignored> [controller_name_0 ... controller_name_n]\n");
 	printf("\t'kill -9'\tsend SIGTERM is the current default\n");
@@ -52,6 +54,8 @@ int main(int argc, char *argv[]) {
 	unsigned int count = 4;
 	int i, j;
 	FILE *log_file;
+
+	InitTAS(0, 97); // Super high priority.
 
 	log_file = fopen("injector_log.txt", "w");
 	if (log_file == NULL) {
