@@ -239,22 +239,6 @@ void returnPipes(int rep_num, char **buffer, int *buff_count) {
   }
 }
 
-bool checkSync(void) {
-  int r_index, p_index;
-  bool nsync = true;
-
-  // check each that for each pipe, each replica has the same number of votes
-  for (p_index = 0; p_index < pipe_count; p_index++) {
-    int votes = replicas[0].vot_pipes[p_index].buff_count;
-    for (r_index = 1; r_index < rep_count; r_index++) {
-      if (votes != replicas[r_index].vot_pipes[p_index].buff_count) {
-        nsync = false;
-      }
-    }
-  }
-  return nsync;
-}
-
 void doOneUpdate(void) {
   int p_index, r_index;
   int retval = 0;
@@ -306,9 +290,8 @@ void doOneUpdate(void) {
   // See if any of the read pipes have anything
   FD_ZERO(&select_set);
   // Check external in pipes
-  bool check_inputs = checkSync();
 
-  if (check_inputs) {
+  if (!timer_started) { // Every pipe must be timed now.
     for (p_index = 0; p_index < pipe_count; p_index++) {
       if (ext_pipes[p_index].fd_in != 0) {
         int e_pipe_fd = ext_pipes[p_index].fd_in;

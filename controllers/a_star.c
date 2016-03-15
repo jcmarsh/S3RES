@@ -252,16 +252,7 @@ void enterLoop(void) {
 
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
-      if (FD_ISSET(pipes[way_req_index].fd_in, &select_set)) {
-        read_ret = read(pipes[way_req_index].fd_in, &recv_msg_req, sizeof(struct comm_way_req));
-        if (read_ret > 0) { // TODO: Do these calls stack up?
-          sendWaypoints();
-        } else if (read_ret < 0) {
-          perror("AStar - read error on way_req_index");
-        } else if (read_ret == 0) {
-          perror("AStar read_ret == 0 on way_req_index");
-        }
-      } else if (FD_ISSET(pipes[updates_index].fd_in, &select_set)) {
+      if (FD_ISSET(pipes[updates_index].fd_in, &select_set)) {
         read_ret = commRecvMapUpdate(&pipes[updates_index], &recv_map_update);
         if (read_ret > 0) {
           pose->x = recv_map_update.pose_x;
@@ -281,6 +272,16 @@ void enterLoop(void) {
           perror("AStar - read error on updates_index");
         } else {
           perror("AStar read_ret == 0 on updates_index");
+        }
+      }
+      if (FD_ISSET(pipes[way_req_index].fd_in, &select_set)) {
+        read_ret = read(pipes[way_req_index].fd_in, &recv_msg_req, sizeof(struct comm_way_req));
+        if (read_ret > 0) { // TODO: Do these calls stack up?
+          sendWaypoints();
+        } else if (read_ret < 0) {
+          perror("AStar - read error on way_req_index");
+        } else if (read_ret == 0) {
+          perror("AStar read_ret == 0 on way_req_index");
         }
       }
     }
