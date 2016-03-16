@@ -100,6 +100,39 @@ int behindRep(struct replica reps[], int num, int pipe_num) {
   return mostBehind;
 }
 
+void balanceReps(struct replica reps[], int num, int default_priority) {
+  int starting = 0; // most behind rep gets data first
+  int second = 1; // the most behind might be dead, so second to go is up next
+  int index = 0;
+
+  for (index = 0; index < num; index++) {
+    if (rep_gap(reps, num, index) > rep_gap(reps, num, starting)) {
+      starting = index;
+    } else if (rep_gap(reps, num, index) > rep_gap(reps, num, second)) {
+      if (index != starting) {
+        second = index;
+      }
+    }
+  }
+
+  for (index = 0; index < num; index++) {
+    int priority;
+    if (index == starting) {
+      priority = default_priority + 2;
+    } else if (index == second) {
+      priority = default_priority + 1;
+    } else {
+      priority = default_priority;
+    }
+    if (sched_set_policy(reps[index].pid, priority) < 0) {
+      // Will fail when the replica is already dead.
+      //printf("Voter error call sched_set_policy for %s, priority %d, retval: %d\n", reps[index].name, priority);
+    } else {
+      reps[index].priority = priority;
+    }
+  }
+}
+
 int rep_gap(struct replica reps[], int num, int rep_num) {
   int p_index = 0;
   int gap = 0;
@@ -151,6 +184,8 @@ void restartReplica(struct replica reps[], int num, struct server_data *sd, stru
   createPipes(&(reps[restartee]), 1, ext_pipes, reps[restarter].pipe_count);
   // send new pipe through fd server (should have a request)
   acceptSendFDS(sd, &(reps[restartee].pid), reps[restartee].rep_pipes, reps[restartee].pipe_count, reps[restartee].pinned_cpu);
+
+  balanceReps(reps, num, default_priority);
 }
 
 void createPipes(struct replica reps[], int num, struct vote_pipe ext_pipes[], int pipe_count){

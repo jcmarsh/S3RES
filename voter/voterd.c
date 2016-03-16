@@ -20,11 +20,11 @@
 #define VOTER_PRIO_OFFSET 5 // Replicas run with a -5 offset
 
 long voting_timeout;
-int timer_start_index;
-int timer_stop_index;
+int current_timer = 0;
+int timer_start_index[2]; // Should have a higher max than two...
+int timer_stop_index[2];
 bool timer_started = false;
 timestamp_t watchdog;
-pid_t last_dead = -1;
 
 // Replica related data
 struct replica replicas[REP_MAX]; // TODO: malloc
@@ -63,90 +63,46 @@ void restart_prep(int restartee, int restarter) {
     timestamp_t start_restart = generate_timestamp();
   #endif // TIME_RESTART_REPLICA
 
-  // Normally the pipes are stolen, then written back.
-  // Here, we want to fill the pipes to test the impact of large messages.
-  // So we will write to them, and then steal them (so that the fake data isn't processed).
-  // But probably won't work if real data is there...
-  // Problem: normally steal once, write twice. Need a second write... use restarted rep?
-  #ifdef PIPE_SMASH
-    char pipe_fill[PIPE_FILL_SIZE] = {1};
-    for (i = 0; i < PIPE_LIMIT; i++) {
-      if (replicas[restarter].vot_pipes[i].fd_out != 0) {
-        writeBuffer(replicas[restarter].vot_pipes[i].fd_out, pipe_fill, sizeof(pipe_fill));
-      }
-    }  
-  #endif // PIPE_SMASH
-
-  char **restarter_buffer = (char **)malloc(sizeof(char *) * PIPE_LIMIT);
+  char **restarter_buffer = (char **)malloc(sizeof(char *) * pipe_count);
   if (restarter_buffer == NULL) {
     perror("Voter failed to malloc memory");
   }
-  for (i = 0; i < PIPE_LIMIT; i++) {
+  int restarter_buff_count[pipe_count];
+  for (i = 0; i < pipe_count; i++) {
+    restarter_buff_count[i] = 0;
     restarter_buffer[i] = (char *)malloc(sizeof(char) * MAX_VOTE_PIPE_BUFF);
     if (restarter_buffer[i] == NULL) {
       perror("Voter failed to allocat memory");
     }
   }
-  int restarter_buff_count[PIPE_LIMIT] = {0};
 
-  // Steal the pipes from healthy reps. This stops them from processing mid restart (also need to copy data to new rep)
+  // Steal the pipes from healthy rep. This stops them from processing mid restart (also need to copy data to new rep)
   stealPipes(restarter, restarter_buffer, restarter_buff_count);
 
   // reset timer
   timer_started = false;
   restartReplica(replicas, rep_count, &sd, ext_pipes, restarter, restartee, replica_priority);
 
-  for (i = 0; i < replicas[restarter].pipe_count; i++) {
+  for (i = 0; i < pipe_count; i++) {
     if (replicas[restarter].vot_pipes[i].fd_in != 0) {
       copyPipe(&(replicas[restartee].vot_pipes[i]), &(replicas[restarter].vot_pipes[i]));
       sendPipe(i, restarter); // TODO: Need to check if available?
     }
   }
 
-  #ifndef PIPE_SMASH
-    // Give the buffers back
-    returnPipes(restartee, restarter_buffer, restarter_buff_count);
-    returnPipes(restarter, restarter_buffer, restarter_buff_count);
-    // free the buffers
-    for (i = 0; i < PIPE_LIMIT; i++) {
-      free(restarter_buffer[i]);
-    }
-    free(restarter_buffer);
-  #endif // !PIPE_SMASH
-
-  // The second write
-  #ifdef PIPE_SMASH
-    for (i = 0; i < PIPE_LIMIT; i++) {
-      if (replicas[restarter].vot_pipes[i].fd_out != 0) {
-        writeBuffer(replicas[restarter].vot_pipes[i].fd_out, pipe_fill, sizeof(pipe_fill));
-      }
-    }  
-  #endif // PIPE_SMASH
+  // Give the buffers back
+  returnPipes(restartee, restarter_buffer, restarter_buff_count);
+  returnPipes(restarter, restarter_buffer, restarter_buff_count);
+  // free the buffers
+  for (i = 0; i < PIPE_LIMIT; i++) {
+    free(restarter_buffer[i]);
+  }
+  free(restarter_buffer);
 
   #ifdef TIME_RESTART_REPLICA
     timestamp_t end_restart = generate_timestamp();
     printf("Restart time elapsed usec (%lf)\n", diff_time(end_restart, start_restart, CPU_MHZ));
   #endif // TIME_RESTART_REPLICA
-
-  // Clean up by stealing the extra write. Not timed.
-  #ifdef PIPE_SMASH
-    if (restarter_buffer == NULL) {
-      perror("Voter failed to malloc memory");
-    }
-    for (i = 0; i < PIPE_LIMIT; i++) {
-      restarter_buffer[i] = (char *)malloc(sizeof(char) * MAX_VOTE_PIPE_BUFF);
-      if (restarter_buffer[i] == NULL) {
-        perror("Voter failed to allocat memory");
-      }
-    }
-
-    stealPipes(restarter, restarter_buffer, restarter_buff_count);
-    // free the buffers
-    for (i = 0; i < PIPE_LIMIT; i++) {
-      free(restarter_buffer[i]);
-    }
-    free(restarter_buffer);
-  #endif // PIPE_SMASH
 
   return;
 }
@@ -163,7 +119,6 @@ void voterRestartHandler(void) {
       #endif // TIME_RESTART_REPLICA
 
       // Need to cold restart the replica
-      last_dead = replicas[0].pid;
       cleanupReplica(replicas, 0);
 
       startReplicas(replicas, rep_count, &sd, controller_name, ext_pipes, pipe_count, replica_priority);
@@ -187,8 +142,7 @@ void voterRestartHandler(void) {
     }
     case TMR: {
       // The failed rep should be the one behind on the timer pipe
-      int restartee = behindRep(replicas, rep_count, timer_stop_index);
-      //last_dead = replicas[restartee].pid;
+      int restartee = behindRep(replicas, rep_count, timer_stop_index[current_timer]);
       int restarter = (restartee + (rep_count - 1)) % rep_count;
       debug_print("\tPID: %d\n", replicas[restartee].pid);
       restart_prep(restartee, restarter);
@@ -239,37 +193,28 @@ void returnPipes(int rep_num, char **buffer, int *buff_count) {
   }
 }
 
+bool checkSync(void) {
+  int r_index, p_index;
+  bool nsync = true;
+
+  // check each that for each pipe, each replica has the same number of votes
+  for (p_index = 0; p_index < pipe_count; p_index++) {
+    int votes = replicas[0].vot_pipes[p_index].buff_count;
+    for (r_index = 1; r_index < rep_count; r_index++) {
+      if (votes != replicas[r_index].vot_pipes[p_index].buff_count) {
+        nsync = false;
+      }
+    }
+  }
+  return nsync;
+}
+
 void doOneUpdate(void) {
   int p_index, r_index;
   int retval = 0;
 
   struct timeval select_timeout;
   fd_set select_set;
-
-  // TODO: Would this trip for a SMR component that faulted?
-  if (rep_type == SMR) { // Detect replica that self-kills, has no timer (Load does this due to memory leak)
-    #ifdef TIME_WAITPID
-      timestamp_t start_restart = generate_timestamp();
-    #endif // TIME_WAITPID
-
-    // can only waitpid for children (unless subreaper is used (prctl is not POSIX compliant)).
-    int exit_pid = waitpid(-1, NULL, WNOHANG); // Seems to take a while for to clean up zombies
-      
-    #ifdef TIME_WAITPID
-      timestamp_t end_restart = generate_timestamp();
-      if (exit_pid > 0 && exit_pid != last_dead) {
-        printf("Waitpid for %d (%s) took usec (%lf)\n", exit_pid, REP_TYPE_T[rep_type], diff_time(end_restart, start_restart, CPU_MHZ));
-      } else {
-        //printf("No zombie took (%lld)\n", end_restart - start_restart);
-      }
-    #endif // TIME_WAITPID
-
-    if (exit_pid > 0 && exit_pid != last_dead) {
-      debug_print("PID %d exited on its own.\n", exit_pid);
-      voterRestartHandler();
-      timer_started = false;
-    }
-  }
 
   select_timeout.tv_sec = 0;
   select_timeout.tv_usec = 50000;
@@ -291,17 +236,16 @@ void doOneUpdate(void) {
   FD_ZERO(&select_set);
 
   // Check external in pipes
-  if (!timer_started) { // Every pipe must be timed now.
-    for (p_index = 0; p_index < pipe_count; p_index++) {
-      if (ext_pipes[p_index].fd_in != 0) {
-        int e_pipe_fd = ext_pipes[p_index].fd_in;
-        FD_SET(e_pipe_fd, &select_set);
+  bool check_inputs = checkSync();
+  if (check_inputs) {
+    if (!timer_started) {
+      for (p_index = 0; p_index < pipe_count; p_index++) {
+        if (ext_pipes[p_index].fd_in != 0) {
+          int e_pipe_fd = ext_pipes[p_index].fd_in;
+          FD_SET(e_pipe_fd, &select_set);
+        }
       }
     }
-  } else if (voter_priority < 5 && ! timer_started) {
-    // non-RT controller is now lagging behind.
-    timer_started = true;
-    watchdog = generate_timestamp();
   }
 
   // Check pipes from replicas
@@ -367,12 +311,19 @@ void writeBuffer(int fd_out, unsigned char* buffer, int buff_count) {
 void processData(struct vote_pipe *pipe, int pipe_index) {
   int r_index;
 
-  if (pipe_index == timer_start_index) {
-    if (!timer_started) {
+  if (!timer_started) {
+    if (pipe_index == timer_start_index[0]) {
+      current_timer = 0;
+      timer_started = true;
+      watchdog = generate_timestamp();
+    } else if (pipe_index == timer_start_index[1]) {
+      current_timer = 1;
       timer_started = true;
       watchdog = generate_timestamp();
     }
   }
+
+  balanceReps(replicas, rep_count, replica_priority);
 
   for (r_index = 0; r_index < rep_count; r_index++) {
     writeBuffer(replicas[r_index].vot_pipes[pipe_index].fd_out, pipe->buffer, pipe->buff_count);
@@ -386,7 +337,7 @@ void sendPipe(int pipe_num, int replica_num) {
     return;
   }
 
-  if (pipe_num == timer_stop_index) {  
+  if (pipe_num == timer_stop_index[0] || pipe_num == timer_stop_index[1]) {
     // reset the timer
     timer_started = false;
   }
@@ -469,8 +420,21 @@ void checkSDC(int pipe_num) {
 ////////////////////////////////////////////////////////////////////////////////
 // Process output from replica; vote on it
 void processFromRep(int replica_num, int pipe_num) {
+  if (!timer_started) {
+    if (pipe_num == timer_stop_index[0]) {
+      current_timer = 0;
+      timer_started = true;
+      watchdog = generate_timestamp();
+    } else if (pipe_num == timer_stop_index[1]) {
+      current_timer = 1;
+      timer_started = true;
+      watchdog = generate_timestamp();
+    }
+  }
+
   // read from pipe
   if (pipeToBuff(&(replicas[replica_num].vot_pipes[pipe_num])) == 0) {
+    balanceReps(replicas, rep_count, replica_priority);
     checkSDC(pipe_num);
   } else {
     debug_print("Voter - read problem on internal pipe - Controller %s, rep %d, pipe %d\n", controller_name, replica_num, pipe_num);
@@ -573,12 +537,15 @@ int parseArgs(int argc, const char **argv) {
     }
 
     // Need to have a similar setup to associate vote pipe with input?
+    int c_in_pipe = 0, c_out_pipe = 0;
     for (i = 0; i < pipe_count; i++) {
       if (ext_pipes[i].timed) {
         if (ext_pipes[i].fd_in != 0) {
-          timer_start_index = i;
+          timer_start_index[c_in_pipe] = i;
+          c_in_pipe++;
         } else {
-          timer_stop_index = i;
+          timer_stop_index[c_out_pipe] = i;
+          c_out_pipe++;
         }
       }
     }
