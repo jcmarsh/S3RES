@@ -27,8 +27,8 @@
 void printUsage(void) {
 	printf("Usage: ./c_injector <ignored> [controller_name_0 ... controller_name_n]\n");
 	printf("\t'kill -9'\tsend SIGTERM is the current default\n");
-	printf("\t'/bin/kill -s SIGRTMIN+2'\tSimulate Silent Data Corruption (NOT IMPLEMENTED)\n");
-	printf("\t'/bin/kill -s SIGRTMIN+3'\tSimulate Control Flow Error (NOT IMPLEMENTED)\n");
+	printf("\t'/bin/kill -s 37'\tSimulate Silent Data Corruption (NOT IMPLEMENTED)\n");
+	printf("\t'/bin/kill -s 38'\tSimulate Control Flow Error (NOT IMPLEMENTED)\n");
 	printf("If controllers are not specified, assumes: AStar ArtPot Filter Mapper\n");
 }
 

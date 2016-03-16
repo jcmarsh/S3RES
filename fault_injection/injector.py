@@ -1,9 +1,7 @@
 # Should look for (via ps) process that need to die!
 # Should find all eligible pids, then execute specified command.
-# Examples - 
-#  * kill a process at random - python injector.py 'kill -9'
-#  * inject simulated SDC - python injector.py '/bin/kill -s SIGRTMIN+2'
-#  * Use the flip bit program = python injector.py './inject_error'
+# Examples - See usuage message.
+#
 # James Marshall
 
 import random
@@ -26,8 +24,9 @@ def getPIDs(pids, weights, names, cmd):
 if len(sys.argv) < 3:
 	print "Usage: python injector.py <weight?> <command_to_execute> [controller_name_0 ... controller_name_n]"
 	print "\t'kill -9'\tsend SIGTERM"
-	print "\t'/bin/kill -s SIGRTMIN+2'\tSimulate Silent Data Corruption"
-	print "\t'/bin/kill -s SIGRTMIN+3'\tSimulate Control Flow Error"
+	print "\t'/bin/kill -s 37'\tSimulate Silent Data Corruption (see controller.h)"
+	print "\t'/bin/kill -s 38'\tSimulate Control Flow Error"
+	print "\t'./inject_error'\tUse register bit flip injector (not converted to ARM, not tested recently)"
 	print "If controllers are not specified, assumes: AStar ArtPot Filter Mapper"
 	sys.exit()
 
