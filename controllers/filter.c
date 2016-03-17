@@ -87,7 +87,7 @@ void enterLoop(void) {
     if (insertCFE) {
       while (1) { }
     }
-        
+
     select_timeout.tv_sec = 1;
     select_timeout.tv_usec = 0;
 

@@ -282,19 +282,29 @@ void vote(bool timeout_occurred) {
       for (p_index = 0; p_index < out_pipe_count; p_index++) {
         if (memcmp(replicas[0].buffers[p_index], replicas[1].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
           if (memcmp(replicas[0].buffers[p_index], replicas[2].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
+            debug_print("SDC spotted: %d\n", replicas[0].pid);
             fault = true;
             restartee = 0;
           } else {
+            debug_print("SDC spotted: %d\n", replicas[1].pid);
             fault = true;
             restartee = 1;
           }
         } else if (memcmp(replicas[0].buffers[p_index], replicas[2].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
+          debug_print("SDC spotted: %d\n", replicas[2].pid);
           fault = true;
           restartee = 2;
         }
       }
 
       if (!fault) {
+        if (timeout_occurred) {
+          // Timeout but no detectable fault?
+          printf("VoterM is bailing on this now.\n");
+          kill(replicas[0].pid, SIGKILL);
+          kill(replicas[1].pid, SIGKILL);
+          kill(replicas[2].pid, SIGKILL);
+        }
         for (p_index = 0; p_index < out_pipe_count; p_index++) {
           if (replicas[0].buff_counts[p_index] != 0) {
             if (write(ext_out_fds[p_index], replicas[0].buffers[p_index], replicas[0].buff_counts[p_index]) != -1) {
