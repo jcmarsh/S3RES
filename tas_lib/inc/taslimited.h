@@ -5,6 +5,7 @@
 #include "tas_time.h"
 
 int sched_set_policy(const pid_t pid, const int priority);
+int RefreshTAS(void);
 int InitTAS(cpu_id_t cpu, int priority);
 void OptOutRT(void);
 

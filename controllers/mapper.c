@@ -62,7 +62,7 @@ int parseArgs(int argc, const char **argv) {
   pipe_count = atoi(argv[2]); // For now always 3
   if (argc < 6) { // Must request fds
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "Mapper", &pinned_cpu);
+    connectRecvFDS(currentPID, pipes, PIPE_COUNT, "Mapper", &pinned_cpu, &priority);
     //connectRecvFDS(currentPID, pipes, PIPE_COUNT, "MapperTest");
     setPipeIndexes();
   } else {

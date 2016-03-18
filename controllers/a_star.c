@@ -98,7 +98,7 @@ int parseArgs(int argc, const char **argv) {
   if (argc < 6) {
     pid_t currentPID = getpid();
     //connectRecvFDS(currentPID, pipes, PIPE_COUNT, "AStarTest"); // For test purposes
-    connectRecvFDS(currentPID, pipes, pipe_count, name, &pinned_cpu);
+    connectRecvFDS(currentPID, pipes, pipe_count, name, &pinned_cpu, &priority);
     setPipeIndexes();
   } else {
     for (i = 0; (i < argc - 3) && (i < PIPE_COUNT); i++) {

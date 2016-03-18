@@ -183,7 +183,7 @@ void restartReplica(struct replica reps[], int num, struct server_data *sd, stru
   initReplicas(&(reps[restartee]), 1, reps[restarter].name, default_priority);
   createPipes(&(reps[restartee]), 1, ext_pipes, reps[restarter].pipe_count);
   // send new pipe through fd server (should have a request)
-  acceptSendFDS(sd, &(reps[restartee].pid), reps[restartee].rep_pipes, reps[restartee].pipe_count, reps[restartee].pinned_cpu);
+  acceptSendFDS(sd, &(reps[restartee].pid), reps[restartee].rep_pipes, reps[restartee].pipe_count, reps[restartee].pinned_cpu, reps[restartee].priority);
 
   balanceReps(reps, num, default_priority);
 }
@@ -232,7 +232,7 @@ void startReplicas(struct replica reps[], int num, struct server_data *sd, const
   createPipes(reps, num, ext_pipes, pipe_count);
   forkReplicas(reps, num, 0, NULL);
   for (i = 0; i < num; i++) {
-    if (acceptSendFDS(sd, &(reps[i].pid), reps[i].rep_pipes, reps[i].pipe_count,  reps[i].pinned_cpu) < 0) {
+    if (acceptSendFDS(sd, &(reps[i].pid), reps[i].rep_pipes, reps[i].pipe_count,  reps[i].pinned_cpu, reps[i].priority) < 0) {
       puts("EmptyRestart acceptSendFDS call failed\n");
       exit(-1);
     }

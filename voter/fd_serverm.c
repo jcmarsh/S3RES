@@ -51,11 +51,11 @@ struct typed_pipe {
 };
 
 // rep_info_in and rep_info_out needed.
-int sendFDS(int connection_fd, struct replicaR * rep, char **rep_info_in, char **rep_info_out, int pinned_cpu) { // pipes are the rep side
+int sendFDS(int connection_fd, struct replicaR * rep, char **rep_info_in, char **rep_info_out, int pinned_cpu, int priority) { // pipes are the rep side
   int i, p_index = 0;
   int pipe_count = rep->in_pipe_count + rep->out_pipe_count;
   struct msghdr hdr;
-  struct iovec datas[2];
+  struct iovec datas[3];
 
   // cmsg is the out-of-band data (fds)
   char cmsgbuf[CMSG_SPACE(sizeof(int) * (pipe_count))];
@@ -81,11 +81,14 @@ int sendFDS(int connection_fd, struct replicaR * rep, char **rep_info_in, char *
   datas[1].iov_base = &pinned_cpu;
   datas[1].iov_len = sizeof(pinned_cpu);
 
+  datas[2].iov_base = &priority;
+  datas[2].iov_len = sizeof(priority);
+
   memset(&hdr, 0, sizeof(hdr));
   hdr.msg_name = NULL;
   hdr.msg_namelen = 0;
   hdr.msg_iov = datas;
-  hdr.msg_iovlen =  2; // number of iovec items in datas
+  hdr.msg_iovlen =  3; // number of iovec items in datas
   hdr.msg_flags = 0;
 
   hdr.msg_control = cmsgbuf;
@@ -184,7 +187,7 @@ int acceptSendFDS(struct server_data * sd, struct replicaR * rep, char **rep_inf
   connection_fd = accept(sd->sock_fd, (struct sockaddr *) &(sd->address), &(sd->address_length));
   if (connection_fd > -1) {
     // send read end to client
-    if (sendFDS(connection_fd, rep, rep_info_in, rep_info_out, rep->pinned_cpu) < 0) {
+    if (sendFDS(connection_fd, rep, rep_info_in, rep_info_out, rep->pinned_cpu, rep->priority) < 0) {
       debug_print("FD_ServerR failed to sendFDS.\n");
       retval = -1;
       goto accept_send_FDS_out;

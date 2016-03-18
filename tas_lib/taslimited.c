@@ -85,6 +85,19 @@ void call_setrlimit(int id, rlim_t c, rlim_t m)
   }
 }
 
+int RefreshTAS(void) {
+  if (lockItUp() != 0) {
+    puts("(voter_d_driver) InitTAS() failed calling lockItUp()\n" );
+  }
+
+  // Walk current memory to get it paged in
+  if (forceMaps() != 0) {
+    puts("(voter_d_driver) InitTAS() failed calling forceMaps()\n" );
+  }
+
+  return 0;
+}
+
 int InitTAS(cpu_id_t cpu, int priority) {
   pid_t pid;
   int result;
@@ -109,16 +122,5 @@ int InitTAS(cpu_id_t cpu, int priority) {
     perror("\tperror");
   }
 
-  // Used to be a separate function. Lock memory may not always be desired with above functions.
-  // lock current and future memory
-  if (lockItUp() != 0) {
-    puts("(voter_d_driver) InitTAS() failed calling lockItUp()\n" );
-  }
-
-  // Walk current memory to get it paged in
-  if (forceMaps() != 0) {
-    puts("(voter_d_driver) InitTAS() failed calling forceMaps()\n" );
-  }
-
-  return 0;
+  return RefreshTAS();
 }

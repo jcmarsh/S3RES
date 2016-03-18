@@ -11,4 +11,4 @@
 #include <sys/socket.h>
 #include <stdlib.h>
 
-int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const char* name, int* pinned_cpu);
+int connectRecvFDS(pid_t pid, struct typed_pipe *pipes, int pipe_count, const char *name, int *pinned_cpu, int * priority);

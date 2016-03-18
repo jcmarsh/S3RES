@@ -26,7 +26,6 @@ struct replicaR *for_reps;
 
 // TAS Stuff
 int voter_priority;
-int replica_priority;
 
 // FD server
 struct server_data sd;
@@ -166,11 +165,34 @@ void sendCollect() {
   vote(timeout_occurred);
 }
 
+int behindRep(void) {
+  int lowest_score = out_pipe_count; // output on every pipe is max score
+  int r_index, p_index;
+  int fault_index = 0;
+
+  for (r_index = 0; r_index < rep_count; r_index++) {
+    int rep_score = 0;
+    // each pipe with output is counted as '1', assuming no partial writes (or multiples)
+    for (p_index = 0; p_index < out_pipe_count; p_index++) {
+      if (replicas[r_index].buff_counts[p_index] > 0) {
+        rep_score++;
+      }
+    }
+    if (rep_score < lowest_score) {
+      // Replicas with a lower index have a higher priority, so '<' makes priority the tie-breaker.
+      fault_index = r_index;
+      lowest_score = rep_score;
+    }
+  }
+
+  return fault_index;
+}
+
 // This function will have to deal with some reps having failed (from sdc, or timeout)
 void vote(bool timeout_occurred) {
   // Should check for all available output, vote on each and send.
   int p_index;
-  int restarter, restartee;
+  int restarter, fault_index;
   bool fault = false;
 
   switch (rep_count) {
@@ -198,27 +220,22 @@ void vote(bool timeout_occurred) {
       }
       return;
     case 2: ; // DMR
-      // Can detect, and check what to do
-      // if buff counts don't match: timeout or exec error... unless sdc caused one rep to output
-      for (p_index = 0; p_index < out_pipe_count; p_index++) {
-        if (replicas[0].buff_counts[p_index] != replicas[1].buff_counts[p_index]) {
-          if (replicas[0].buff_counts[p_index] > replicas[1].buff_counts[p_index]) {
+      if (timeout_occurred) {
+        // Execution error or control flow error.
+        fault_index = behindRep();
+        fault = true;
+      } else {
+        // Can only detect SDCs
+        for (p_index = 0; p_index < out_pipe_count; p_index++) {
+          if (replicas[0].buff_counts[p_index] != replicas[1].buff_counts[p_index]) {
             fault = true;
-            restartee = 1;
-          } else {
+            fault_index = 0; // Take a guess, 50 / 50 shot right?
+          } else if (memcmp(replicas[0].buffers[p_index], replicas[1].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
             fault = true;
-            restartee = 0;
+            fault_index = 0; // Take a guess, 50 / 50 shot right?
           }
         }
       }
-
-      // Should skipped if already found
-      /*
-      for (p_index = 0; p_index < out_pipe_count; p_index++) {
-        if (memcmp(replicas[0].buffers[p_index], replicas[1].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
-          // SDC found... but what to do?
-        }
-      } */
 
       if (!fault) {
         for (p_index = 0; p_index < out_pipe_count; p_index++) {
@@ -231,16 +248,16 @@ void vote(bool timeout_occurred) {
         }
       } else {
         debug_print("VoterM trying to handle DMR recovery. Timeout? %d\n", timeout_occurred);
-        restarter = (restartee + (rep_count - 1)) % rep_count;
-        debug_print("\tRestartee: %d - %d\t Restarter: %d - %d\n", restartee, replicas[restartee].pid, restarter, replicas[restarter].pid);
+        restarter = (fault_index + (rep_count - 1)) % rep_count;
+        debug_print("\tRestartee: %d - %d\t Restarter: %d - %d\n", fault_index, replicas[fault_index].pid, restarter, replicas[restarter].pid);
 
         // kill restartee
-        kill(replicas[restartee].pid, SIGKILL);
+        kill(replicas[fault_index].pid, SIGKILL);
         // kill (signal) restarter
         kill(replicas[restarter].pid, RESTART_SIGNAL);
 
         // start restartee
-        startReplicas(false, restartee, 1);
+        startReplicas(false, fault_index, 1);
 
         // Recovery should be done. Send data.
         for (p_index = 0; p_index < out_pipe_count; p_index++) {
@@ -260,51 +277,54 @@ void vote(bool timeout_occurred) {
       return;
     case 3: ;// TMR
       // Send the solution that at least two agree on
-      // TODO: Should stop searching for faults once one is found
-      for (p_index = 0; p_index < out_pipe_count; p_index++) {
-        if (replicas[0].buff_counts[p_index] != replicas[1].buff_counts[p_index]) {
-          if (replicas[0].buff_counts[p_index] != replicas[2].buff_counts[p_index]) {
-            debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[0].pid, replicas[0].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
+      if (timeout_occurred) {
+        // Timeout exceeded: Execution fault or control flow fault.
+        // Fault is with the rep most behind (priority tie-breaker)
+        fault_index = behindRep();
+        debug_print("BehindRep is %d\n", fault_index);
+        fault = true;
+      } else {
+        // Need to check for SDC
+        for (p_index = 0; p_index < out_pipe_count; p_index++) {
+          if (replicas[0].buff_counts[p_index] != replicas[1].buff_counts[p_index]) {
+            if (replicas[0].buff_counts[p_index] != replicas[2].buff_counts[p_index]) {
+              debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[0].pid, replicas[0].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
+              fault = true;
+              fault_index = 0;
+            } else {
+              debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[0].pid, replicas[0].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
+              fault = true;
+              fault_index = 1;
+            }
+          } else if(replicas[0].buff_counts[p_index] != replicas[2].buff_counts[p_index]) {
+            debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[2].pid, replicas[2].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
             fault = true;
-            restartee = 0;
-          } else {
-            debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[0].pid, replicas[0].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
-            fault = true;
-            restartee = 1;
+            fault_index = 2;
           }
-        } else if(replicas[0].buff_counts[p_index] != replicas[2].buff_counts[p_index]) {
-          debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[2].pid, replicas[2].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
-          fault = true;
-          restartee = 2;
         }
-      }
 
-      for (p_index = 0; p_index < out_pipe_count; p_index++) {
-        if (memcmp(replicas[0].buffers[p_index], replicas[1].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
-          if (memcmp(replicas[0].buffers[p_index], replicas[2].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
-            debug_print("SDC spotted: %d\n", replicas[0].pid);
-            fault = true;
-            restartee = 0;
-          } else {
-            debug_print("SDC spotted: %d\n", replicas[1].pid);
-            fault = true;
-            restartee = 1;
+        if (!fault) {
+          for (p_index = 0; p_index < out_pipe_count; p_index++) {
+            if (memcmp(replicas[0].buffers[p_index], replicas[1].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
+              if (memcmp(replicas[0].buffers[p_index], replicas[2].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
+                debug_print("SDC spotted: %d\n", replicas[0].pid);
+                fault = true;
+                fault_index = 0;
+              } else {
+                debug_print("SDC spotted: %d\n", replicas[1].pid);
+                fault = true;
+                fault_index = 1;
+              }
+            } else if (memcmp(replicas[0].buffers[p_index], replicas[2].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
+              debug_print("SDC spotted: %d\n", replicas[2].pid);
+              fault = true;
+              fault_index = 2;
+            }
           }
-        } else if (memcmp(replicas[0].buffers[p_index], replicas[2].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
-          debug_print("SDC spotted: %d\n", replicas[2].pid);
-          fault = true;
-          restartee = 2;
         }
       }
 
       if (!fault) {
-        if (timeout_occurred) {
-          // Timeout but no detectable fault?
-          printf("VoterM is bailing on this now.\n");
-          kill(replicas[0].pid, SIGKILL);
-          kill(replicas[1].pid, SIGKILL);
-          kill(replicas[2].pid, SIGKILL);
-        }
         for (p_index = 0; p_index < out_pipe_count; p_index++) {
           if (replicas[0].buff_counts[p_index] != 0) {
             if (write(ext_out_fds[p_index], replicas[0].buffers[p_index], replicas[0].buff_counts[p_index]) != -1) {
@@ -315,16 +335,16 @@ void vote(bool timeout_occurred) {
         }
       } else {
         debug_print("VoterM trying to handle TMR recovery. Timeout? %d, Component %s\n", timeout_occurred, controller_name);
-        restarter = (restartee + (rep_count - 1)) % rep_count;
-        debug_print("\tRestartee: %d - %d\t Restarter: %d - %d\n", restartee, replicas[restartee].pid, restarter, replicas[restarter].pid);
+        restarter = (fault_index + (rep_count - 1)) % rep_count;
+        debug_print("\tRestartee: %d - %d\t Restarter: %d - %d\n", fault_index, replicas[fault_index].pid, restarter, replicas[restarter].pid);
 
         // kill restartee
-        kill(replicas[restartee].pid, SIGKILL);
+        kill(replicas[fault_index].pid, SIGKILL);
         // kill (signal) restarter
         kill(replicas[restarter].pid, RESTART_SIGNAL);
 
         // start restartee
-        startReplicas(false, restartee, 1);
+        startReplicas(false, fault_index, 1);
 
         // Recovery should be done. Send data.
         for (p_index = 0; p_index < out_pipe_count; p_index++) {
@@ -362,15 +382,15 @@ void forkReplicas(int rep_index, int rep_count) {
     // rep_priority may be + or -, but less than 3 digits.
     rep_argv[1] = (char *) malloc(sizeof(char) * 4); // 3 + null?
     str_index = 0;
-    if (replica_priority < 0) {
+    if (replicas[index].priority < 0) {
       rep_argv[1][str_index++] = '-';
     }
-    if (replica_priority / 10.0 > 0) {
-      rep_argv[1][str_index++] = 48 + (replica_priority / 10);
+    if (replicas[index].priority / 10.0 > 0) {
+      rep_argv[1][str_index++] = 48 + (replicas[index].priority / 10);
     }
-    rep_argv[1][str_index++] = 48 + (replica_priority % 10);
+    rep_argv[1][str_index++] = 48 + (replicas[index].priority % 10);
     rep_argv[1][str_index] = 0;
-    debug_print("CONVERTED %d to %s\n", replica_priority, rep_argv[1]);
+    debug_print("CONVERTED %d to %s\n", replicas[index].priority, rep_argv[1]);
 
     // pipe_count will always be positive, and no more than 2 digits.
     rep_argv[2] = (char *) malloc(sizeof(char) * 3); // 2 + null
@@ -380,7 +400,7 @@ void forkReplicas(int rep_index, int rep_count) {
     }
     rep_argv[2][str_index++] = 48 + ((in_pipe_count + out_pipe_count) % 10);
     rep_argv[2][str_index] = 0;
-    debug_print("CONVERTED %d to %s\n", (in_pipe_count + out_pipe_count), rep_argv[2]);
+    //debug_print("CONVERTED %d to %s\n", (in_pipe_count + out_pipe_count), rep_argv[2]);
 
     rep_argv[3] = NULL;
 
@@ -436,13 +456,11 @@ void startReplicas(bool forking, int rep_index, int rep_count) {
     }
   }
 
-  //forkReplicas(reps, num, 0, NULL);
-  if (forking) {
-    forkReplicas(rep_index, rep_count);
-  }
-
   // Give the replicas their pipes (same method as restart)
   for (index = rep_index; index < rep_index + rep_count; index++) {
+    if (forking) {
+      forkReplicas(index, 1); // Fork one at a time.
+    }
     int pid = acceptSendFDS(&sd, &for_reps[index], rep_info_in, rep_info_out);
     if (pid < 0) {
       debug_print("VoterM's acceptSendFDS call failed\n");
@@ -460,8 +478,6 @@ void startReplicas(bool forking, int rep_index, int rep_count) {
 ////////////////////////////////////////////////////////////////////////////////
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
 int initVoterM(void) {
-  replica_priority = voter_priority - VOTER_PRIO_OFFSET;
-
   // Setup fd server
   createFDS(&sd, controller_name);
 
@@ -470,6 +486,8 @@ int initVoterM(void) {
   replicas = (struct replicaR *) malloc(sizeof(struct replicaR) * rep_count);
   for_reps = (struct replicaR *) malloc(sizeof(struct replicaR) * rep_count);
   for (index = 0; index < rep_count; index++) {
+    replicas[index].priority = voter_priority - (1 + index);
+    for_reps[index].priority = voter_priority - (1 + index);
     if (CONTROLLER_PIN == QUAD_PIN_POLICY) {
       replicas[index].pinned_cpu = index + 1; // TODO: don't need both
       for_reps[index].pinned_cpu = index + 1;

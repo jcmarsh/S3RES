@@ -31,6 +31,7 @@ struct server_data {
 // Represents one redundant execution, implemented as a process
 struct replicaR {
   int pinned_cpu;
+  int priority;
   pid_t pid;
   // list of connections
   // Uses the same format as the plumber

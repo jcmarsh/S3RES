@@ -7,13 +7,12 @@
 
 // All extern here must be in the controller code (such as art_pot.c)
 extern void setPipeIndexes(void);
-extern void enterLoop(void);
 
-extern int priority;
 extern int pipe_count;
 extern struct typed_pipe pipes[];
 extern const char* name;
 extern int pinned_cpu;
+extern int priority;
 
 extern bool insertSDC;
 extern bool insertCFE;
@@ -95,18 +94,18 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
 
       // Get own pid, send to voter
       currentPID = getpid();
-      if (connectRecvFDS(currentPID, pipes, pipe_count, name, &pinned_cpu) < 0) {
+      if (connectRecvFDS(currentPID, pipes, pipe_count, name, &pinned_cpu, &priority) < 0) {
         debug_print("Error in %s: failed connectRecvFDS call.\n", name);
         return;
       }
 
       InitTAS(pinned_cpu, priority);
-      
+
       setPipeIndexes();
       
       return;
     } else {   // Parent needs to re-lock / walk own pages
-      InitTAS(pinned_cpu, priority);
+      RefreshTAS();
       return;
     }
   } else {

@@ -51,7 +51,7 @@ int parseArgs(int argc, const char **argv) {
   if (argc < 5) { // Must request fds
     // printf("Usage: Filter <priority> <pipe_num> <pipe_in> <pipe_out_0> <pipe_out_1>\n");
     pid_t currentPID = getpid();
-    connectRecvFDS(currentPID, pipes, pipe_count, name, &pinned_cpu);
+    connectRecvFDS(currentPID, pipes, pipe_count, name, &pinned_cpu, &priority);
   } else {
     deserializePipe(argv[3], &pipes[data_index]);
     for (i = 4; i < 4 + pipe_count - 1; i++) {
