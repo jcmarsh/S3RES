@@ -53,8 +53,6 @@ int acceptSendFDS(struct server_data * sd, struct replicaR * rep, char **rep_inf
 // int -> recv -> sendCollect -> vote -> output -> recv
 //                               |-> recover -^
 int  initVoterD(void);
-void recvData(void);
-void sendCollect(void);
-void vote(bool timeout_occurred);
-void recover(void);
-void output(void);
+bool recvData(void);
+bool sendCollect(void);
+bool vote(void);

@@ -48,7 +48,7 @@ char **rep_info_out;
 
 void startReplicas(bool forking, int rep_index, int rep_count);
 
-void recvData(void) {
+bool recvData(void) {
   int p_index;
   int retval = 0;
 
@@ -84,15 +84,17 @@ void recvData(void) {
   }
 
   if (-1 == active_index) {
-    return; // Will loop back to start of function
+    return false; // Will loop back to start of function
   } else {
-    sendCollect();
+    return true;;
   }
 }
 
-void sendCollect() {
+
+bool timeout_occurred;
+bool sendCollect() {
+  timeout_occurred = false;
   int p_index, r_index, retval;
-  bool timeout_occurred = false;
   fd_set select_set;
   struct timeval select_timeout;
 
@@ -115,7 +117,7 @@ void sendCollect() {
     }
   }
   if (!waiting) {
-    return;
+    return false; // No voting
   }
 
   bool done = false;
@@ -162,7 +164,7 @@ void sendCollect() {
     } //for replica
   } // while !done
 
-  vote(timeout_occurred);
+  return true; // Means vote!
 }
 
 int behindRep(void) {
@@ -189,7 +191,7 @@ int behindRep(void) {
 }
 
 // This function will have to deal with some reps having failed (from sdc, or timeout)
-void vote(bool timeout_occurred) {
+bool vote(void) {
   // Should check for all available output, vote on each and send.
   int p_index;
   int restarter, fault_index;
@@ -216,9 +218,9 @@ void vote(bool timeout_occurred) {
         startReplicas(true, 0, rep_count);
 
         // Send old data to the new replica
-        sendCollect();
+        return true; // need to rerun sendCollect();
       }
-      return;
+      return false;
     case 2: ; // DMR
       if (timeout_occurred) {
         // Execution error or control flow error.
@@ -274,7 +276,7 @@ void vote(bool timeout_occurred) {
         replicas[0].buff_counts[p_index] = 0;
         replicas[1].buff_counts[p_index] = 0;
       }
-      return;
+      return false;
     case 3: ;// TMR
       // Send the solution that at least two agree on
       if (timeout_occurred) {
@@ -347,6 +349,7 @@ void vote(bool timeout_occurred) {
         startReplicas(false, fault_index, 1);
 
         // Recovery should be done. Send data.
+        // Needs to deal with the possibility that none of the replicas have finished running...
         for (p_index = 0; p_index < out_pipe_count; p_index++) {
           if (replicas[restarter].buff_counts[p_index] != 0) {
             if (write(ext_out_fds[p_index], replicas[restarter].buffers[p_index], replicas[restarter].buff_counts[p_index]) != -1) {
@@ -364,6 +367,7 @@ void vote(bool timeout_occurred) {
       }
     // switch case statement
   }
+  return false;
 }
 
 void forkReplicas(int rep_index, int rep_count) {
@@ -661,7 +665,17 @@ int main(int argc, const char **argv) {
   }
 
   while(1) {
-    recvData();
+    if (recvData()) {
+      if (sendCollect()) {
+        if (vote()) {
+          // should only need to call at most twice
+          // For example, SMR rep crashes, discover on first vote, rerun sendcollect, and vote again.
+          if (sendCollect()) {
+            vote();
+          }
+        }
+      }
+    }
   }
 
   return 0;
