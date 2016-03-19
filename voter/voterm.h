@@ -50,9 +50,13 @@ int createFDS(struct server_data * sd, const char* name);
 int acceptSendFDS(struct server_data * sd, struct replicaR * rep, char **rep_info_in, char **rep_info_out);
 
 // VoterR Functions
-// int -> recv -> sendCollect -> vote -> output -> recv
-//                               |-> recover -^
 int  initVoterD(void);
-bool recvData(void);
-bool sendCollect(void);
-bool vote(void);
+
+bool recvData(void);   // sets active_pipe_index (pipe data came in on)
+bool sendToReps(void); // sends data to replica in pipe[active_pipe_index]
+int  collectFromReps(bool set_timer, int rep_count); // returns number of reps that are done. Set timer and wait for rep_count responses
+bool checkSDC(void);   // checkSDC will have to kill faulty replicas on its own and set fault_index
+// void restartReplica(void); // restarts fault_index
+void startReplicas(bool forking, int rep_index, int rep_count); // existing function, also used in initial startup
+void sendData(int rep_to_send); // sends data from (TODO: Which rep?) out of voter. Reset all state for next loop
+void findFaultReplica(void);    // set fault_index

@@ -42,15 +42,16 @@ unsigned int * ext_in_fds; // should in_pipe_count of these
 char **rep_info_in;
 int ext_in_bufcnt = 0;
 unsigned char ext_in_buffer[MAX_PIPE_BUFF];
-int active_index;
 unsigned int * ext_out_fds; // should out_pipe_count of these
 char **rep_info_out;
 
-void startReplicas(bool forking, int rep_index, int rep_count);
-
+// sets active_pipe_index (pipe data came in on)
+int active_pipe_index;
 bool recvData(void) {
   int p_index;
   int retval = 0;
+
+  active_pipe_index = -1;
 
   struct timeval select_timeout;
   fd_set select_set;
@@ -67,14 +68,13 @@ bool recvData(void) {
   // This will wait at least timeout until return. Returns earlier if something has data.
   retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
 
-  active_index = -1;
   if (retval > 0) {    
     // Check for data from external sources
     for (p_index = 0; p_index < in_pipe_count; p_index++) {
       if (FD_ISSET(ext_in_fds[p_index], &select_set)) {
         ext_in_bufcnt = read(ext_in_fds[p_index], ext_in_buffer, MAX_PIPE_BUFF);
         if (ext_in_bufcnt > 0) {
-          active_index = p_index;
+          active_pipe_index = p_index;
           break;
         } else {
           debug_print("VoterM - read on external pipe error - Controller %s pipe %d\n", controller_name, p_index);
@@ -83,45 +83,52 @@ bool recvData(void) {
     }
   }
 
-  if (-1 == active_index) {
+  if (-1 == active_pipe_index) {
     return false; // Will loop back to start of function
   } else {
     return true;;
   }
 }
 
-
-bool timeout_occurred;
-bool sendCollect() {
-  timeout_occurred = false;
+// sends data to replica in pipe[active_pipe_index]
+bool sendToReps(void) {
   int p_index, r_index, retval;
-  fd_set select_set;
-  struct timeval select_timeout;
-
-  // Timers are once again for ALL replicas... sigh.
-  // All input / outputs are timed now.
-  watchdog = generate_timestamp();
 
   // send data to all replicas
   for (r_index = 0; r_index < rep_count; r_index++) {
-    retval = write(replicas[r_index].fd_ins[active_index], ext_in_buffer, ext_in_bufcnt);
+    retval = write(replicas[r_index].fd_ins[active_pipe_index], ext_in_buffer, ext_in_bufcnt);
     if (retval != ext_in_bufcnt) {
       debug_print("Voter writeBuffer failed.\n");
     }
   }
 
+  // If input is on a non-timed pipe (ex. comm_ack into mapper), do not wait for data to be returned.
   bool waiting = false;
   for (p_index = 0; p_index < indexed_pipes; p_index++) {
-    if (active_index == timer_start_index[p_index]) {
+    if (active_pipe_index == timer_start_index[p_index]) {
       waiting = true;
     }
   }
   if (!waiting) {
-    return false; // No voting
+    return false; // Not a timed pipe
   }
 
-  bool done = false;
+  return true;
+}
+
+// returns number of reps that are done. Set timer and wait for expected responses
+bool timeout_occurred;
+int  collectFromReps(bool set_timer, int expected) {
+  int p_index, r_index, retval;
+  fd_set select_set;
+  struct timeval select_timeout;
+  timeout_occurred = false;
   int rep_done = 0;
+
+  // Timers are once again for ALL replicas, because I don't know how to do per rep with quad core
+  watchdog = generate_timestamp();
+
+  bool done = false;
   while(!done) {
     // Select, but only over outgoing pipes from the replicas
     FD_ZERO(&select_set);
@@ -131,21 +138,25 @@ bool sendCollect() {
       }
     }
 
-    timestamp_t current = generate_timestamp();
-    long remaining = voting_timeout - diff_time(current, watchdog, CPU_MHZ);
-    if (remaining > 0) {
+    if (set_timer) {
+      timestamp_t current = generate_timestamp();
+      long remaining = voting_timeout - diff_time(current, watchdog, CPU_MHZ);
+      if (remaining > 0) {
+        select_timeout.tv_sec = 0;
+        select_timeout.tv_usec = remaining;
+      } else { // Timeout detected
+        timeout_occurred = true;
+        break; // while(!done)
+      }
+    } else {
       select_timeout.tv_sec = 0;
-      select_timeout.tv_usec = remaining;
-    } else { // Timeout
-      timeout_occurred = true;
-      break; // while(!done)
+      select_timeout.tv_usec = 50000;
     }
 
     retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     for (r_index = 0; r_index < rep_count; r_index++) {
       for (p_index = 0; p_index < out_pipe_count; p_index++) {
         if (FD_ISSET(replicas[r_index].fd_outs[p_index], &select_set)) {
-          // TODO: Need to deal with different pipes being timed?
           replicas[r_index].buff_counts[p_index] = read(replicas[r_index].fd_outs[p_index], replicas[r_index].buffers[p_index], MAX_PIPE_BUFF);
 
           // If the non-timed pipe outputs multiple times, only the last will be saved.
@@ -153,9 +164,9 @@ bool sendCollect() {
             debug_print("Voter - read problem on internal pipe - Controller %s, rep %d, pipe %d\n", controller_name, r_index, p_index);
           }
 
-          if (p_index == timer_stop_index[active_index]) {
+          if (p_index == timer_stop_index[active_pipe_index]) {
             rep_done++;
-            if (rep_done == rep_count) {
+            if (rep_done == expected) {
               done = true; // All timed pipe calls are in. Off to voting.
             }
           }
@@ -164,13 +175,18 @@ bool sendCollect() {
     } //for replica
   } // while !done
 
-  return true; // Means vote!
+  return rep_done;
 }
 
-int behindRep(void) {
+// A timeout was detected, which rep has not yet responded?
+// On quad core this is easy, since only the frozen rep will have failed to respond.
+// On a single core system, a high priority rep could have locked up and prevent all other reps from running.
+int fault_index;
+void findFaultReplica(void) {
   int lowest_score = out_pipe_count; // output on every pipe is max score
   int r_index, p_index;
-  int fault_index = 0;
+
+  fault_index = 0;
 
   for (r_index = 0; r_index < rep_count; r_index++) {
     int rep_score = 0;
@@ -186,188 +202,98 @@ int behindRep(void) {
       lowest_score = rep_score;
     }
   }
-
-  return fault_index;
 }
 
-// This function will have to deal with some reps having failed (from sdc, or timeout)
-bool vote(void) {
+// checkSDC will have to kill faulty replicas on its own and set fault_index
+bool checkSDC(void) { // returns true if SDC was found
   // Should check for all available output, vote on each and send.
   int p_index;
-  int restarter, fault_index;
+  int restarter;
   bool fault = false;
 
   switch (rep_count) {
     case 1: ; // SMR
-      if (!timeout_occurred) {
-        for (p_index = 0; p_index < out_pipe_count; p_index++) {
-          if (replicas[0].buff_counts[p_index] != 0) {
-            if (write(ext_out_fds[p_index], replicas[0].buffers[p_index], replicas[0].buff_counts[p_index]) != -1) {
-              replicas[0].buff_counts[p_index] = 0;
-            } else {
-              debug_print("VoterM write failed.\n");
-            }
-          }
-        }
-      } else {
-        debug_print("Restarting SMR component: %s\n", controller_name);
-        for (p_index = 0; p_index < out_pipe_count; p_index++) {
-          replicas[0].buff_counts[p_index] = 0;
-        }
-
-        startReplicas(true, 0, rep_count);
-
-        // Send old data to the new replica
-        return true; // need to rerun sendCollect();
-      }
-      return false;
+      break;
     case 2: ; // DMR
-      if (timeout_occurred) {
-        // Execution error or control flow error.
-        fault_index = behindRep();
-        fault = true;
-      } else {
-        // Can only detect SDCs
-        for (p_index = 0; p_index < out_pipe_count; p_index++) {
-          if (replicas[0].buff_counts[p_index] != replicas[1].buff_counts[p_index]) {
-            fault = true;
-            fault_index = 0; // Take a guess, 50 / 50 shot right?
-          } else if (memcmp(replicas[0].buffers[p_index], replicas[1].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
-            fault = true;
-            fault_index = 0; // Take a guess, 50 / 50 shot right?
-          }
-        }
-      }
-
-      if (!fault) {
-        for (p_index = 0; p_index < out_pipe_count; p_index++) {
-          if (replicas[0].buff_counts[p_index] != 0) {
-            if (write(ext_out_fds[p_index], replicas[0].buffers[p_index], replicas[0].buff_counts[p_index]) != -1) {
-            } else {
-              debug_print("VoterM write failed.\n");
-            }
-          }
-        }
-      } else {
-        debug_print("VoterM trying to handle DMR recovery. Timeout? %d\n", timeout_occurred);
-        restarter = (fault_index + (rep_count - 1)) % rep_count;
-        debug_print("\tRestartee: %d - %d\t Restarter: %d - %d\n", fault_index, replicas[fault_index].pid, restarter, replicas[restarter].pid);
-
-        // kill restartee
-        kill(replicas[fault_index].pid, SIGKILL);
-        // kill (signal) restarter
-        kill(replicas[restarter].pid, RESTART_SIGNAL);
-
-        // start restartee
-        startReplicas(false, fault_index, 1);
-
-        // Recovery should be done. Send data.
-        for (p_index = 0; p_index < out_pipe_count; p_index++) {
-          if (replicas[restarter].buff_counts[p_index] != 0) {
-            if (write(ext_out_fds[p_index], replicas[restarter].buffers[p_index], replicas[restarter].buff_counts[p_index]) != -1) {
-            } else {
-              debug_print("VoterM write failed.\n");
-            }
-          }
-        }
-      }
-
+      // Can only detect SDCs
       for (p_index = 0; p_index < out_pipe_count; p_index++) {
-        replicas[0].buff_counts[p_index] = 0;
-        replicas[1].buff_counts[p_index] = 0;
+        if (replicas[0].buff_counts[p_index] != replicas[1].buff_counts[p_index]) {
+          fault = true;
+          fault_index = 0; // Take a guess, 50 / 50 shot right?
+        } else if (memcmp(replicas[0].buffers[p_index], replicas[1].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
+          fault = true;
+          fault_index = 0; // Take a guess, 50 / 50 shot right?
+        }
       }
-      return false;
+      break;
     case 3: ;// TMR
       // Send the solution that at least two agree on
-      if (timeout_occurred) {
-        // Timeout exceeded: Execution fault or control flow fault.
-        // Fault is with the rep most behind (priority tie-breaker)
-        fault_index = behindRep();
-        debug_print("BehindRep is %d\n", fault_index);
-        fault = true;
-      } else {
-        // Need to check for SDC
+      // Check buffer counts
+      for (p_index = 0; p_index < out_pipe_count; p_index++) {
+        if (replicas[0].buff_counts[p_index] != replicas[1].buff_counts[p_index]) {
+          if (replicas[0].buff_counts[p_index] != replicas[2].buff_counts[p_index]) {
+            debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[0].pid, replicas[0].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
+            fault = true;
+            fault_index = 0;
+          } else {
+            debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[0].pid, replicas[0].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
+            fault = true;
+            fault_index = 1;
+          }
+        } else if(replicas[0].buff_counts[p_index] != replicas[2].buff_counts[p_index]) {
+          debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[2].pid, replicas[2].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
+          fault = true;
+          fault_index = 2;
+        }
+      }
+
+      // check buffer contents
+      if (!fault) {
         for (p_index = 0; p_index < out_pipe_count; p_index++) {
-          if (replicas[0].buff_counts[p_index] != replicas[1].buff_counts[p_index]) {
-            if (replicas[0].buff_counts[p_index] != replicas[2].buff_counts[p_index]) {
-              debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[0].pid, replicas[0].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
+          if (memcmp(replicas[0].buffers[p_index], replicas[1].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
+            if (memcmp(replicas[0].buffers[p_index], replicas[2].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
+              debug_print("SDC spotted: %d\n", replicas[0].pid);
               fault = true;
               fault_index = 0;
             } else {
-              debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[0].pid, replicas[0].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
+              debug_print("SDC spotted: %d\n", replicas[1].pid);
               fault = true;
               fault_index = 1;
             }
-          } else if(replicas[0].buff_counts[p_index] != replicas[2].buff_counts[p_index]) {
-            debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[2].pid, replicas[2].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
+          } else if (memcmp(replicas[0].buffers[p_index], replicas[2].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
+            debug_print("SDC spotted: %d\n", replicas[2].pid);
             fault = true;
             fault_index = 2;
           }
         }
-
-        if (!fault) {
-          for (p_index = 0; p_index < out_pipe_count; p_index++) {
-            if (memcmp(replicas[0].buffers[p_index], replicas[1].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
-              if (memcmp(replicas[0].buffers[p_index], replicas[2].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
-                debug_print("SDC spotted: %d\n", replicas[0].pid);
-                fault = true;
-                fault_index = 0;
-              } else {
-                debug_print("SDC spotted: %d\n", replicas[1].pid);
-                fault = true;
-                fault_index = 1;
-              }
-            } else if (memcmp(replicas[0].buffers[p_index], replicas[2].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
-              debug_print("SDC spotted: %d\n", replicas[2].pid);
-              fault = true;
-              fault_index = 2;
-            }
-          }
-        }
       }
+      break;
+  } // switch(rep_count)
 
-      if (!fault) {
-        for (p_index = 0; p_index < out_pipe_count; p_index++) {
-          if (replicas[0].buff_counts[p_index] != 0) {
-            if (write(ext_out_fds[p_index], replicas[0].buffers[p_index], replicas[0].buff_counts[p_index]) != -1) {
-            } else {
-              debug_print("VoterM write failed.\n");
-            }
-          }
-        }
-      } else {
-        debug_print("VoterM trying to handle TMR recovery. Timeout? %d, Component %s\n", timeout_occurred, controller_name);
-        restarter = (fault_index + (rep_count - 1)) % rep_count;
-        debug_print("\tRestartee: %d - %d\t Restarter: %d - %d\n", fault_index, replicas[fault_index].pid, restarter, replicas[restarter].pid);
-
-        // kill restartee
-        kill(replicas[fault_index].pid, SIGKILL);
-        // kill (signal) restarter
-        kill(replicas[restarter].pid, RESTART_SIGNAL);
-
-        // start restartee
-        startReplicas(false, fault_index, 1);
-
-        // Recovery should be done. Send data.
-        // Needs to deal with the possibility that none of the replicas have finished running...
-        for (p_index = 0; p_index < out_pipe_count; p_index++) {
-          if (replicas[restarter].buff_counts[p_index] != 0) {
-            if (write(ext_out_fds[p_index], replicas[restarter].buffers[p_index], replicas[restarter].buff_counts[p_index]) != -1) {
-            } else {
-              debug_print("VoterM write failed.\n");
-            }
-          }
-        }
-      }
-
-      for (p_index = 0; p_index < out_pipe_count; p_index++) {
-        replicas[0].buff_counts[p_index] = 0;
-        replicas[1].buff_counts[p_index] = 0;
-        replicas[2].buff_counts[p_index] = 0;
-      }
-    // switch case statement
+  if (fault) {
+    kill(replicas[fault_index].pid, SIGKILL);
   }
-  return false;
+  return fault;
+}
+
+// sends data from rep_to_send out of voter. Reset all state for next loop
+void sendData(int rep_to_send) {
+  int p_index, r_index;
+
+  for (p_index = 0; p_index < out_pipe_count; p_index++) {
+    if (replicas[rep_to_send].buff_counts[p_index] != 0) {
+      if (write(ext_out_fds[p_index], replicas[rep_to_send].buffers[p_index], replicas[rep_to_send].buff_counts[p_index]) != -1) {
+      } else {
+        debug_print("VoterM write failed.\n");
+      }
+    }
+  }
+
+  for (r_index = 0; r_index < rep_count; r_index++) {
+    for (p_index = 0; p_index < out_pipe_count; p_index++) {
+      replicas[r_index].buff_counts[p_index] = 0;
+    }
+  }
 }
 
 void forkReplicas(int rep_index, int rep_count) {
@@ -432,14 +358,14 @@ void forkReplicas(int rep_index, int rep_count) {
 }
 
 // Start all replicas (or just restart one)
-void startReplicas(bool forking, int rep_index, int rep_count) {
+void startReplicas(bool forking, int rep_index, int rep_start_count) {
   #ifdef TIME_RESTART_REPLICA
     timestamp_t last = generate_timestamp();
   #endif /* TIME_RESTART_REPLICA */
   int index, jndex;
   //createPipes(reps, num, ext_pipes, pipe_count);
   int pipe_fds[2];
-  for (index = rep_index; index < rep_index + rep_count; index++) {
+  for (index = rep_index; index < rep_index + rep_start_count; index++) {
     for (jndex = 0; jndex < in_pipe_count; jndex++) {
       if (pipe(pipe_fds) == -1) {
         debug_print("Replica pipe error\n");
@@ -449,7 +375,7 @@ void startReplicas(bool forking, int rep_index, int rep_count) {
       }
     }
   }
-  for (index = rep_index; index < rep_index + rep_count; index++) {
+  for (index = rep_index; index < rep_index + rep_start_count; index++) {
     for (jndex = 0; jndex < out_pipe_count; jndex++) {
       if (pipe(pipe_fds) == -1) {
         debug_print("Replica pipe error\n");
@@ -461,9 +387,12 @@ void startReplicas(bool forking, int rep_index, int rep_count) {
   }
 
   // Give the replicas their pipes (same method as restart)
-  for (index = rep_index; index < rep_index + rep_count; index++) {
+  for (index = rep_index; index < rep_index + rep_start_count; index++) {
     if (forking) {
       forkReplicas(index, 1); // Fork one at a time.
+    } else { // If voter isn't forking, find a replica to instead.
+      // rep_start_count should only be 1 in this case
+      kill(replicas[(fault_index + (rep_count - 1)) % rep_count].pid, RESTART_SIGNAL);
     }
     int pid = acceptSendFDS(&sd, &for_reps[index], rep_info_in, rep_info_out);
     if (pid < 0) {
@@ -664,19 +593,60 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
+  // I swear that this all makes sense and is a better way to organize everything.
   while(1) {
-    if (recvData()) {
-      if (sendCollect()) {
-        if (vote()) {
-          // should only need to call at most twice
-          // For example, SMR rep crashes, discover on first vote, rerun sendcollect, and vote again.
-          if (sendCollect()) {
-            vote();
+    // It starts with receiving data. Returns false if nothing received
+    if (recvData()) { // sets active_pipe_index (pipe data come in on)
+      // Data received, send to replicas
+      if (sendToReps()) { // returns false if no response is expected. Sends data to replica in pipe[active_pipe_index]
+        int reps_done = collectFromReps(true, rep_count); // Set timer and wait for rep_count responses
+        // sets timeout_occurred and #done
+        if (!timeout_occurred) { // All reps responded in time.
+          if (checkSDC()) { // checkSDC will have to kill faulty replicas on its own and set fault_index
+            debug_print("SDC detected: %d - %d\n", fault_index, replicas[fault_index].pid);
+            // SDC found, recover (SMR will never trip SDC)
+            startReplicas(false, fault_index, 1); // restarts fault_index
+            sendData((fault_index + (rep_count - 1)) % rep_count);
+          } else {
+            sendData(0); // This is the standard, no faults path
           }
-        }
-      }
-    }
-  }
+        } else { // timeout_occurred
+          // Need to make sure killed in case of CFE (for SMR, DMR, and TMR)
+          findFaultReplica(); // set fault_index
+          debug_print("CFE or ExecFault detected: %d - %d\n", fault_index, replicas[fault_index].pid);          
+          kill(replicas[fault_index].pid, SIGKILL); // TODO: ???
+          if (1 == rep_count) {
+            // With SMR, have to restart the replica from it's exec
+            startReplicas(true, 0, 1); // SMR must fork/exec
+            sendToReps(); // Ignore return (response is expected)
+            collectFromReps(false, 1);
+            sendData((fault_index + (rep_count - 1)) % rep_count);
+          } else {
+            debug_print("Replicas done: %d\n", reps_done);
+            // With DMR and TMR we need to find the fault rep, and see which healthy reps ran
+            // Quad core setups should always have had their healthy reps respond
+            if (2 == rep_count) {
+              if (0 == reps_done) {
+                // Wait for healthy replica to run
+                collectFromReps(false, 1);
+              }
+            } else { // 3 == rep_count
+              if (0 == reps_done) {
+                // Neither of the healthy reps ran
+                collectFromReps(false, 2);
+              } else if (1 == reps_done) {
+                // Only one (healthy rep) didn't run
+                collectFromReps(false, 1);
+              }
+            }
+            // Now set to recover both DMR and TMR cases
+            startReplicas(false, fault_index, 1);
+            sendData((fault_index + (rep_count - 1)) % rep_count); // TODO: who sends the data?
+          }
+        } // if / else for timeout_occurred
+      } // if(sendToReps) false (no response expected), restart loop
+    } // if(recvData) false (no data received) restart loop
+  } // while(1)
 
   return 0;
 }
