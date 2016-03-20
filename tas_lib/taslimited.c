@@ -29,7 +29,8 @@ int sched_set_policy(const pid_t pid, const int priority) {
     // Components use musl, which does not.
     // pthread requires about 13k to link, thus voters avoid it.
     if( sched_setscheduler( pid, SCHED_RR, &param ) == -1 ) {
-      perror("sched_setscheduler SCHED_RR ");
+      // This happens if the process is killed, but VoterD hasn't noticed yet and tries to balance the reps.
+      // perror("sched_setscheduler SCHED_RR ");
       return -1;
     }
     #else

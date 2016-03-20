@@ -10,8 +10,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/un.h>
 #include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/wait.h>
+
 
 #include "bench_config.h"
 #include "system_config.h"

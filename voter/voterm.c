@@ -204,6 +204,29 @@ void findFaultReplica(void) {
   }
 }
 
+// kill a replica, and clean up its fds. If SMR, wait for its zombie.
+void killAndClean(int rep_to_kill) {
+  int p_index;
+
+  kill(replicas[rep_to_kill].pid, SIGKILL);
+
+  for (p_index = 0; p_index < in_pipe_count; p_index++) {
+    // rep and vote sides
+    close(replicas[rep_to_kill].fd_ins[p_index]);
+    close(for_reps[rep_to_kill].fd_ins[p_index]);
+  }
+  for (p_index = 0; p_index < out_pipe_count; p_index++) {
+    // rep and vote sides
+    close(replicas[rep_to_kill].fd_outs[p_index]);
+    close(for_reps[rep_to_kill].fd_outs[p_index]);
+  }
+
+  // Prevents zombies from accumulating
+  if (1 == rep_count) {
+    waitpid(-1, NULL, WNOHANG);
+  }
+}
+
 // checkSDC will have to kill faulty replicas on its own and set fault_index
 bool checkSDC(void) { // returns true if SDC was found
   // Should check for all available output, vote on each and send.
@@ -271,7 +294,7 @@ bool checkSDC(void) { // returns true if SDC was found
   } // switch(rep_count)
 
   if (fault) {
-    kill(replicas[fault_index].pid, SIGKILL);
+    killAndClean(fault_index);
   }
   return fault;
 }
@@ -614,7 +637,7 @@ int main(int argc, const char **argv) {
           // Need to make sure killed in case of CFE (for SMR, DMR, and TMR)
           findFaultReplica(); // set fault_index
           debug_print("CFE or ExecFault detected: %s %d - %d\n", controller_name, fault_index, replicas[fault_index].pid);
-          kill(replicas[fault_index].pid, SIGKILL);
+          killAndClean(fault_index);
           if (1 == rep_count) {
             // With SMR, have to restart the replica from it's exec
             startReplicas(true, 0, 1); // SMR must fork/exec
