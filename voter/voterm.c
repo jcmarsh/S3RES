@@ -613,8 +613,8 @@ int main(int argc, const char **argv) {
         } else { // timeout_occurred
           // Need to make sure killed in case of CFE (for SMR, DMR, and TMR)
           findFaultReplica(); // set fault_index
-          debug_print("CFE or ExecFault detected: %d - %d\n", fault_index, replicas[fault_index].pid);          
-          kill(replicas[fault_index].pid, SIGKILL); // TODO: ???
+          debug_print("CFE or ExecFault detected: %s %d - %d\n", controller_name, fault_index, replicas[fault_index].pid);
+          kill(replicas[fault_index].pid, SIGKILL);
           if (1 == rep_count) {
             // With SMR, have to restart the replica from it's exec
             startReplicas(true, 0, 1); // SMR must fork/exec
@@ -622,7 +622,6 @@ int main(int argc, const char **argv) {
             collectFromReps(false, 1);
             sendData((fault_index + (rep_count - 1)) % rep_count);
           } else {
-            debug_print("Replicas done: %d\n", reps_done);
             // With DMR and TMR we need to find the fault rep, and see which healthy reps ran
             // Quad core setups should always have had their healthy reps respond
             if (2 == rep_count) {

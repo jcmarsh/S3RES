@@ -288,12 +288,6 @@ void forkReplicas(struct replica reps[], int num, int additional_argc, char **ad
 
     rep_argv[rep_argc - 1] = NULL;
 
-    int i;
-    debug_print("Args for new replica:\n");
-    for (i = 0; i < rep_argc; i++) {
-      debug_print("Arg %d: %s\n", i, rep_argv[i]);
-    }
-
     curr->pid = forkSingle(rep_argv);
     for (a_index = 1; a_index < rep_argc; a_index++) {
       free(rep_argv[a_index]);

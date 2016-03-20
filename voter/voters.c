@@ -47,7 +47,7 @@ void writeBuffer(int fd_out, unsigned char* buffer, int buff_count);
 
 void voterRestartHandler(void) {
   int p_index;
-  debug_print("Caught Exec / Control loop error (%s)\n", controller_name);
+  // Caught Exec / Control loop error
 
   switch (rep_type) {
     case SMR: {
@@ -83,7 +83,7 @@ void doOneUpdate(void) {
   int exit_pid = waitpid(-1, NULL, WNOHANG); // Seems to take a while for to clean up zombies
       
   if (exit_pid > 0) {
-    debug_print("PID %d exited on its own.\n", exit_pid);
+    debug_print("%s PID %d exited on its own.\n", controller_name, exit_pid);
     voterRestartHandler();
   }
 
