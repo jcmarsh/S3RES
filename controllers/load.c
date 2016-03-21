@@ -1,6 +1,8 @@
 /*
  * Meant to stress the cpu and record it's resource usage.
- * Supposed to be based off of sensor data... so it will have range / pose updates.
+ * To test, run from stage/experiments (needs picture file)
+ *   Just Load: sudo ./Load 20 1 MSG_BUFFER:0:2
+ *   With VoterS: sudo ./VoterS Load SMR 1000 20 MSG_BUFFER:0:2:0
  *
  * James Marshall
  */
@@ -34,7 +36,7 @@ void setPipeIndexes(void) {
 
 int parseArgs(int argc, const char **argv) {
   if (argc < 2) {
-    printf("Usage: Load <priority> <pipe_cound(ignored)> <pipe_out(optional)>\n");
+    printf("Usage: Load <priority> <pipe_count(ignored)> <pipe_out(optional)>\n");
     return -1;
   }
   setPipeIndexes();

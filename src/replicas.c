@@ -105,6 +105,10 @@ void balanceReps(struct replica reps[], int num, int default_priority) {
   int second = 1; // the most behind might be dead, so second to go is up next
   int index = 0;
 
+  if (num < 2) {
+    return;
+  }
+
   for (index = 0; index < num; index++) {
     if (rep_gap(reps, num, index) > rep_gap(reps, num, starting)) {
       starting = index;

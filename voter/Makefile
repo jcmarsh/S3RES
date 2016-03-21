@@ -1,9 +1,10 @@
 include ../directory_paths
 
 LIB=-lrt -lTASLimitedDiet
+#LIB=-lrt -lTASLimited -pthread
 INC=-I../include/ -I../tas_lib/inc/
 COMPILE=diet -Os gcc -O2 -nostdinc -Werror -static
-#COMPILE=gcc -O3 -static -fstack-usage -Wstack-usage=128 # -fconserve-stack
+#COMPILE=gcc -g -static #-fstack-usage -Wstack-usage=128 # -fconserve-stack
 
 all: VoterD VoterM VoterS
 

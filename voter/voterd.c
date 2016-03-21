@@ -121,6 +121,8 @@ void voterRestartHandler(void) {
       // Need to cold restart the replica
       cleanupReplica(replicas, 0);
 
+      waitpid(-1, NULL, WNOHANG); // Only you can prevent zombie outbreaks.
+
       startReplicas(replicas, rep_count, &sd, controller_name, ext_pipes, pipe_count, replica_priority);
       
       // Resend last data
