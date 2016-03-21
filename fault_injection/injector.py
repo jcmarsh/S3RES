@@ -57,8 +57,7 @@ print "executing: ", cmd_start
 random.seed(None) # uses system time
 
 # This will need to change if mixing TMR and DMR
-victim_types = len(victim_programs) # different controllers
-victim_count = 1 # 3 # replicated 3 times
+victim_count = -1
 while True:
 	time.sleep(1/2.0)
 	victim_pids = []
@@ -70,7 +69,10 @@ while True:
 		search_str = 'ps -ao pid,pcpu,comm | grep "' + name + '" | grep -v "Test" | grep -v "defunct"'
 		getPIDs(victim_pids, victim_weights, victim_names, search_str)
 
-	if (len(victim_pids) < (victim_types * victim_count)):
+        if (-1 == victim_count): # record victim count at start, should not change.
+                victim_count = len(victim_pids)
+
+	if (len(victim_pids) < victim_count):
 		print "Error: One of the controllers did not successfully restart"
 		#sys.exit()
 	else:
