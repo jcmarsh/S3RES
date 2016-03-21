@@ -99,15 +99,15 @@ int main(int argc, const char **argv) {
     return -1;
   }
 
-  sleep(3);
+  sleep(2);
 
   int retval, i = 50;
   while (i > 0) {
     retval = read(trans_pipes[0].fd_in, &range_pose_data_msg, sizeof(struct comm_range_pose_data));
-    printf("benchmarker pre-read %d bytes\n", retval);
+    //printf("benchmarker pre-read %d bytes\n", retval);
     i--;
   }
-  printf("benchmarker moving on to main loop.\n");
+  //printf("benchmarker moving on to main loop.\n");
 
   enterLoop();
 
