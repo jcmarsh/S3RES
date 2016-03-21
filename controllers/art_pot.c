@@ -19,7 +19,7 @@
   #define OBST_RADIUS .2
   #define OBST_EXTENT .5
   #define OBST_SCALE 1
-#else // GRID_NUM==80
+#elif GRID_NUM==80
   #define VEL_SCALE 2
   #define DIST_EPSILON .6
   #define GOAL_RADIUS 0
@@ -28,6 +28,15 @@
   #define OBST_RADIUS .4
   #define OBST_EXTENT .7
   #define OBST_SCALE 1
+#else
+  #define VEL_SCALE 2
+  #define DIST_EPSILON .7
+  #define GOAL_RADIUS 0
+  #define GOAL_EXTENT .4
+  #define GOAL_SCALE 1
+  #define OBST_RADIUS .3
+  #define OBST_EXTENT .4
+  #define OBST_SCALE 2
 #endif
 
 #define PIPE_COUNT 4
@@ -185,7 +194,7 @@ void command(void) {
     vel_cmd[0] += 1;
   }
 
-  if (vel_cmd[0] < 0.1) {
+  if (vel_cmd[0] < 0.05 && vel_cmd[1] < 0.05) {
     // Detect if robot is "stuck"
     request_way = true;
   }
