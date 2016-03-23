@@ -9,6 +9,8 @@
 #include "./inc/mapping.h"
 #include <math.h>
 
+// the blocks that make up the maze are 1.6x1.6
+// With grid_num = 48, each grid is 0.33x0.33
 // Configuration parameters
 #if GRID_NUM==96
   #define VEL_SCALE 2
@@ -28,11 +30,11 @@
   #define OBST_RADIUS .4
   #define OBST_EXTENT .7
   #define OBST_SCALE 1
-#else
-  #define VEL_SCALE 2
-  #define DIST_EPSILON .7
+#else  // GRID_NUM == 48
+  #define VEL_SCALE 1.5
+  #define DIST_EPSILON .3
   #define GOAL_RADIUS 0
-  #define GOAL_EXTENT .4
+  #define GOAL_EXTENT .2
   #define GOAL_SCALE 1
   #define OBST_RADIUS .3
   #define OBST_EXTENT .4
@@ -194,14 +196,18 @@ void command(void) {
     vel_cmd[0] += 1;
   }
 
-  if (vel_cmd[0] < 0.05 && vel_cmd[1] < 0.05) {
-    // Detect if robot is "stuck"
-    request_way = true;
-  }
+  //if (vel_cmd[0] < 0.1 && vel_cmd[1] < 0.1) {
+  //  // Detect if robot is "stuck"
+  //  request_way = true;
+  //}
 
-  if (request_way && !way_pending) {
+  if (!way_pending) {
     way_pending = true;
-    commSendWaypointRequest(&pipes[way_req_index]);
+    if (request_way) {
+      commSendWaypointRequest(&pipes[way_req_index], 1);
+    } else {
+      commSendWaypointRequest(&pipes[way_req_index], 0);
+    }
   }
 
   // Write move command
@@ -232,20 +238,6 @@ void enterLoop(void) {
 
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
-      if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
-        read_ret = read(pipes[data_index].fd_in, &recv_msg_data, sizeof(struct comm_range_pose_data));
-        if (read_ret == sizeof(struct comm_range_pose_data)) {
-          commCopyRanger(&recv_msg_data, ranges, pos);
-          // Calculates and sends the new command
-          command();
-        } else if (read_ret > 0) {
-          debug_print("ArtPot read data_index did not match expected size.\n");
-        } else if (read_ret < 0) {
-          debug_print("ArtPot - read data_index problems.\n");
-        } else {
-          debug_print("ArtPot read_ret == 0 on data_index.\n");
-        }
-      }
       if (PIPE_COUNT == pipe_count) {
         if (FD_ISSET(pipes[way_res_index].fd_in, &select_set)) {
           read_ret = read(pipes[way_res_index].fd_in, &recv_msg_way, sizeof(struct comm_way_res));
@@ -259,6 +251,20 @@ void enterLoop(void) {
           } else {
             debug_print("ArtPot read_ret == 0 on way_res_index.\n");
           } 
+        }
+      }
+      if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
+        read_ret = read(pipes[data_index].fd_in, &recv_msg_data, sizeof(struct comm_range_pose_data));
+        if (read_ret == sizeof(struct comm_range_pose_data)) {
+          commCopyRanger(&recv_msg_data, ranges, pos);
+          // Calculates and sends the new command
+          command();
+        } else if (read_ret > 0) {
+          debug_print("ArtPot read data_index did not match expected size.\n");
+        } else if (read_ret < 0) {
+          debug_print("ArtPot - read data_index problems.\n");
+        } else {
+          debug_print("ArtPot read_ret == 0 on data_index.\n");
         }
       }
     }

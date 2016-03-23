@@ -236,7 +236,7 @@ void commCopyWaypoints(struct comm_way_res* recv_msg, double* waypoints, double*
   return;
 }
 
-int commSendWaypointRequest(struct typed_pipe* pipe) {
+int commSendWaypointRequest(struct typed_pipe* pipe, int padding) {
   if (pipe->fd_out == 0 || pipe->type != WAY_REQ) {
     debug_print("commSendWaypointsRequest Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
     return 0;
@@ -245,6 +245,7 @@ int commSendWaypointRequest(struct typed_pipe* pipe) {
   struct comm_way_req send_msg;
   memset(&send_msg, 0, sizeof(struct comm_way_req));
 
+  send_msg.padding = padding;
   return write(pipe->fd_out, &send_msg, sizeof(struct comm_way_req));
 }
 

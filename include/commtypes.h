@@ -100,7 +100,7 @@ int commSendWaypoints(struct typed_pipe* pipe,
                       double n_way_x, double n_way_y, double n_way_a);
 void commCopyWaypoints(struct comm_way_res* recv_msg, double* waypoints, double* n_waypoints);
 
-int commSendWaypointRequest(struct typed_pipe* pipe);
+int commSendWaypointRequest(struct typed_pipe* pipe, int padding);
 
 int commSendMoveCommand(struct typed_pipe* pipe, double vel_0, double vel_1);
 

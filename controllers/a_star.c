@@ -37,7 +37,7 @@ const char* name = "AStar";
 
 void enterLoop(void);
 void command(void);
-void sendWaypoints(void);
+void sendWaypoints(bool force_send);
 
 // Set indexes based on pipe types
 void setPipeIndexes(void) {
@@ -194,38 +194,54 @@ void command(void) {
   }
 }
 
-void sendWaypoints(void) {
-  if (current_goal != NULL) {
-    free(current_goal);
-    current_goal = NULL;
-  }
-  if (n_current_goal != NULL) {
-    free(n_current_goal);
-    n_current_goal = NULL;
-  }
+void sendWaypoints(bool force_send) {
   struct point_d *n_goal_p;
   struct point_d *goal_p;
 
-  //free(pop(&goal_path)); // trash closest
-  current_goal = pop(&goal_path);
-  if (current_goal == NULL) { // TODO: these contingences never happen.
-    commSendWaypoints(&pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
-  } else {
-    goal_p = degridify(current_goal->x, current_goal->y);
-    n_current_goal = pop(&goal_path);
-    if (n_current_goal == NULL) {
-      // At goal! (Err... right next to it) Just hang out I suppose. By sending same goal twice.
-      commSendWaypoints(&pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
-    } else{
-      n_goal_p = degridify(n_current_goal->x, n_current_goal->y);
-      commSendWaypoints(&pipes[way_res_index], goal_p->x, goal_p->y, 0.0, n_goal_p->x, n_goal_p->y, 0.0);
-      free(n_goal_p);
+  if (force_send) {
+    if (current_goal != NULL) {
+      free(current_goal);
+      current_goal = NULL;
     }
-    free(goal_p);
+    if (n_current_goal != NULL) {
+      free(n_current_goal);
+      n_current_goal = NULL;
+    }
+
+    //free(pop(&goal_path)); // trash closest
+    current_goal = pop(&goal_path);
+    if (current_goal == NULL) { // TODO: these contingences never happen.
+      commSendWaypoints(&pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
+    } else {
+      goal_p = degridify(current_goal->x, current_goal->y);
+      n_current_goal = pop(&goal_path);
+      if (n_current_goal == NULL) {
+        // At goal! (Err... right next to it) Just hang out I suppose. By sending same goal twice.
+        commSendWaypoints(&pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
+      } else{
+        n_goal_p = degridify(n_current_goal->x, n_current_goal->y);
+        commSendWaypoints(&pipes[way_res_index], goal_p->x, goal_p->y, 0.0, n_goal_p->x, n_goal_p->y, 0.0);
+        free(n_goal_p);
+      }
+      free(goal_p);
+    }
+  } else {
+    if (current_goal == NULL) {
+      commSendWaypoints(&pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
+    } else {
+      if (n_current_goal == NULL) {
+        commSendWaypoints(&pipes[way_res_index], 7.0, 7.0, 0.0, 7.0, 7.0, 0.0);
+      } else {
+        goal_p = degridify(current_goal->x, current_goal->y);
+        n_goal_p = degridify(n_current_goal->x, n_current_goal->y);
+        commSendWaypoints(&pipes[way_res_index], goal_p->x, goal_p->y, 0.0, n_goal_p->x, n_goal_p->y, 0.0);
+      }
+    }
   }
 }
 
 bool request_all = false;
+bool ready_to_send = false;
 void enterLoop(void) {
   int index;
   int read_ret;
@@ -266,7 +282,8 @@ void enterLoop(void) {
             fake_hash++;
           }
           if (recv_map_update.obs_count > 0) { // New obstacle arrived
-            command();
+            command(); // Should send waypoints.
+            ready_to_send = true;
           }
           if (request_all) {
             request_all = false;
@@ -283,7 +300,12 @@ void enterLoop(void) {
       if (FD_ISSET(pipes[way_req_index].fd_in, &select_set)) {
         read_ret = read(pipes[way_req_index].fd_in, &recv_msg_req, sizeof(struct comm_way_req));
         if (read_ret > 0) { // TODO: Do these calls stack up?
-          sendWaypoints();
+          if (ready_to_send || (1 == recv_msg_req.padding)) {
+            ready_to_send = false;
+            sendWaypoints(true); // Force new send
+          } else {
+            sendWaypoints(false); // Don't send new ones, just ack
+          }
         } else if (read_ret < 0) {
           perror("AStar - read error on way_req_index");
         } else if (read_ret == 0) {
