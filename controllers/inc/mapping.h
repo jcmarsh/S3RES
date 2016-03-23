@@ -8,6 +8,7 @@
 #define MAP_SIZE 16
 #define OFFSET_X  8
 #define OFFSET_Y  8
+#define MAX_OBSTACLES 2042 // 4096 (Max pipe buffer) * 2 (x and y) + 12 (header bytes)
 
 struct point_i {
   int x;

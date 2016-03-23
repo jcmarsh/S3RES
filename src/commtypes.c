@@ -190,6 +190,7 @@ void printBuffer(struct typed_pipe* pipe, char *buffer, int buff_count) {
     case COMM_ACK: ;
       struct comm_ack *ack = (struct comm_ack *) buffer;
       printf("\tHash: %08lx\n", ack->hash);
+      printf("\tresend_request: %d\n", ack->resend_request);
       break;
     case MSG_BUFFER:
       printf("\tNot implemented.\n");
@@ -270,25 +271,34 @@ int commSendMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg) {
   }
 
   int index = 0;
-  int buffer[MAX_TYPED_PIPE_BUFF / sizeof(int)] = {0};
+  unsigned char buffer[12 + (2 * msg->obs_count)];
   int buff_count = 0;
 
-  buffer[buff_count++] = msg->pose_x;
-  buffer[buff_count++] = msg->pose_y;
-  buffer[buff_count++] = msg->obs_count;
+  buffer[buff_count++] = (msg->pose_x >> 24) & 0xFF;
+  buffer[buff_count++] = (msg->pose_x >> 16) & 0xFF;
+  buffer[buff_count++] = (msg->pose_x >> 8) & 0xFF;
+  buffer[buff_count++] = (msg->pose_x) & 0xFF;
+  buffer[buff_count++] = (msg->pose_y >> 24) & 0xFF;
+  buffer[buff_count++] = (msg->pose_y >> 16) & 0xFF;
+  buffer[buff_count++] = (msg->pose_y >> 8) & 0xFF;
+  buffer[buff_count++] = (msg->pose_y) & 0xFF;
+  buffer[buff_count++] = (msg->obs_count >> 24) & 0xFF;
+  buffer[buff_count++] = (msg->obs_count >> 16) & 0xFF;
+  buffer[buff_count++] = (msg->obs_count >> 8) & 0xFF;
+  buffer[buff_count++] = (msg->obs_count) & 0xFF;
 
   for (index = 0; index < msg->obs_count; index++) {
     buffer[buff_count++] = msg->obs_x[index];
     buffer[buff_count++] = msg->obs_y[index];
     
-    if (buff_count * sizeof(int) > MAX_TYPED_PIPE_BUFF) {
+    if (buff_count > MAX_TYPED_PIPE_BUFF) {
       debug_print("ERROR: Commtypes:commSendMapUpdate attempting to surpase MAX_TYPED_PIPE_BUFF\n");
       break;
     }
   }
   
-  int written = write(pipe->fd_out, buffer, sizeof(int) * buff_count);
-  if (written != buff_count * sizeof(int)) { // TODO: more should check this
+  int written = write(pipe->fd_out, buffer, buff_count);
+  if (written != buff_count) { // TODO: more should check this
     debug_print("Write for commSendMapUpdate did not complete.\n");
   }
 
@@ -301,22 +311,22 @@ int commRecvMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg) {
     debug_print("commRecvMapUpdate Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_in);
     return 0;
   }
-  int recv_msg_buffer[MAX_TYPED_PIPE_BUFF / sizeof(int)] = {0};
+  unsigned char recv_msg_buffer[MAX_TYPED_PIPE_BUFF] = {0};
   int header_ints = 3; // pose x, pose y, and obstacle count
   int index = 0;
 
   int read_ret = read(pipe->fd_in, &recv_msg_buffer, sizeof(int) * header_ints);
   if (read_ret == sizeof(int) * header_ints) { // TODO: Read may still have been interrupted.
-    msg->pose_x = recv_msg_buffer[0];
-    msg->pose_y = recv_msg_buffer[1];
-    msg->obs_count = recv_msg_buffer[2];
+    msg->pose_x = recv_msg_buffer[0] << 24 | recv_msg_buffer[1] << 16 | recv_msg_buffer[2] << 8 | recv_msg_buffer[3];
+    msg->pose_y = recv_msg_buffer[4] << 24 | recv_msg_buffer[5] << 16 | recv_msg_buffer[6] << 8 | recv_msg_buffer[7];
+    msg->obs_count = recv_msg_buffer[8] << 24 | recv_msg_buffer[9] << 16 | recv_msg_buffer[10] << 8 | recv_msg_buffer[11];
 
     if (msg->obs_count > 0) { // read obstacles
-      read_ret = read(pipe->fd_in, &recv_msg_buffer[header_ints], sizeof(int) * 2 * msg->obs_count);
-      if (read_ret == sizeof(int) * 2 * msg->obs_count) {
+      read_ret = read(pipe->fd_in, &recv_msg_buffer[sizeof(int) * header_ints], 2 * msg->obs_count);
+      if (read_ret == 2 * msg->obs_count) {
         for (index = 0; index < msg->obs_count; index++) {
-          msg->obs_x[index] = recv_msg_buffer[header_ints + (index * 2)];
-          msg->obs_y[index] = recv_msg_buffer[header_ints + (index * 2 + 1)];
+          msg->obs_x[index] = recv_msg_buffer[sizeof(int) * header_ints + (index * 2)];
+          msg->obs_y[index] = recv_msg_buffer[sizeof(int) * header_ints + (index * 2 + 1)];
         }
       } else if (read_ret > 0) {
         debug_print("commRecvMapUpdate read obstacles did not match expected size: %d\n", read_ret); 
@@ -367,7 +377,7 @@ int commSendRanger(struct typed_pipe* pipe, double* ranger_data, double* pose_da
   return write_ret;
 }
 
-int commSendAck(struct typed_pipe* pipe, long state_hash) {
+int commSendAck(struct typed_pipe* pipe, long state_hash, int resend_request) {
   if (pipe->fd_out == 0 || pipe->type != COMM_ACK) {
     debug_print("commSendAck Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
     return 0;
@@ -377,6 +387,7 @@ int commSendAck(struct typed_pipe* pipe, long state_hash) {
   memset(&msg, 0, sizeof(struct comm_ack));
 
   msg.hash = state_hash;
+  msg.resend_request = resend_request;
 
   return write(pipe->fd_out, &msg, sizeof(struct comm_ack));
 }

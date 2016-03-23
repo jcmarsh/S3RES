@@ -225,13 +225,14 @@ void sendWaypoints(void) {
   }
 }
 
+bool request_all = false;
 void enterLoop(void) {
   int index;
   int read_ret;
   struct comm_way_req recv_msg_req;
   struct comm_map_update recv_map_update;
-  int obs_x[200] = {0}; // TODO: This isn't great... and should be checked I suppose.
-  int obs_y[200] = {0};
+  unsigned char obs_x[MAX_OBSTACLES] = {0}; // TODO: This isn't great... and should be checked I suppose.
+  unsigned char obs_y[MAX_OBSTACLES] = {0};
   recv_map_update.obs_x = obs_x;
   recv_map_update.obs_y = obs_y;
 
@@ -267,7 +268,12 @@ void enterLoop(void) {
           if (recv_map_update.obs_count > 0) { // New obstacle arrived
             command();
           }
-          commSendAck(&pipes[ack_index], fake_hash);
+          if (request_all) {
+            request_all = false;
+            commSendAck(&pipes[ack_index], fake_hash, 1);
+          } else {
+            commSendAck(&pipes[ack_index], fake_hash, 0);
+          }
         } else if (read_ret < 0) {
           perror("AStar - read error on updates_index");
         } else {
@@ -328,6 +334,7 @@ int main(int argc, const char **argv) {
   free(heap_reserve); // give it back (but reserved for process thanks to mallopt calls)
 #endif /* __GLIBC__ */
 
+  request_all = true; // Should only happen when A_Star is restarted.
   enterLoop();
 
   return 0;

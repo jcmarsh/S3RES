@@ -98,8 +98,9 @@ bool addObstacle(struct point_i* obs) {
   }
 }
 
+bool resending_all = false;
 void updateMap(struct comm_range_pose_data * data) {
-  int i;
+  int i, j;
   double theta_pose;
   // Read pose
   struct point_d pose;
@@ -127,6 +128,20 @@ void updateMap(struct comm_range_pose_data * data) {
     obstacle_g.y += pose.y;
 
     addObstacle(gridify(&obstacle_g));
+  }
+
+  if (resending_all) {
+    resending_all = false;
+    // all newly discovered obstacles should already be in the message (will add duplicates)
+    for (i = 0; i < GRID_NUM; i++) {
+      for (j = 0; j < GRID_NUM; j++) {
+        if (obstacle_map[i][j] > OBS_THRES) {
+          send_msg.obs_x[send_msg.obs_count] = i;
+          send_msg.obs_y[send_msg.obs_count] = j;
+          send_msg.obs_count++;
+        }
+      }
+    }
   }
 
   // TODO: What if a SDC messed with the obs_count sent?
@@ -177,6 +192,9 @@ void enterLoop(void) {
       if (FD_ISSET(pipes[ack_index].fd_in, &select_set)) {
         read_ret = read(pipes[ack_index].fd_in, &ack_msg, sizeof(struct comm_ack));
         if (read_ret == sizeof(struct comm_ack)) {
+          if (1 == ack_msg.resend_request) {
+            resending_all = true;
+          }
           // Do nothing
         } else if (read_ret > 0) {
           debug_print("Mapper read ack_index did not match expected size: %d\n", read_ret);
@@ -205,8 +223,8 @@ int main(int argc, const char **argv) {
   send_msg.pose_x = 0;
   send_msg.pose_y = 0;
   send_msg.obs_count = 0;
-  send_msg.obs_x = (int*)malloc(sizeof(int) * 128);
-  send_msg.obs_y = (int*)malloc(sizeof(int) * 128);
+  send_msg.obs_x = (unsigned char *)malloc(MAX_OBSTACLES); // That is the max number of obstacles that can be sent (needed in case of an A* reset)
+  send_msg.obs_y = (unsigned char *)malloc(MAX_OBSTACLES); // DANGER: This can be quickly overcome if the grid is too fine. In this case 46 * 46 is too big... but not everything can be an obstacle.
 
   // Remember, don't initialize anything in the loop! (this used to be there... problems)
   for (i = 0; i < GRID_NUM; i++) {
