@@ -31,13 +31,13 @@
   #define OBST_EXTENT .7
   #define OBST_SCALE 1
 #else  // GRID_NUM == 48
-  #define VEL_SCALE 1.5
+  #define VEL_SCALE 1.4
   #define DIST_EPSILON .3
   #define GOAL_RADIUS 0
   #define GOAL_EXTENT .2
   #define GOAL_SCALE 1
   #define OBST_RADIUS .3
-  #define OBST_EXTENT .4
+  #define OBST_EXTENT .45
   #define OBST_SCALE 2
 #endif
 
