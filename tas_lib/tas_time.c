@@ -23,7 +23,8 @@ timestamp_t generate_timestamp( void ) {
     if (pmcntenset & 0x80000000ul) {  // Is it counting?
       asm volatile ("mrc p15, 0, %0, c9, c13, 0" : "=r" (pmccntr));
       // The counter is set up to count every 64th cycle
-      return (((timestamp_t) pmccntr) * 64);  // Should optimize to << 6
+      // return (((timestamp_t) pmccntr) * 64);  // Should optimize to << 6
+      return (((timestamp_t) pmccntr));
     }
   }
   //  printf("Arm performance monitor not enabled (check for module)\n");
@@ -41,7 +42,8 @@ float diff_time(timestamp_t current, timestamp_t last, float cpu_mhz) {
     return (current - last) / cpu_mhz;
   } else {
 #if defined(__ARM_ARCH_7A__)
-    return ((((timestamp_t) UINT_MAX * 64) - last) + current) / cpu_mhz;
+    //return ((((timestamp_t) UINT_MAX * 64) - last) + current) / cpu_mhz;
+    return ((((timestamp_t) UINT_MAX) - last) + current) / cpu_mhz;
 #else
     return 0.0;
 #endif

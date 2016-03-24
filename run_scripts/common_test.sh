@@ -1,7 +1,7 @@
-SIM_IP=192.168.0.101
+sim_ip=192.168.0.101
 
-PINT_DIR=/home/jcmarsh/research/PINT
-CONFIG_DIR=$PINT_DIR/controllers/configs
+pint_dir=/home/jcmarsh/research/PINT
+config_dir=$pint_dir/controllers/configs
 
 # $1 # of iterations, $2 file prefix, $3 player time, $4 PINT time
 runExperiment () {
@@ -9,7 +9,7 @@ runExperiment () {
     for index in `seq 0 $1`; do
 	timeout $3 player baseline.cfg > $2$index.txt &
 	sleep 5
-	timeout $4 $PINT_DIR/stage_control/basic $SIM_IP &
+	timeout $4 $pint_dir/stage_control/basic $sim_ip &
 	sleep $4
 	sleep 40
     done
@@ -24,7 +24,7 @@ runExperimentFaults() {
     for index in `seq 0 $1`; do
 	timeout $4 player baseline.cfg > $2$index.txt &
 	sleep 5
-	timeout $5 $PINT_DIR/stage_control/basic $SIM_IP &
+	timeout $5 $pint_dir/stage_control/basic $sim_ip &
 	sleep 5
 	ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm > $2injector_$index.txt
 	timeout $6 python injector.py false $3 >> $2injector_$index.txt &
