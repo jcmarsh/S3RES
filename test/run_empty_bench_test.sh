@@ -1,7 +1,7 @@
 #!/bin/bash
 
-BASIC_TIME=300
-SLEEP_TIME=310
+BASIC_TIME=900
+SLEEP_TIME=910
 
 if [ $# -lt 1 ]
 then
@@ -12,6 +12,9 @@ fi
 echo "Comments for Run:" > $1_comments.txt
 cpufreq-info >> $1_comments.txt
 ls -lh >> $1_comments.txt
+
+cat ../include/bench_config.h >> $1_comments.txt
+cat ../include/system_config.h >> $1_comments.txt
 
 echo "Running NMR case" >> $1_comments.txt
 echo "Running NMR case"

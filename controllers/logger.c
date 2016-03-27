@@ -90,7 +90,7 @@ void command(void) {
     double velocity = 0.0;
     double distance = sqrt(((pose[0] - prev_x) * (pose[0] - prev_x)) + ((pose[1] - prev_y) * (pose[1] - prev_y)));
     double time_this_round = diff_time(current_time, prev_time, (1000000 * CPU_MHZ)); // diff_time normally returns usec, multiplying CPU_MHZ by 1 mil gives seconds
-    time_elapsed = time_elapsed + time_this_round;    
+    time_elapsed = time_elapsed + time_this_round;
 
     if (pose[0] == prev_x && pose[1] == prev_y) {
       velocity = 0.0;
@@ -99,7 +99,7 @@ void command(void) {
       time_elapsed = 0.0;
     }
 
-    // obstacle distance  
+    // obstacle distance
     double min = 1000; // approximately infinite.
     for (index = 0; index < RANGER_COUNT; index++) {
       if (ranges[index] < min) {
@@ -107,7 +107,7 @@ void command(void) {
       }
     }
 
-    fprintf(log_file, "(%f,\t%f,\t%f,\t%f,\t%f,\t%f)\n", min, velocity, distance, time_this_round, pose[0], pose[1]); 
+    fprintf(log_file, "(%f,\t%f,\t%f,\t%f,\t%f,\t%f)\n", min, velocity, distance, time_this_round, pose[0], pose[1]);
   }
   prev_time = current_time;
   prev_x = pose[0];
@@ -125,7 +125,7 @@ void enterLoop(void) {
     if (insertSDC || insertCFE) {
       printf("ERROR: no errors should be inserted into the logger component!\n");
     }
-    
+
     select_timeout.tv_sec = 1;
     select_timeout.tv_usec = 0;
 
@@ -134,7 +134,7 @@ void enterLoop(void) {
 
     int i;
     for (i = 1; i < pipe_count; i++) {
-      FD_SET(pipes[i].fd_in, &select_set);      
+      FD_SET(pipes[i].fd_in, &select_set);
     }
 
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
@@ -154,14 +154,14 @@ void enterLoop(void) {
         }
       }
       for (i = 1; i < pipe_count; i++) {
-        if (FD_ISSET(pipes[i].fd_in, &select_set)) {  
+        if (FD_ISSET(pipes[i].fd_in, &select_set)) {
           struct comm_msg_buffer msg;
           commRecvMsgBuffer(&pipes[i], &msg);
           if(!finished) {
             fprintf(log_file, "LOGGED MSG: %s", msg.message);
           }
           free(msg.message);
-        }   
+        }
       }
     }
   }
@@ -184,7 +184,7 @@ int openFile(void) {
     return -1;
   }
 
-  fprintf(log_file, "(min_dist,\tvelocity,\tdistance,\ttime_elapsed,\tX position,\tY position\n"); 
+  fprintf(log_file, "(min_dist,\tvelocity,\tdistance,\ttime_elapsed,\tX position,\tY position\n");
 }
 
 int main(int argc, const char **argv) {

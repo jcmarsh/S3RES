@@ -26,10 +26,14 @@ cp $CONFIG_DIR/all_smr_wl.cfg ./config_plumber.cfg
 runExperiment $ITARS baseline_all_smr_wl_ $PLAYER_TIME $BASIC_TIME
 mv *.txt $OUTPUT/all_smr_wl/
 
+sleep 60
+
 # 02 All DMR baseline
 cp $CONFIG_DIR/all_dmr_wl.cfg ./config_plumber.cfg
 runExperiment $ITARS baseline_all_dmr_wl_ $PLAYER_TIME $BASIC_TIME
 mv *.txt $OUTPUT/all_dmr_wl/
+
+sleep 60
 
 # 03 All Tri baseline
 cp $CONFIG_DIR/all_tmr_wl.cfg ./config_plumber.cfg
