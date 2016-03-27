@@ -13,7 +13,7 @@ int requestFDS(int sock_fd, struct typed_pipe* pipes, int pipe_count, int *pinne
   struct iovec datas[3];
   struct cmsghdr *cmsg;
   int retval;
-  
+
   datas[0].iov_base = pipes;
   datas[0].iov_len = sizeof(struct typed_pipe) * pipe_count;
 
@@ -66,7 +66,7 @@ int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const ch
   int index, name_index = 0;
   char* actual_name;
 
-  actual_name = (char *)malloc(sizeof(char) * (strlen(pre_name) + strlen(name) + strlen(post_name)));
+  actual_name = (char *)malloc(sizeof(char) * (strlen(pre_name) + strlen(name) + strlen(post_name) + 1));
   for (index = 0; index < strlen(pre_name); index++) {
     actual_name[name_index++] = pre_name[index];
   }
@@ -89,14 +89,15 @@ int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const ch
   memset(&address, 0, sizeof(struct sockaddr_un));
  
   address.sun_family = AF_UNIX;
-  if (strlen(actual_name) < 100) {
+  if (strlen(actual_name) < 200) {
     memcpy(&(address.sun_path), actual_name, strlen(actual_name));
   } else {
     debug_print("Client Address length longer than max.\n");
+    debug_print("Args: fd %d\t actual_name %s\n", sock_fd, actual_name);
     retval = -1;
     goto connect_recv_FDS_sock_out;
   }
-  
+
   if(connect(sock_fd, (struct sockaddr *) &address, sizeof(struct sockaddr_un)) != 0) {
     debug_print("Replica connect() failed.\n");
     debug_print("Args: fd %d\t actual_name %s\n", sock_fd, actual_name);
@@ -105,6 +106,7 @@ int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const ch
   }
 
   if (requestFDS(sock_fd, pipes, pipe_count, pinned_cpu, priority) < 0) {
+    perror("Failed requestFDS");
     retval = -1;
     goto connect_recv_FDS_sock_out;
   }

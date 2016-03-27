@@ -4,7 +4,7 @@ LIB=-lpthread -lrt -lTASLimited
 
 all: vote
 
-vote: Controllers Voters AStarVoteTest MapperVoteTest FilterVoteTest ArtPotVoteTest GenericEmptyVoteTest
+vote: Controllers Voters AStarVoteTest MapperVoteTest FilterVoteTest EmptyVoteTest ArtPotVoteTest GenericEmptyVoteTest
 
 %.o: %.c
 	gcc -c -o $@ $< $(INC)
@@ -31,8 +31,12 @@ ArtPotVoteTest: art_pot_vote_test.o $(SRC)
 	cp ../controllers/ArtPot ./
 
 GenericEmptyVoteTest: generic_empty_vote_test.o $(SRC)
-	gcc -o GEVoteTest generic_empty_vote_test.o $(SRC) $(LIB)
+	gcc -o GenericEmptyVoteTest generic_empty_vote_test.o $(SRC) $(LIB)
 	cp ../controllers/GenericEmpty ./
+
+EmptyVoteTest: empty_vote_test.o $(SRC)
+	gcc -o EmptyVoteTest empty_vote_test.o $(SRC) $(LIB)
+	cp ../controllers/Empty ./
 
 AStarVoteTest: a_star_vote_test.o $(SRC)
 	gcc -o AStarVoteTest a_star_vote_test.o $(SRC) $(LIB)
@@ -49,7 +53,6 @@ clean:
 	rm -f Mapper_fd_server
 	rm -f Mapper
 	rm -f FilterVoteTest
-	rm -f FilterTest_fd_server
 	rm -f Filter_fd_server
 	rm -f Filter
 	rm -f ArtPotVoteTest
@@ -58,13 +61,12 @@ clean:
 	rm -f AStarVoteTest
 	rm -f AStar_fd_server
 	rm -f AStar
-	rm -f EmptyTest
-	rm -f EmptyTest_fd_server
+	rm -f EmptyVoteTest
+	rm -f Empty_fd_server
 	rm -f Empty
 	rm -f LoadTest
-	rm -f LoadTest_fd_server
 	rm -f Load
-	rm -f GEVoteTest
+	rm -f GenericEmptyVoteTest
 	rm -f GenericEmpty
 	rm -f GenericEmpty_fd_server
 	rm -f VoterD

@@ -30,17 +30,17 @@ int parseArgs(int argc, const char **argv) {
   setPipeIndexes();
 
   if (argc < 2) {
-    puts("Usage: GenericEmpty <priority> <optional pipes...>\n");
+    puts("Usage: GenericEmpty <priority> <pipe_count> <optional pipes...>\n");
   }
   // TODO: error checking
   priority = atoi(argv[1]);
   pipe_count = 2; // For now always 2
-  if (argc < 4) { // Must request fds
+  if (argc < 5) { // Must request fds (ignores cla, but matches other controllers)
     pid_t pid = getpid();
-    connectRecvFDS(pid, pipes, pipe_count, "GenericEmpty", &pinned_cpu, &priority);
+    connectRecvFDS(pid, pipes, pipe_count, name, &pinned_cpu, &priority);
   } else {
-    deserializePipe(argv[2], &pipes[read_in_index]);
-    deserializePipe(argv[3], &pipes[write_out_index]);
+    deserializePipe(argv[3], &pipes[read_in_index]);
+    deserializePipe(argv[4], &pipes[write_out_index]);
   }
 
   return 0;

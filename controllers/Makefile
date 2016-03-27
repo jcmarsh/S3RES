@@ -47,6 +47,7 @@ copy:
 	cp AStar $(INSTALL_DIR)
 	cp BenchMarker $(INSTALL_DIR)
 	cp Empty $(INSTALL_DIR)
+	cp GenericEmpty $(INSTALL_DIR)
 	cp Filter $(INSTALL_DIR)
 	cp Logger $(INSTALL_DIR)
 	cp Mapper $(INSTALL_DIR)

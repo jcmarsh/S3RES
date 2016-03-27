@@ -125,7 +125,7 @@ int createFDS(struct server_data * sd, const char* name) {
   int index, name_index = 0;
   char* actual_name;
   
-  actual_name = (char *)malloc(sizeof(char) * (strlen(pre_name) + strlen(name) + strlen(post_name)));
+  actual_name = (char *)malloc(sizeof(char) * (strlen(pre_name) + strlen(name) + strlen(post_name) + 1));
   for (index = 0; index < strlen(pre_name); index++) {
     actual_name[name_index++] = pre_name[index];
   }
@@ -136,10 +136,6 @@ int createFDS(struct server_data * sd, const char* name) {
     actual_name[name_index++] = post_name[index];
   }
   actual_name[name_index] = 0;
-
-  //if (asprintf(&actual_name, "%s%s%s", pre_name, name, post_name) < 0) {
-  //  debug_print("FD_ServerR failed to allocate fd_name.\n");
-  //}
 
   sd->sock_fd = socket(PF_UNIX, SOCK_STREAM, 0);
   if (sd->sock_fd < 0) {
