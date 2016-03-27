@@ -19,17 +19,17 @@
 #define CPU_MHZ 1200.000
 //#define VOTER_PIN 0
 //#define CONTROLLER_PIN QUAD_PIN_POLICY
-#define VOTER_PIN 1
-#define CONTROLLER_PIN 1
+#define VOTER_PIN 0
+#define CONTROLLER_PIN 0
 
 // Optiplex 990
 //#define CPU_MHZ 3092.0
-//#define VOTER_CPU 1 // bind voter to CPU 1
-//#define CONTROLLER_PIN 1
+//#define VOTER_CPU 0 // bind voter to CPU 1
+//#define CONTROLLER_PIN 0
 
 // BeagleBone Black Rev C
 //#define CPU_MHZ 1000.0
-//#define VOTER_PIN -1 // Do not bind CPU
-//#define CONTROLLER_PIN -1
+//#define VOTER_PIN 0
+//#define CONTROLLER_PIN 0
 
 #endif /* SYSTEM_H */
