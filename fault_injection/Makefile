@@ -15,9 +15,10 @@ bit_flipper: register_util.o print_registers.h
 	gcc -o bit_flipper register_util.o
 
 copy:
-#	cp bit_flipper $(INSTALL_DIR)
-	cp c_injector  $(INSTALL_DIR)
-	cp injector.py $(INSTALL_DIR)
+#	cp bit_flipper     $(INSTALL_DIR)
+	cp c_injector      $(INSTALL_DIR)
+	cp injector.py     $(INSTALL_DIR)
+	cp player_to_rt.py $(INSTALL_DIR)
 
 clean:
 	rm -f *.o

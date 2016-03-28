@@ -118,50 +118,74 @@ void enterLoop() {
   struct timeval select_timeout;
   fd_set select_set;
   bool waiting_response = false;
-  int retval;
 
-  #ifdef TIME_FULL_BENCH
-    timestamp_t last;
-  #endif
+#ifdef TIME_FULL_BENCH
+  timestamp_t last;
+#endif
 
-  while(1) {
+  while (1) {
+    select_timeout.tv_sec = 1;
+    select_timeout.tv_usec = 0;
+
+    FD_ZERO(&select_set);
+    FD_SET(trans_pipes[0].fd_in, &select_set);
+    FD_SET(replica.vot_pipes[1].fd_in, &select_set);
+
     // Message comes in from translator
-    retval = read(trans_pipes[0].fd_in, &range_pose_data_msg, sizeof(struct comm_range_pose_data));
-    if (retval == sizeof(struct comm_range_pose_data)) {
-      #ifdef TIME_FULL_BENCH
-        last = generate_timestamp();
-      #endif
-
-      if (write(replica.vot_pipes[0].fd_out, &range_pose_data_msg, sizeof(struct comm_range_pose_data)) != sizeof(struct comm_range_pose_data)) {
-        perror("BenchMarker failed range data write");
-      }
-    } else if (retval > 0) {
-      printf("Bench pipe 0 read did no match expected size.\n");
-    } else if (retval < 0) {
-      perror("Bench - pipe 0 read problems");
-    } else {
-      perror("Bench retval == 0 on pipe 0");
-    }
-
     // Message goes out from replica
-    // Second part of the cycle: response from replica
-    retval = read(replica.vot_pipes[1].fd_in, &mov_cmd_msg, sizeof(struct comm_mov_cmd));
-    if (retval == sizeof(struct comm_mov_cmd)) {
-      #ifdef TIME_FULL_BENCH
-        timestamp_t current = generate_timestamp();
-        printf("usec (%lf)\n", diff_time(current, last, CPU_MHZ));
-      #endif
+    int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
+    if (retval > 0) {
+      if (FD_ISSET(trans_pipes[0].fd_in, &select_set)) {
+	retval = read(trans_pipes[0].fd_in, &range_pose_data_msg, sizeof(struct comm_range_pose_data));
+	if (retval == sizeof(struct comm_range_pose_data)) {
+	  if (waiting_response) {
+	    debug_print("ERROR, sending data but still waiting on previous response.\n");
+#ifdef TIME_FULL_BENCH
+	    timestamp_t toss = generate_timestamp();
+	    printf("Error time elapsed (usec): %lf\n", diff_time(toss, last, CPU_MHZ));
+#endif
+	  }
+	  waiting_response = true;
 
-      // data was set by read in enterLoop
-      if (write(trans_pipes[1].fd_out, &mov_cmd_msg, sizeof(struct comm_mov_cmd)) != sizeof(struct comm_mov_cmd)) {
-        perror("Bencmarker failed mov_cmd write");
+#ifdef TIME_FULL_BENCH
+	  last = generate_timestamp(); // TODO: Not sure about this
+#endif
+	  if (write(replica.vot_pipes[0].fd_out, &range_pose_data_msg, sizeof(struct comm_range_pose_data)) != sizeof(struct comm_range_pose_data)) {
+	    perror("BenchMarker failed range data write");
+	  }
+	  // puts("Data into BENCH!\n");
+	} else if (retval > 0) {
+	  printf("Bench pipe 0 read did no match expected size.\n");
+	} else if (retval < 0) {
+	  perror("Bench - pipe 0 read problems");
+	} else {
+	  perror("Bench retval == 0 on pipe 0");
+	}
       }
-    } else if (retval > 0) {
-      printf("Bench pipe 1 read did no match expected size.\n");
-    } else if (retval < 0) {
-      perror("Bench - pipe 1 read problems");
-    } else {
-      perror("Bench retval == 0 on pipe 1");
+ 
+      if (FD_ISSET(replica.vot_pipes[1].fd_in, &select_set)) {
+	// Second part of the cycle: response from replica
+	retval = read(replica.vot_pipes[1].fd_in, &mov_cmd_msg, sizeof(struct comm_mov_cmd));
+	if (retval == sizeof(struct comm_mov_cmd)) {
+	  waiting_response = false;
+
+#ifdef TIME_FULL_BENCH
+	  timestamp_t current = generate_timestamp();
+	  printf("usec (%lf)\n", diff_time(current, last, CPU_MHZ));
+#endif
+
+	  // data was set by read in enterLoop
+	  if (write(trans_pipes[1].fd_out, &mov_cmd_msg, sizeof(struct comm_mov_cmd)) != sizeof(struct comm_mov_cmd)) {
+	    perror("Bencmarker failed mov_cmd write");
+	  }
+	} else if (retval > 0) {
+	  printf("Bench pipe 1 read did no match expected size.\n");
+	} else if (retval < 0) {
+	  perror("Bench - pipe 1 read problems");
+	} else {
+	  perror("Bench retval == 0 on pipe 1");
+	}
+      }
     }
   }
 }

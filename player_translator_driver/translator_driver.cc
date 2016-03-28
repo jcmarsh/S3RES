@@ -135,7 +135,17 @@ int TranslatorDriver::MainSetup() {
 
   puts("Translator driver initialising in MainSetup");
 
-  InitTAS(0, 5);
+  // Initialize the position device we are reading from
+  if (this->SetupOdom() != 0) {
+    return -1;
+  }
+
+  // Initialize the ranger
+  if (this->ranger_addr.interf && this->SetupRanger() != 0) {
+    return -1;
+  }
+
+  InitTAS(0, 45);
   curr_goal[INDEX_X] = curr_goal[INDEX_Y] = curr_goal[INDEX_A] = 0.0;
 
   // Initial starting position
@@ -176,16 +186,6 @@ int TranslatorDriver::MainSetup() {
   fcntl(rep.vot_pipes[1].fd_in, F_SETFL, flags | O_NONBLOCK);
 
   puts("Translator driver ready");
-
-  // Initialize the position device we are reading from
-  if (this->SetupOdom() != 0) {
-    return -1;
-  }
-
-  // Initialize the ranger
-  if (this->ranger_addr.interf && this->SetupRanger() != 0) {
-    return -1;
-  }
 
   return(0);
 }
@@ -265,7 +265,7 @@ void TranslatorDriver::DoOneUpdate() {
   int retval;
   struct comm_mov_cmd recv_msg;
 
-  usleep(50000);
+  usleep(100000);
 
   if (!this->InQueue->Empty()) {
     this->ProcessMessages();
