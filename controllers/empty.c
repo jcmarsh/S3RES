@@ -13,8 +13,6 @@ struct typed_pipe pipes[PIPE_COUNT];
 int pipe_count = PIPE_COUNT;
 int read_in_index, write_out_index;
 
-char *filler;
-
 // TAS related
 int priority;
 int pinned_cpu;
@@ -88,20 +86,6 @@ void enterLoop(void) {
 }
 
 int main(int argc, const char **argv) {
-  //filler = malloc(sizeof(char) * 8896 * 1024 + (sizeof(char) * 150000 * 1024)); // for 160,000 kB
-  // No filler = 1092
-  // filler = malloc(sizeof(char) * 1024 * 952); // for 2048
-  // filler = malloc(sizeof(char) * 1024 * 952 + (sizeof(char) * 1024 * 1024)); // for 3072
-  // filler = malloc(sizeof(char) * 1024 * 952 + (sizeof(char) * 2048 * 1024)); // for 4096
-  // filler = malloc(sizeof(char) * 1024 * 952 + (sizeof(char) * 4096 * 1024)); // for 6144
-  // filler = malloc(sizeof(char) * 1024 * 952 + (sizeof(char) * 6144 * 1024)); // for 8192
-  // filler = malloc(sizeof(char) * 1024 * 952 + (sizeof(char) * (6144 + 4096) * 1024)); // for 12288
-  // filler = malloc(sizeof(char) * 1024 * 952 + (sizeof(char) * (6144 + 8192) * 1024)); // for 16384 
-  // filler = malloc(sizeof(char) * 1024 * 952 + (sizeof(char) * (6144 + 16384) * 1024)); // for 24576
-  // filler = malloc(sizeof(char) * 1024 * 952 + (sizeof(char) * (6144 + 24576) * 1024)); // for 32768
-  // filler = malloc(sizeof(char) * 1024 * 952 + (sizeof(char) * (6144 + 24576 + 16384) * 1024)); // for 49152
-  // filler = malloc(sizeof(char) * 1024 * 952 + (sizeof(char) * (6144 + 24576 + 32768) * 1024)); // for 65536
-
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");
     return -1;

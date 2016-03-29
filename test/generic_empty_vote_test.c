@@ -10,6 +10,7 @@ const char* controller_name = "GenericEmpty";
 int main(int argc, const char** argv) {
   printf("Usage: No voter -> GenericEmptyVoteTest\n");
   printf("       Voter -> GenericEmptyVoteTest <Voter_Name> <Redundancy_Level>\n");
+  printf("       Voter -> GenericEmptyVoteTest <Voter_Name> <Redundancy_Level> <Controller_Name>\n");
 
   pid_t currentPID = 0;
   char** rep_argv;
@@ -30,6 +31,9 @@ int main(int argc, const char** argv) {
     asprintf(&rep_argv[4], "%s:%d:%d", "MSG_BUFFER", 0, pipe_out[1]);
     rep_argv[5] = NULL;
   } else {
+    if (argc == 4) {
+      controller_name = argv[3];
+    }
     // With Voter
     rep_argv = malloc(sizeof(char *) * 8);
     rep_argv[0] = argv[1]; // VoterM or Voterd

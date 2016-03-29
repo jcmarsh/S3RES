@@ -80,7 +80,12 @@ void enterLoop(void) {
   }
 }
 
+char *filler;
 int main(int argc, const char **argv) {
+  #ifdef FILLER_SIZE
+  filler = malloc(sizeof(char) * FILLER_SIZE);
+  #endif
+
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");
     return -1;

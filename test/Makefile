@@ -4,7 +4,7 @@ LIB=-lpthread -lrt -lTASLimited
 
 all: vote
 
-vote: Controllers Voters AStarVoteTest MapperVoteTest FilterVoteTest EmptyVoteTest ArtPotVoteTest GenericEmptyVoteTest
+vote: Controllers Voters AStarVoteTest MapperVoteTest FilterVoteTest EmptyVoteTest ArtPotVoteTest GEVoteTest
 
 %.o: %.c
 	gcc -c -o $@ $< $(INC)
@@ -30,9 +30,10 @@ ArtPotVoteTest: art_pot_vote_test.o $(SRC)
 	gcc -o ArtPotVoteTest art_pot_vote_test.o $(SRC) $(LIB)
 	cp ../controllers/ArtPot ./
 
-GenericEmptyVoteTest: generic_empty_vote_test.o $(SRC)
-	gcc -o GenericEmptyVoteTest generic_empty_vote_test.o $(SRC) $(LIB)
-	cp ../controllers/GenericEmpty ./
+GEVoteTest: generic_empty_vote_test.o $(SRC)
+	gcc -o GEVoteTest generic_empty_vote_test.o $(SRC) $(LIB)
+	make -C ../controllers GenericSizes
+	cp ../controllers/GenericEmpty* ./
 
 EmptyVoteTest: empty_vote_test.o $(SRC)
 	gcc -o EmptyVoteTest empty_vote_test.o $(SRC) $(LIB)
@@ -66,8 +67,8 @@ clean:
 	rm -f Empty
 	rm -f LoadTest
 	rm -f Load
-	rm -f GenericEmptyVoteTest
-	rm -f GenericEmpty
+	rm -f GEVoteTest
+	rm -f GenericEmpty*
 	rm -f GenericEmpty_fd_server
 	rm -f VoterD
 	rm -f VoterM

@@ -42,6 +42,15 @@ Load: load.c $(SRC) $(DEP)
 GenericEmpty: generic_empty.o $(SRC) $(DEP)
 	$(COMPILE) -o GenericEmpty generic_empty.o $(SRC) $(INC) $(LIB)
 
+GenericSizes: generic_empty.c $(SRC) $(DEP)
+	$(COMPILE) -o GenericEmpty_0204K generic_empty.c -D FILLER_SIZE=0 $(SRC) $(INC) $(LIB)
+	$(COMPILE) -o GenericEmpty_0256K generic_empty.c -D FILLER_SIZE=52*1024 $(SRC) $(INC) $(LIB)
+	$(COMPILE) -o GenericEmpty_0512K generic_empty.c -D FILLER_SIZE=52*1024+252*1024 $(SRC) $(INC) $(LIB)
+	$(COMPILE) -o GenericEmpty_1024K generic_empty.c -D FILLER_SIZE=52*1024+766*1024 $(SRC) $(INC) $(LIB)
+	$(COMPILE) -o GenericEmpty_2048K generic_empty.c -D FILLER_SIZE=52*1024+1790*1024 $(SRC) $(INC) $(LIB)
+	$(COMPILE) -o GenericEmpty_4096K generic_empty.c -D FILLER_SIZE=52*1024+3838*1024 $(SRC) $(INC) $(LIB)
+	$(COMPILE) -o GenericEmpty_8192K generic_empty.c -D FILLER_SIZE=52*1024+7934*1024 $(SRC) $(INC) $(LIB)
+
 copy:
 	cp ArtPot $(INSTALL_DIR)
 	cp AStar $(INSTALL_DIR)
@@ -59,7 +68,7 @@ clean:
 	rm -f AStar
 	rm -f BenchMarker
 	rm -f Empty
-	rm -f GenericEmpty
+	rm -f GenericEmpty*
 	rm -f Filter
 	rm -f Logger
 	rm -f Mapper

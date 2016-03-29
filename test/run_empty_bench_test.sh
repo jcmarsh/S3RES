@@ -19,7 +19,7 @@ cat ../include/system_config.h >> $1_comments.txt
 echo "Running NMR case" >> $1_comments.txt
 echo "Running NMR case"
 date
-timeout $BASIC_TIME ./GenericEmptyVoteTest > $1_NMR.txt &
+timeout $BASIC_TIME ./GEVoteTest > $1_NMR.txt &
 sleep 5
 ps -Ao pid,cpuid,maj_flt,min_flt,rtprio,pri,nice,pcpu,stat,wchan:20,comm >> $1_comments.txt
 sleep $SLEEP_TIME
@@ -28,7 +28,7 @@ echo "" >> $1_comments.txt
 echo "Running SMR case" >> $1_comments.txt
 echo "Running SMR case"
 date
-timeout $BASIC_TIME ./GenericEmptyVoteTest VoterM SMR > $1_SMR.txt &
+timeout $BASIC_TIME ./GEVoteTest VoterM SMR > $1_SMR.txt &
 sleep 5
 ps -Ao pid,cpuid,maj_flt,min_flt,rtprio,pri,nice,pcpu,stat,wchan:20,comm >> $1_comments.txt
 sleep $SLEEP_TIME
@@ -37,7 +37,7 @@ echo "" >> $1_comments.txt
 echo "Running DMR case" >> $1_comments.txt
 echo "Running DMR case"
 date
-timeout $BASIC_TIME ./GenericEmptyVoteTest VoterM DMR > $1_DMR.txt &
+timeout $BASIC_TIME ./GEVoteTest VoterM DMR > $1_DMR.txt &
 sleep 5
 ps -Ao pid,cpuid,maj_flt,min_flt,rtprio,pri,nice,pcpu,stat,wchan:20,comm >> $1_comments.txt
 sleep $SLEEP_TIME
@@ -46,7 +46,7 @@ echo "" >> $1_comments.txt
 echo "Running TMR case" >> $1_comments.txt
 echo "Running TMR case"
 date
-timeout $BASIC_TIME ./GenericEmptyVoteTest VoterM TMR > $1_TMR.txt &
+timeout $BASIC_TIME ./GEVoteTest VoterM TMR > $1_TMR.txt &
 sleep 5
 ps -Ao pid,cpuid,maj_flt,min_flt,rtprio,pri,nice,pcpu,stat,wchan:20,comm >> $1_comments.txt
 sleep $SLEEP_TIME
