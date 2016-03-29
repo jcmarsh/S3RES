@@ -118,7 +118,7 @@ void fakeToPipe(struct vote_pipe* pipe, int n) {
   pipe->buff_count = pipe->buff_count - n;  
 }
 
-// checks if n bytes match (wrappes memcmp, so same returns... kinda)
+// checks if n bytes match (wraps memcmp, so same returns... kinda)
 int compareBuffs(struct vote_pipe *pipeA, struct vote_pipe *pipeB, int n) {
   if (pipeA->buff_index != pipeB->buff_index) {
     debug_print("Vote_buff compareBuffs: buffers do not have the same index!\n");

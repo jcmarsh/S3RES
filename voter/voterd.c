@@ -110,7 +110,7 @@ void restart_prep(int restartee, int restarter) {
 void voterRestartHandler(void) {
   // Timer went off, so the timer_stop_index is the pipe which is awaiting a rep
   int p_index;
-  debug_print("Caught Exec / Control loop error (%s)\n", controller_name);
+  debug_print("VoterD(%s) Caught Exec / Control loop error\n", controller_name);
 
   switch (rep_type) {
     case SMR: {
@@ -229,7 +229,7 @@ void doOneUpdate(void) {
       select_timeout.tv_sec = 0;
       select_timeout.tv_usec = remaining;
     } else {
-      debug_print("Restart handler called, %s is %ld late\n", controller_name, remaining);
+      debug_print("VoterD(%s) Restart handler called, %ld late\n", controller_name, remaining);
       voterRestartHandler();
     }
   }
@@ -273,10 +273,12 @@ void doOneUpdate(void) {
           if (ext_pipes[p_index].buff_count > 0) { // TODO: read may still have been interrupted
             processData(&(ext_pipes[p_index]), p_index);
           } else if (ext_pipes[p_index].buff_count < 0) {
-            debug_print("Voter - read error on external pipe - Controller %s pipe %d\n", controller_name, p_index);
+            debug_print("VoterD(%s) read error on external pipe - %d\n", controller_name, p_index);
           } else {
-            debug_print("Voter - read == 0 on external pipe - Controller %s pipe %d\n", controller_name, p_index);
+            debug_print("VoterD(%s) read == 0 on external pipe - %d\n", controller_name, p_index);
           }
+
+	  break; // Hmmmmmmm
         }
       }
     }
@@ -300,11 +302,11 @@ void writeBuffer(int fd_out, unsigned char* buffer, int buff_count) {
   if (retval == buff_count) {
     // success, do nothing
   } else if (retval > 0) { // TODO: resume write? 
-    debug_print("Voter wrote partial message for %s, pipe %d, bytes written: %d\texpected: %d\n", controller_name, fd_out, retval, buff_count);
+    debug_print("VoterD(%s) wrote partial message, pipe %d, bytes written: %d\texpected: %d\n", controller_name, fd_out, retval, buff_count);
   } else if (retval < 0) {
-    debug_print("Voter for %s failed write fd: %d\n", controller_name, fd_out);
+    debug_print("VoterD(%s) failed write fd: %d\n", controller_name, fd_out);
   } else {
-    debug_print("Voter wrote == 0 for %s fd: %d\n", controller_name, fd_out);
+    debug_print("VoterD(%s) wrote == 0 fd: %d\n", controller_name, fd_out);
   }
 }
 
@@ -327,6 +329,7 @@ void processData(struct vote_pipe *pipe, int pipe_index) {
 
   balanceReps(replicas, rep_count, replica_priority);
 
+  // printf("VoterD(%s) writing %d bytes to pipes\n", controller_name, pipe->buff_count);
   for (r_index = 0; r_index < rep_count; r_index++) {
     writeBuffer(replicas[r_index].vot_pipes[pipe_index].fd_out, pipe->buffer, pipe->buff_count);
   }
@@ -369,7 +372,31 @@ void checkSDC(int pipe_num) {
     case DMR:
       // Can detect, and check what to do
       if (compareBuffs(&(replicas[0].vot_pipes[pipe_num]), &(replicas[1].vot_pipes[pipe_num]), bytes_avail) != 0) {
-        debug_print("Voting disagreement: caught SDC in DMR but can't do anything about it.\n");
+        debug_print("VoterD(%s) caught SDC in DMR but can't do anything about it.\n", controller_name);
+	debug_print("\tPipe_num %d, Bytes available %d, buff_counts: %d, %d\n", pipe_num, bytes_avail, replicas[0].vot_pipes[pipe_num].buff_count, replicas[1].vot_pipes[pipe_num].buff_count);
+
+            #ifdef DEBUG_PRINT
+              // Create typed pipes for meta data
+              struct typed_pipe print_pipesA[pipe_count];
+              struct typed_pipe print_pipesB[pipe_count];
+              convertVoteToTyped(replicas[0].vot_pipes, pipe_count, print_pipesA);
+              convertVoteToTyped(replicas[1].vot_pipes, pipe_count, print_pipesB);
+              
+              // Copy the buffer over
+              char *buffer_A = (char *)malloc(sizeof(char) * MAX_VOTE_PIPE_BUFF);
+              char *buffer_B = (char *)malloc(sizeof(char) * MAX_VOTE_PIPE_BUFF);
+              copyBuffer(&(replicas[0].vot_pipes[pipe_num]), buffer_A, bytes_avail);
+              copyBuffer(&(replicas[1].vot_pipes[pipe_num]), buffer_B, bytes_avail);
+
+              // print them out.
+              printBuffer(&(print_pipesA[pipe_num]), buffer_A, bytes_avail);
+              printBuffer(&(print_pipesB[pipe_num]), buffer_B, bytes_avail);
+
+              free(buffer_A);
+              free(buffer_B);
+            #endif /* DEBUG_PRINT */
+
+
       }
 
       sendPipe(pipe_num, 0);
@@ -383,7 +410,7 @@ void checkSDC(int pipe_num) {
           if (compareBuffs(&(replicas[r_index].vot_pipes[pipe_num]), &(replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num]), bytes_avail) != 0) {  
             int restartee = (r_index + 2) % rep_count;
             
-            debug_print("Caught SDC: %s : %d\n", controller_name, replicas[restartee].pid);
+            debug_print("VoterD(%s) Caught SDC: %d\n", controller_name, replicas[restartee].pid);
             #ifdef DEBUG_PRINT
               // print all three or just two?
 
@@ -415,7 +442,7 @@ void checkSDC(int pipe_num) {
         } 
       }
 
-      debug_print("VoterD: TMR no two replicas agreed.\n");
+      debug_print("VoterD(%s): TMR no two replicas agreed.\n", controller_name);
   }
 }
 
@@ -439,7 +466,7 @@ void processFromRep(int replica_num, int pipe_num) {
     balanceReps(replicas, rep_count, replica_priority);
     checkSDC(pipe_num);
   } else {
-    debug_print("Voter - read problem on internal pipe - Controller %s, rep %d, pipe %d\n", controller_name, replica_num, pipe_num);
+    debug_print("VoterD(%s) - read problem on internal pipe. rep %d, pipe %d\n", controller_name, replica_num, pipe_num);
   }
 }
 
@@ -450,7 +477,7 @@ int initVoterD(void) {
 
   // Setup fd server
   if (createFDS(&sd, controller_name) < 0) {
-    debug_print("Failed to create FD server\n");
+    debug_print("VoterD(%s) Failed to create FD server\n", controller_name);
   }
   startReplicas(replicas, rep_count, &sd, controller_name, ext_pipes, pipe_count, replica_priority);
 
@@ -524,7 +551,7 @@ int parseArgs(int argc, const char **argv) {
       pipe_count++;
     }
     if (pipe_count >= PIPE_LIMIT) {
-      debug_print("VoterD: Raise pipe limit.\n");
+      debug_print("VoterD(%s) Raise pipe limit.\n", controller_name);
     }
 
     ext_pipes = (struct vote_pipe *) malloc(sizeof(struct vote_pipe) * pipe_count);

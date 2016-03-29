@@ -241,9 +241,11 @@ bool checkSDC(void) { // returns true if SDC was found
       // Can only detect SDCs
       for (p_index = 0; p_index < out_pipe_count; p_index++) {
         if (replicas[0].buff_counts[p_index] != replicas[1].buff_counts[p_index]) {
+	  debug_print("VoterM(%s) DMR Buff counts off.\n", controller_name);
           fault = true;
           fault_index = 0; // Take a guess, 50 / 50 shot right?
         } else if (memcmp(replicas[0].buffers[p_index], replicas[1].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
+	  debug_print("VoterM(%s) DMR Buff contents off.\n", controller_name);
           fault = true;
           fault_index = 0; // Take a guess, 50 / 50 shot right?
         }
@@ -255,16 +257,16 @@ bool checkSDC(void) { // returns true if SDC was found
       for (p_index = 0; p_index < out_pipe_count; p_index++) {
         if (replicas[0].buff_counts[p_index] != replicas[1].buff_counts[p_index]) {
           if (replicas[0].buff_counts[p_index] != replicas[2].buff_counts[p_index]) {
-            debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[0].pid, replicas[0].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
+            debug_print("VoterM(%s) Buff counts off: %d - %d vs %d - %d\n", controller_name, replicas[0].pid, replicas[0].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
             fault = true;
             fault_index = 0;
           } else {
-            debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[0].pid, replicas[0].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
+            debug_print("VoterM(%s) Buff counts off: %d - %d vs %d - %d\n", controller_name, replicas[0].pid, replicas[0].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
             fault = true;
             fault_index = 1;
           }
         } else if(replicas[0].buff_counts[p_index] != replicas[2].buff_counts[p_index]) {
-          debug_print("Buff counts off: %d - %d vs %d - %d\n", replicas[2].pid, replicas[2].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
+          debug_print("VoterM(%s) Buff counts off: %d - %d vs %d - %d\n", controller_name, replicas[2].pid, replicas[2].buff_counts[p_index], replicas[1].pid, replicas[1].buff_counts[p_index]);
           fault = true;
           fault_index = 2;
         }
@@ -275,16 +277,16 @@ bool checkSDC(void) { // returns true if SDC was found
         for (p_index = 0; p_index < out_pipe_count; p_index++) {
           if (memcmp(replicas[0].buffers[p_index], replicas[1].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
             if (memcmp(replicas[0].buffers[p_index], replicas[2].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
-              debug_print("SDC spotted: %d\n", replicas[0].pid);
+              debug_print("VoterM(%s) SDC spotted: %d\n", replicas[0].pid);
               fault = true;
               fault_index = 0;
             } else {
-              debug_print("SDC spotted: %d\n", replicas[1].pid);
+              debug_print("VoterM(%s) SDC spotted: %d\n", replicas[1].pid);
               fault = true;
               fault_index = 1;
             }
           } else if (memcmp(replicas[0].buffers[p_index], replicas[2].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
-            debug_print("SDC spotted: %d\n", replicas[2].pid);
+            debug_print("VoterM(%s) SDC spotted: %d\n", replicas[2].pid);
             fault = true;
             fault_index = 2;
           }
@@ -343,7 +345,6 @@ void forkReplicas(int rep_index, int rep_count) {
     }
     rep_argv[1][str_index++] = 48 + (replicas[index].priority % 10);
     rep_argv[1][str_index] = 0;
-    debug_print("CONVERTED %d to %s\n", replicas[index].priority, rep_argv[1]);
 
     // pipe_count will always be positive, and no more than 2 digits.
     rep_argv[2] = (char *) malloc(sizeof(char) * 3); // 2 + null
@@ -356,9 +357,6 @@ void forkReplicas(int rep_index, int rep_count) {
     //debug_print("CONVERTED %d to %s\n", (in_pipe_count + out_pipe_count), rep_argv[2]);
 
     rep_argv[3] = NULL;
-
-    debug_print("Args for new replica:\n");
-    debug_print("Arg 0: %s\tArg 1: %s\tArg 2: %s\n", rep_argv[0], rep_argv[1], rep_argv[2]);
 
     //replicas[index]->pid = forkSingle(rep_argv);
     pid_t currentPID = fork();
@@ -382,6 +380,8 @@ void forkReplicas(int rep_index, int rep_count) {
 
 // Start all replicas (or just restart one)
 void startReplicas(bool forking, int rep_index, int rep_start_count) {
+  debug_print("VoterM(%s) is starting a replica.\n", controller_name);
+
   #ifdef TIME_RESTART_REPLICA
     timestamp_t last = generate_timestamp();
   #endif /* TIME_RESTART_REPLICA */
@@ -626,7 +626,7 @@ int main(int argc, const char **argv) {
         // sets timeout_occurred and #done
         if (!timeout_occurred) { // All reps responded in time.
           if (checkSDC()) { // checkSDC will have to kill faulty replicas on its own and set fault_index
-            debug_print("SDC detected: %d - %d\n", fault_index, replicas[fault_index].pid);
+            debug_print("VoterM(%s) SDC detected: %d - %d\n", controller_name, fault_index, replicas[fault_index].pid);
             // SDC found, recover (SMR will never trip SDC)
             startReplicas(false, fault_index, 1); // restarts fault_index
             sendData((fault_index + (rep_count - 1)) % rep_count);
@@ -636,7 +636,7 @@ int main(int argc, const char **argv) {
         } else { // timeout_occurred
           // Need to make sure killed in case of CFE (for SMR, DMR, and TMR)
           findFaultReplica(); // set fault_index
-          debug_print("CFE or ExecFault detected: %s %d - %d\n", controller_name, fault_index, replicas[fault_index].pid);
+          debug_print("VoterM(%s) CFE or ExecFault detected: %d - %d\n", controller_name, fault_index, replicas[fault_index].pid);
           killAndClean(fault_index);
           if (1 == rep_count) {
             // With SMR, have to restart the replica from it's exec

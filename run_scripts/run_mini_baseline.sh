@@ -7,9 +7,9 @@ output=Dropbox/Research/EMSOFT16/mini_test/latest_run
 
 source ./common_test.sh
 
-player_time=320s
-basic_time=310s
-another_time=300s
+player_time=260s
+basic_time=250s
+another_time=240s
 
 itars=9
 

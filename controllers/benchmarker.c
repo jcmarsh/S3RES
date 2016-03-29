@@ -144,16 +144,17 @@ void enterLoop() {
 	    timestamp_t toss = generate_timestamp();
 	    printf("Error time elapsed (usec): %lf\n", diff_time(toss, last, CPU_MHZ));
 #endif
-	  }
-	  waiting_response = true;
+	  } else { // Data is dropped if PINT hasn't yet responded.
+	    waiting_response = true;
 
 #ifdef TIME_FULL_BENCH
-	  last = generate_timestamp(); // TODO: Not sure about this
+	    last = generate_timestamp();
 #endif
-	  if (write(replica.vot_pipes[0].fd_out, &range_pose_data_msg, sizeof(struct comm_range_pose_data)) != sizeof(struct comm_range_pose_data)) {
-	    perror("BenchMarker failed range data write");
-	  }
-	  // puts("Data into BENCH!\n");
+
+	    if (write(replica.vot_pipes[0].fd_out, &range_pose_data_msg, sizeof(struct comm_range_pose_data)) != sizeof(struct comm_range_pose_data)) {
+	      perror("BenchMarker failed range data write");
+	    }
+	  }	
 	} else if (retval > 0) {
 	  printf("Bench pipe 0 read did no match expected size.\n");
 	} else if (retval < 0) {
