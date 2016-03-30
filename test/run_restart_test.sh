@@ -38,15 +38,15 @@ cat ../include/system_config.h >> $1_comments.txt
 
 echo "Running SMR case" >> $1_comments.txt
 echo "Running SMR case"
-runRestart SMR GenericEmpty_0204K SMR
+runRestart SMR GenericEmpty_00204K SMR
 
 echo "Running DMR case" >> $1_comments.txt
 echo "Running DMR case"
-runRestart DMR GenericEmpty_0204K DMR
+runRestart DMR GenericEmpty_00204K DMR
 
 echo "Running TMR case" >> $1_comments.txt
 echo "Running TMR case"
-runRestart TMR GenericEmpty_0204K TMR
+runRestart TMR GenericEmpty_00204K TMR
 
 echo "With TMR and different sizes" >> $1_comments.txt
 echo "With TMR and different sizes"
