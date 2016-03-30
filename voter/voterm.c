@@ -427,7 +427,7 @@ void startReplicas(bool forking, int rep_index, int rep_start_count) {
   }
   #ifdef TIME_RESTART_REPLICA
     timestamp_t current = generate_timestamp();
-    printf("voterm_usec (%lf)\n", diff_time(current, last, CPU_MHZ));
+    printf("voterm_usec restart (%lf)\n", diff_time(current, last, CPU_MHZ));
   #endif /* TIME_RESTART_REPLICA */
 }
 
@@ -435,7 +435,12 @@ void startReplicas(bool forking, int rep_index, int rep_start_count) {
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
 int initVoterM(void) {
   // Setup fd server
-  createFDS(&sd, controller_name);
+  // Horrible hack for having different named GenericEmpty controllers for tests
+  if (controller_name[0] == 'G' && controller_name[7] == 'E') {
+    createFDS(&sd, "GenericEmpty");
+  } else {
+    createFDS(&sd, controller_name);
+  }
 
   //initReplicas(reps, num, name, default_priority);
   int index, jndex;

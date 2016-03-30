@@ -38,21 +38,23 @@ cat ../include/system_config.h >> $1_comments.txt
 
 echo "Running SMR case" >> $1_comments.txt
 echo "Running SMR case"
-runRestart SMR GenericEmpty_0204K SMR
+runRestart SMR GenericEmpty_00204K SMR
 
 echo "Running DMR case" >> $1_comments.txt
 echo "Running DMR case"
-runRestart DMR GenericEmpty_0204K DMR
+runRestart DMR GenericEmpty_00204K DMR
 
 echo "Running TMR case" >> $1_comments.txt
 echo "Running TMR case"
-runRestart TMR GenericEmpty_0204K TMR
+runRestart TMR GenericEmpty_00204K TMR
 
-echo "With TMR and different sizes" >> $1_comments
+echo "With TMR and different sizes" >> $1_comments.txt
 echo "With TMR and different sizes"
-runRestart TMR GenericEmpty_0256K TMR_0256K
-runRestart TMR GenericEmpty_0512K TMR_0512K
-runRestart TMR GenericEmpty_1024K TMR_1024K
-runRestart TMR GenericEmpty_2048K TMR_2048K
-runRestart TMR GenericEmpty_4096K TMR_4096K
-runRestart TMR GenericEmpty_8192K TMR_8192K
+runRestart TMR GenericEmpty_00256K TMR_00256K
+runRestart TMR GenericEmpty_00512K TMR_00512K
+runRestart TMR GenericEmpty_01024K TMR_01024K
+runRestart TMR GenericEmpty_02048K TMR_02048K
+runRestart TMR GenericEmpty_04096K TMR_04096K
+runRestart TMR GenericEmpty_08192K TMR_08192K
+runRestart TMR GenericEmpty_16384K TMR_16384K
+runRestart TMR GenericEmpty_32768K TMR_32768K
