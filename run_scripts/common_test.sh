@@ -7,7 +7,7 @@ config_dir=$pint_dir/controllers/configs
 runExperiment () {
     echo "**** Starting runExperiment $2, $1 + 1 iterations ****"
     for index in `seq 0 $1`; do
-	echo "**** Iteration $1 ****"
+	echo "**** Iteration $index ****"
 	timeout $3 player baseline.cfg > $2$index.txt &
 	python player_to_rt.py 30
 	sleep 5
@@ -24,7 +24,7 @@ runExperiment () {
 runExperimentFaults() {
     echo "**** Starting runExperimentFaults $2 w/ $3, $1 + 1 iterations ****"
     for index in `seq 0 $1`; do
-	echo "**** Iteration $1 ****"
+	echo "**** Iteration $index ****"
 	timeout $4 player baseline.cfg > $2$index.txt &
 	python player_to_rt.py 30
 	sleep 5
