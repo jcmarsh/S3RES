@@ -92,16 +92,16 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
         debug_print("Controller signal unblock error.\n");
       }
 
+      // InitTAS before connectRecvFDS forces memory operations before voter continues.
+      InitTAS(pinned_cpu, priority);
+      setPipeIndexes();
+
       // Get own pid, send to voter
       currentPID = getpid();
       if (connectRecvFDS(currentPID, pipes, pipe_count, name, &pinned_cpu, &priority) < 0) {
         debug_print("Error in %s: failed connectRecvFDS call.\n", name);
         return;
       }
-
-      InitTAS(pinned_cpu, priority);
-
-      setPipeIndexes();
       
       return;
     } else {   // Parent needs to re-lock / walk own pages

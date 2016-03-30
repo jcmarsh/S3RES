@@ -37,7 +37,7 @@ int main(int argc, const char** argv) {
     // With Voter
     rep_argv = malloc(sizeof(char *) * 8);
     rep_argv[0] = argv[1]; // VoterM or Voterd
-    rep_argv[1] = "GenericEmpty";
+    rep_argv[1] = controller_name;
     rep_argv[2] = argv[2]; // SMR, DMR, or TMR
     rep_argv[3] = "800"; // Timeout
     rep_argv[4] = "80";  // priority
@@ -73,7 +73,7 @@ int main(int argc, const char** argv) {
 
     timestamp_t current = generate_timestamp();
 
-    printf("generic_empty_test_usec (%lf)\n", diff_time(current, last, CPU_MHZ));
+    //printf("generic_empty_test_usec (%lf)\n", diff_time(current, last, CPU_MHZ));
 
     usleep(100000); // 10 Hz
   }
