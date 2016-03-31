@@ -2,16 +2,16 @@
 
 # Check Baseline performance (configurations with no faults injected).
 
-pint_dir=/home/debian/research/PINT
-output=Dropbox/Research/EMSOFT16/mini_test/latest_run
+#pint_dir=/home/debian/research/PINT
+output=Dropbox/Research/EMSOFT16/mini_test/sim_two_latest
 
 source ./common_test.sh
 
-player_time=260s
-basic_time=250s
-another_time=240s
+player_time=220s
+basic_time=210s
+another_time=200s
 
-itars=9
+itars=79
 
 # Now all with load
 
@@ -40,12 +40,12 @@ rm *.txt
 sleep 60
 
 # 03 All TMR baseline
-cp $config_dir/all_tmr_wl.cfg ./config_plumber.cfg
-runExperiment $itars baseline_all_tmr_wl_ $player_time $basic_time
-tar -cvf baseline_all_tmr_wl.tar *.txt
-sudo -u debian scp baseline_all_tmr_wl.tar jcmarsh@$sim_ip:~/$output
-rm *.txt
-sleep 60
+#cp $config_dir/all_tmr_wl.cfg ./config_plumber.cfg
+#runExperiment $itars baseline_all_tmr_wl_ $player_time $basic_time
+#tar -cvf baseline_all_tmr_wl.tar *.txt
+#sudo -u debian scp baseline_all_tmr_wl.tar jcmarsh@$sim_ip:~/$output
+#rm *.txt
+#sleep 60
 
 # 04 Reactive TMR, other DMR baseline
 cp $config_dir/rl_tmr_other_dmr_wl.cfg ./config_plumber.cfg
@@ -64,9 +64,9 @@ rm *.txt
 sleep 60
 
 # 06 Filter SMR, all others TMR
-cp $config_dir/filter_smr_all_tmr_wl.cfg ./config_plumber.cfg
-runExperiment $itars filter_smr_all_tmr_wl_ $player_time $basic_time
-tar -cvf filter_smr_all_tmr_wl.tar *.txt
-sudo -u debian scp filter_smr_all_tmr_wl.tar jcmarsh@$sim_ip:~/$output
-rm *.txt
-sleep 60
+#cp $config_dir/filter_smr_all_tmr_wl.cfg ./config_plumber.cfg
+#runExperiment $itars filter_smr_all_tmr_wl_ $player_time $basic_time
+#tar -cvf filter_smr_all_tmr_wl.tar *.txt
+#sudo -u debian scp filter_smr_all_tmr_wl.tar jcmarsh@$sim_ip:~/$output
+#rm *.txt
+#sleep 60
