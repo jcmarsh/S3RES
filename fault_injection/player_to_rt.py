@@ -8,7 +8,7 @@ from subprocess import Popen, PIPE, call
 
 # Get the pid of the named process
 def getPID(name):
-	proc = Popen('ps | grep "' + name + '"', shell=True, stdout=PIPE)
+	proc = Popen('ps -a | grep "' + name + '"', shell=True, stdout=PIPE)
 	for line in proc.stdout:
 		words = line.split()
 		try:
