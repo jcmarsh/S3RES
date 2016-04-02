@@ -32,7 +32,7 @@ ArtPotVoteTest: art_pot_vote_test.o $(SRC)
 
 GEVoteTest: generic_empty_vote_test.o $(SRC)
 	gcc -o GEVoteTest generic_empty_vote_test.o $(SRC) $(LIB)
-	make -C ../controllers GenericSizes
+	#make -C ../controllers GenericSizes
 	cp ../controllers/GenericEmpty* ./
 
 EmptyVoteTest: empty_vote_test.o $(SRC)

@@ -62,8 +62,12 @@ int main(int argc, const char** argv) {
 
   timestamp_t last;
   while (1) {
-    int send_buffer[] = {4, 0, 1, 2, 3};
-    int receive_buffer[] = {0, 0, 0, 0, 0};
+    //int send_buffer[] = {4, 0, 1, 2, 3};
+    //int receive_buffer[] = {0, 0, 0, 0, 0};
+    //int send_buffer[1024] = {1};
+    //int receive_buffer[1024] = {0};
+    int send_buffer[2048] = {1};
+    int receive_buffer[2048] = {0};
 
     last = generate_timestamp();
     write(pipe_in[1], send_buffer, sizeof(send_buffer));
@@ -73,7 +77,7 @@ int main(int argc, const char** argv) {
 
     timestamp_t current = generate_timestamp();
 
-    //printf("generic_empty_test_usec (%lf)\n", diff_time(current, last, CPU_MHZ));
+    printf("generic_empty_test_usec (%lf)\n", diff_time(current, last, CPU_MHZ));
 
     usleep(100000); // 10 Hz
   }

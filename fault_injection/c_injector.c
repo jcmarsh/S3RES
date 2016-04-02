@@ -57,12 +57,6 @@ int main(int argc, char *argv[]) {
 
 	InitTAS(0, 97); // Super high priority.
 
-	log_file = fopen("injector_log.txt", "w");
-	if (log_file == NULL) {
-		printf("ERROR: c_injector failed open file.\n");
-		exit(0);
-	}
-
 	if (argc < 2) {
 		printUsage();
 		exit(0);
@@ -77,17 +71,17 @@ int main(int argc, char *argv[]) {
 		printf("Running as non-RT\n");
 	}
 
-	if (2 == argc) {
+	//	if (2 == argc) {
 		// No process names specified, assume default 4
-		process_names = (char **)default_names;
-	} else {
-		process_names = &(argv[2]);
-		count = argc - 2;
-		printf("This is my test of args\n");
-		for (i = 0; i < count; i++) {
-			printf("\targ %d, %s\n", i, process_names[i]);
-		}
-	}
+	process_names = (char **)default_names;
+	//} else { // TODO: bug here
+	//	process_names = &(argv[2]);
+	//	count = argc - 2;
+	//	printf("This is my test of args\n");
+	//	for (i = 0; i < count; i++) {
+	//		printf("\targ %d, %s\n", i, process_names[i]);
+	//	}
+	//}
 
 	int *pids = (int *)malloc(count * 3 * sizeof(int)); // 3 for TMR, assumed max
 	float *weights = (float *)malloc(count * 3 * sizeof(float)); // 3 for TMR, assumed max
@@ -117,14 +111,22 @@ int main(int argc, char *argv[]) {
 	free(names_string);
 
 	srand(time(NULL));
+	// TODO: count should be two variables. Was the number of types of components, now the total count of components.
+	count = getPIDs(pids, weights, cmd_str);
 	while(true) {
 		int total = 0;
-		usleep(500 * 1000);
+		usleep(2000 * 1000);
 
 		total = getPIDs(pids, weights, cmd_str);
 		if (total < count) {
 			printf("Error, less processes found than named.\n");
 		} else {
+		  // TODO: This program needs work.
+		  int kill_index = rand() % total;
+		  kill(pids[kill_index], SIGKILL);
+		  printf("SIGKILL on %d\n", pids[kill_index]);
+
+		  /*
 			float kill_index = (float)((rand() / (double)(RAND_MAX)) * 100);
 			float psum = 0.0;
 
@@ -138,6 +140,7 @@ int main(int argc, char *argv[]) {
 			}
 			
 			fprintf(log_file, "\tInjection done. %f %f\n", psum, kill_index);
+		  */
 		}
 	}
 
