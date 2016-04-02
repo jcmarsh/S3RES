@@ -277,16 +277,16 @@ bool checkSDC(void) { // returns true if SDC was found
         for (p_index = 0; p_index < out_pipe_count; p_index++) {
           if (memcmp(replicas[0].buffers[p_index], replicas[1].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
             if (memcmp(replicas[0].buffers[p_index], replicas[2].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
-              debug_print("VoterM(%s) SDC spotted: %d\n", replicas[0].pid);
+              debug_print("VoterM(%s) SDC spotted: %d\n", controller_name, replicas[0].pid);
               fault = true;
               fault_index = 0;
             } else {
-              debug_print("VoterM(%s) SDC spotted: %d\n", replicas[1].pid);
+              debug_print("VoterM(%s) SDC spotted: %d\n", controller_name, replicas[1].pid);
               fault = true;
               fault_index = 1;
             }
           } else if (memcmp(replicas[0].buffers[p_index], replicas[2].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
-            debug_print("VoterM(%s) SDC spotted: %d\n", replicas[2].pid);
+            debug_print("VoterM(%s) SDC spotted: %d\n", controller_name, replicas[2].pid);
             fault = true;
             fault_index = 2;
           }

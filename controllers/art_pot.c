@@ -122,8 +122,6 @@ void command(void) {
   int total_factors, i;
   bool request_way = false;
 
-  // pid_t currentPID = getpid(); // TODO: left over from debugging?
-
   // Head towards the goal! odom_pose: 0-x, 1-y, 2-theta
   dist = sqrt(pow(goal[INDEX_X] - pos[INDEX_X], 2) + pow(goal[INDEX_Y] - pos[INDEX_Y], 2));
   theta = atan2(goal[INDEX_Y] - pos[INDEX_Y], goal[INDEX_X] - pos[INDEX_X]) - pos[INDEX_A];

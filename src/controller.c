@@ -94,7 +94,6 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
 
       // InitTAS before connectRecvFDS forces memory operations before voter continues.
       InitTAS(pinned_cpu, priority);
-      setPipeIndexes();
 
       // Get own pid, send to voter
       currentPID = getpid();
@@ -102,6 +101,8 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
         debug_print("Error in %s: failed connectRecvFDS call.\n", name);
         return;
       }
+      
+      setPipeIndexes(); // Needs to be AFTER new pipe fds have been attained in connectRecvFDS. Crazy, huh?
       
       return;
     } else {   // Parent needs to re-lock / walk own pages
