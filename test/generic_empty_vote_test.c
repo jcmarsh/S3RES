@@ -1,44 +1,68 @@
 // Test Generic Empty
 
+#include <unistd.h>
+
 #include "commtypes.h"
 #include "replicas.h"
 #include "system_config.h"
 #include "taslimited.h"
 
-const char* controller_name = "GenericEmpty";
-
-int main(int argc, const char** argv) {
-  printf("Usage: No voter -> GenericEmptyVoteTest\n");
-  printf("       Voter -> GenericEmptyVoteTest <Voter_Name> <Redundancy_Level>\n");
-  printf("       Voter -> GenericEmptyVoteTest <Voter_Name> <Redundancy_Level> <Controller_Name>\n");
+int main(int argc, char** argv) {
+  printf("Usage: GenericEmptyVoteTest [-s send_size] [-v voter_name] [-c controller_name] [-r redundancy_level]\n");
+  //  printf("       Voter -> GenericEmptyVoteTest <Voter_Name> <Redundancy_Level>\n");
+  //  printf("       Voter -> GenericEmptyVoteTest <Voter_Name> <Redundancy_Level> <Controller_Name>\n");
 
   pid_t currentPID = 0;
   char** rep_argv;
   int pipe_in[2], pipe_out[2];
+  int arg_ret;
+  int send_size = 8;
+  char* voter_name = NULL;
+  char* redundancy_level = NULL;
+  char* controller_name = "GenericEmpty";
+
+  while ((arg_ret = getopt (argc, argv, "s:v:c:r:")) != -1) {
+    switch(arg_ret) {
+    case 's':
+      send_size = atoi(optarg);
+      break;
+    case 'v':
+      voter_name = optarg;
+      break;
+    case 'c':
+      controller_name = optarg;
+      break;
+    case 'r':
+      redundancy_level = optarg;
+      break;
+    case '?':
+      fprintf (stderr, "Arg parsing error\n");
+      return 1;
+    default:
+      abort ();
+    }
+  }
 
   InitTAS(VOTER_PIN, 50);
 
   pipe(pipe_in);
   pipe(pipe_out);
 
-  if (argc == 1) {
+  if (NULL == voter_name) {
     // No Voter
     rep_argv = malloc(sizeof(char *) * 6);
-    rep_argv[0] = "GenericEmpty";
+    rep_argv[0] = controller_name;
     rep_argv[1] = "80"; // priority
     rep_argv[2] = "2"; // Pipe Count (ignored)
     asprintf(&rep_argv[3], "%s:%d:%d", "MSG_BUFFER", pipe_in[0], 0);
     asprintf(&rep_argv[4], "%s:%d:%d", "MSG_BUFFER", 0, pipe_out[1]);
     rep_argv[5] = NULL;
   } else {
-    if (argc == 4) {
-      controller_name = argv[3];
-    }
     // With Voter
     rep_argv = malloc(sizeof(char *) * 8);
-    rep_argv[0] = argv[1]; // VoterM or Voterd
+    rep_argv[0] = voter_name; // VoterM or Voterd
     rep_argv[1] = controller_name;
-    rep_argv[2] = argv[2]; // SMR, DMR, or TMR
+    rep_argv[2] = redundancy_level; // SMR, DMR, or TMR
     rep_argv[3] = "800"; // Timeout
     rep_argv[4] = "80";  // priority
     asprintf(&rep_argv[5], "%s:%d:%d:%d", "MSG_BUFFER", pipe_in[0], 0, 1);
@@ -58,27 +82,36 @@ int main(int argc, const char** argv) {
     }
   }
 
+  printf("Running with send_size %d\n", send_size);
+
   sleep(2);
 
   timestamp_t last;
   while (1) {
-    //int send_buffer[] = {4, 0, 1, 2, 3};
-    //int receive_buffer[] = {0, 0, 0, 0, 0};
-    //int send_buffer[1024] = {1};
-    //int receive_buffer[1024] = {0};
-    int send_buffer[2048] = {1};
-    int receive_buffer[2048] = {0};
+    int write_ret, read_ret;
+    char *send_buffer = malloc(sizeof(char) * send_size);
+    char *receive_buffer = malloc(sizeof(char) * send_size);
+
+    memset(send_buffer, 'a', send_size);
 
     last = generate_timestamp();
-    write(pipe_in[1], send_buffer, sizeof(send_buffer));
+    write_ret = write(pipe_in[1], send_buffer, send_size);
 
     // read filtered data
-    read(pipe_out[0], receive_buffer, sizeof(receive_buffer));
+    read_ret = read(pipe_out[0], receive_buffer, send_size);
 
     timestamp_t current = generate_timestamp();
 
+    if (write_ret != send_size) {
+      printf("ERROR: write sizes don't match %d - %d\n", write_ret, send_size);
+    }
+
+    if (read_ret != send_size) {
+      printf("ERROR: read sizes don't match %d - %d\n", read_ret, send_size);
+    }
+
     printf("generic_empty_test_usec (%lf)\n", diff_time(current, last, CPU_MHZ));
 
-    usleep(100000); // 10 Hz
+    usleep(100 * 1000); // 10 Hz
   }
 }
