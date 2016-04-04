@@ -125,7 +125,7 @@ int main(int argc, char *argv[]) {
 		  int kill_index = rand() % total;
 		  kill(pids[kill_index], SIGKILL);
 		  printf("SIGKILL on %d\n", pids[kill_index]);
-
+		  fflush(stdout);
 		  /*
 			float kill_index = (float)((rand() / (double)(RAND_MAX)) * 100);
 			float psum = 0.0;

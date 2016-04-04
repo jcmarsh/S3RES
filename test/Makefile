@@ -14,6 +14,7 @@ Controllers:
 
 Voters:
 	cp ../fault_injection/injector.py ./
+	cp ../fault_injection/c_injector ./
 	make -C ../voter
 	cp ../voter/VoterM ./
 	cp ../voter/VoterD ./
@@ -49,6 +50,7 @@ LoadTest: load_test.o $(SRC)
 
 clean:
 	rm -f injector.py
+	rm -f c_injector
 	rm -f *.o
 	rm -f MapperVoteTest
 	rm -f Mapper_fd_server
