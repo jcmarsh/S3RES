@@ -13,6 +13,7 @@ Controllers:
 	make -C ../controllers
 
 Voters:
+	make -C ../fault_injection
 	cp ../fault_injection/injector.py ./
 	cp ../fault_injection/c_injector ./
 	make -C ../voter
@@ -69,6 +70,7 @@ clean:
 	rm -f Empty
 	rm -f LoadTest
 	rm -f Load
+	rm -f Load_fd_server
 	rm -f GEVoteTest
 	rm -f GenericEmpty*
 	rm -f GenericEmpty_fd_server

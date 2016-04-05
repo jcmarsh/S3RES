@@ -24,7 +24,7 @@ int main(int argc, const char** argv) {
     // No Voter
     rep_argv = malloc(sizeof(char *) * 8);
     rep_argv[0] = "AStar";
-    rep_argv[1] = "80"; // priority
+    rep_argv[1] = "30"; // priority
     rep_argv[2] = "4"; // Pipe Count
     asprintf(&rep_argv[3], "%s:%d:%d", "MAP_UPDATE", map_in[0], 0);
     asprintf(&rep_argv[4], "%s:%d:%d", "COMM_ACK", 0, ack_out[1]);
@@ -38,7 +38,7 @@ int main(int argc, const char** argv) {
     rep_argv[1] = "AStar";
     rep_argv[2] = argv[2]; // SMR, DMR, or TMR
     rep_argv[3] = "80000"; // Timeout
-    rep_argv[4] = "80";  // priority
+    rep_argv[4] = "30";  // priority
     asprintf(&rep_argv[5], "%s:%d:%d:%d", "MAP_UPDATE", map_in[0], 0, 1);
     asprintf(&rep_argv[6], "%s:%d:%d:%d", "COMM_ACK", 0, ack_out[1], 1);
     asprintf(&rep_argv[7], "%s:%d:%d:%d", "WAY_REQ", way_req_in[0], 0, 2);
@@ -58,24 +58,26 @@ int main(int argc, const char** argv) {
 
   sleep(2);
 
-  int loops = 100;
   int c = 0;
   int i;
   timestamp_t last;
   struct comm_way_req way_req;
   struct comm_way_res way_res;
-  while (loops--) {
+  while (true) {
     // send waypoint request
     write(way_req_in[1], &way_req, sizeof(way_req));
     read(way_res_out[0], &way_res, sizeof(way_res));
-    printf("Waypoint: %f, %f\n", way_res.point[0], way_res.point[1]);
+    //printf("Waypoint: %f, %f\n", way_res.point[0], way_res.point[1]);
 
     // Send Map update
     // x y pose, obstacle count (5), and x y for each obstacle
-    int buffer[13] = {4, 5, 5, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4};
+    unsigned char buffer[] = {(4 >> 24) & 0xFF, (4 >> 16) & 0xFF, (4 >> 8) & 0xFF, 4 & 0xFF,
+			      (5 >> 24) & 0xFF, (5 >> 16) & 0xFF, (5 >> 8) & 0xFF, 5 & 0xFF,
+			      (5 >> 24) & 0xFF, (5 >> 16) & 0xFF, (5 >> 8) & 0xFF, 5 & 0xFF,
+			      0, 0, 1, 1, 2, 2, 3, 3, 4, 4};
 
     last = generate_timestamp();
-    write(map_in[1], buffer, sizeof(int) * 13);
+    write(map_in[1], buffer, sizeof(buffer));
 
     //write(way_req_in[1], &way_req, sizeof(way_req));
     //write(way_req_in[1], &way_req, sizeof(way_req));
@@ -86,21 +88,8 @@ int main(int argc, const char** argv) {
     
     timestamp_t current = generate_timestamp();
 
-    printf("ast_test_usec (%lf)\n", diff_time(current, last, CPU_MHZ));
-    read(way_res_out[0], &way_res, sizeof(way_res));
-    printf("Waypoint: %f, %f\n", way_res.point[0], way_res.point[1]);
-
-    // send waypoint request
-    //write(way_req_in[1], &way_req, sizeof(way_req));
-    write(way_req_in[1], &way_req, sizeof(way_req));
-    // get waypoint response
-    read(way_res_out[0], &way_res, sizeof(way_res));
-    printf("Waypoint: %f, %f\n", way_res.point[0], way_res.point[1]);
-
-    write(way_req_in[1], &way_req, sizeof(way_req));
-    read(way_res_out[0], &way_res, sizeof(way_res));    
-    printf("Waypoint: %f, %f\n", way_res.point[0], way_res.point[1]);
-
-  	sleep(1);
+    //printf("ast_test_usec (%lf)\n", diff_time(current, last, CPU_MHZ));
+    
+    usleep(1000);
   }
 }

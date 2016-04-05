@@ -9,10 +9,6 @@
  * James Marshall
  */
 
- /*
-  * TODO: May need to support different signals (right now just kills)
-  */
-
 #include <sched.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -24,125 +20,121 @@
 
 #include "taslimited.h"
 
+#define SLEEP_USEC 2000 * 1000
+
 void printUsage(void) {
-	printf("Usage: ./c_injector <ignored> [controller_name_0 ... controller_name_n]\n");
-	printf("\t'kill -9'\tsend SIGTERM is the current default\n");
-	printf("\t'/bin/kill -s 37'\tSimulate Silent Data Corruption (NOT IMPLEMENTED)\n");
-	printf("\t'/bin/kill -s 38'\tSimulate Control Flow Error (NOT IMPLEMENTED)\n");
-	printf("If controllers are not specified, assumes: AStar ArtPot Filter Mapper\n");
+  printf("Usage: ./c_injector [kill command] [controller_name_0 ... controller_name_n]\n");
+  printf("\tSuggested kill commands: '9' for Exec (SIGKILL), '37' for SDCs, and '38' for CFE.\n");
+  printf("If controllers are not specified, assumes: AStar ArtPot Filter Mapper\n");
 }
 
 int getPIDs(int *pids, float *weights, const char *cmd) {
-	FILE *pout;
-	char line[80];
-	int i = 0;
+  FILE *pout;
+  char line[80];
+  int i = 0;
 
-	pout = popen(cmd, "r");
-	while (fgets(line, 80, pout) != NULL) {
-		sscanf(line, "%d %f", &pids[i], &weights[i]);
-		i++;
-	}
+  pout = popen(cmd, "r");
+  while (fgets(line, 80, pout) != NULL) {
+    sscanf(line, "%d %f", &pids[i], &weights[i]);
+    i++;
+  }
 
-	pclose(pout);
+  pclose(pout);
 
-	return i;
+  return i;
 }
 
 int main(int argc, char *argv[]) {
-	char *default_names[4] = {"AStar", "Filter", "Mapper", "ArtPot"};
-	char **process_names;
-	unsigned int count = 4;
-	int i, j;
-	FILE *log_file;
+  char *default_names[4] = {"AStar", "Filter", "Mapper", "ArtPot"};
+  char **controller_names;
+  int kill_cmd;
+  unsigned int controller_count = 4;
+  unsigned int process_count;
+  int i, j;
+  FILE *log_file;
 
-	InitTAS(0, 97); // Super high priority.
+  InitTAS(0, 97); // Super high priority.
 
-	if (argc < 2) {
-		printUsage();
-		exit(0);
+  if (argc < 2) {
+    printUsage();
+    exit(0);
+  }
+
+  kill_cmd = atoi(argv[1]);
+
+  if (2 == argc) {
+    // No process names specified, assume default 4
+    controller_names = (char **)default_names;
+  } else { // TODO: bug here
+    controller_count = argc - 2;
+    controller_names = (char **) malloc(sizeof(char*) * controller_count);
+    for (i = 0; i < controller_count; i++) {
+      controller_names[i] = argv[2+i];
+      // printf("\tcontroller name %d - %s\n", i, controller_names[i]);
+    }
+  }
+
+  int *pids = (int *)malloc(controller_count * 3 * sizeof(int)); // 3 for TMR, assumed max
+  float *weights = (float *)malloc(controller_count * 3 * sizeof(float)); // 3 for TMR, assumed max
+
+  int name_length = 0;
+  for (i = 0; i < controller_count; i++) {
+    name_length += strlen(controller_names[i]) + 2; // 2 for the \| separator needed
+  }
+  name_length++;
+
+  char * names_string = malloc(name_length * sizeof(char));
+  int total_i = 0;
+  for (i = 0; i < controller_count; i++) {
+    for (j = 0; j < strlen(controller_names[i]); j++) {
+      names_string[total_i++] = controller_names[i][j];
+    }
+    if (i + 1 < controller_count) {
+      names_string[total_i++] = '\\';
+      names_string[total_i++] = '|';
+    } else {
+      names_string[total_i] = '\0';
+    }
+  }
+
+  char* cmd_str;
+  i = asprintf(&cmd_str, "ps -ao pid,pcpu,comm | grep \"%s\" | grep -v \"Test\" | grep -v \"defunct\"", names_string);
+  free(names_string);
+
+  srand(time(NULL));
+  
+  printf("c_injector kill signal: %d, usleep %d\n\tpid search: %s\n", kill_cmd, SLEEP_USEC, cmd_str);
+  process_count = getPIDs(pids, weights, cmd_str); // # of process at startup.
+  while(true) {
+    int total = 0;
+    usleep(SLEEP_USEC);
+
+    total = getPIDs(pids, weights, cmd_str);
+    if (total < process_count) {
+      printf("Error, less processes found than named.\n");
+    } else {
+      // TODO: This program needs work.
+      int kill_index = rand() % total;
+      kill(pids[kill_index], kill_cmd);
+      printf("Signal %d on %d\n", kill_cmd, pids[kill_index]);
+      fflush(stdout);
+      /*
+	float kill_index = (float)((rand() / (double)(RAND_MAX)) * 100);
+	float psum = 0.0;
+
+	for (i = 0; i < total; i++) {
+	psum += weights[i];
+	if (psum > kill_index) {
+	fprintf(log_file, "Killing pid %d\n", pids[i]);
+	kill(pids[i], kill_cmd);
+	break;
+	}
 	}
 
-	// Set as RT, high priority
-	struct sched_param param;
-	param.sched_priority = sched_get_priority_max(SCHED_RR) - 1;
-
-	// set the scheduler as with policy of round robin (realtime)
-	if (sched_setscheduler(getpid(), SCHED_RR, &param ) == -1) {
-		printf("Running as non-RT\n");
-	}
-
-	//	if (2 == argc) {
-		// No process names specified, assume default 4
-	process_names = (char **)default_names;
-	//} else { // TODO: bug here
-	//	process_names = &(argv[2]);
-	//	count = argc - 2;
-	//	printf("This is my test of args\n");
-	//	for (i = 0; i < count; i++) {
-	//		printf("\targ %d, %s\n", i, process_names[i]);
-	//	}
-	//}
-
-	int *pids = (int *)malloc(count * 3 * sizeof(int)); // 3 for TMR, assumed max
-	float *weights = (float *)malloc(count * 3 * sizeof(float)); // 3 for TMR, assumed max
-
-	int name_length = 0;
-	for (i = 0; i < count; i++) {
-		name_length += strlen(process_names[i]) + 2; // 2 for the \| separator needed, -1 for the \0
-	}
-	name_length--;
-
-	char * names_string = malloc(name_length * sizeof(char));
-	int total_i = 0;
-	for (i = 0; i < count; i++) {
-		for (j = 0; j < strlen(process_names[i]); j++) {
-			names_string[total_i++] = process_names[i][j];
-		}
-		if (i + 1 < count) {
-			names_string[total_i++] = '\\';
-			names_string[total_i++] = '|';
-		} else {
-			names_string[total_i] = '\0';
-		}
-	}
-
-	char* cmd_str;
-	i = asprintf(&cmd_str, "ps -ao pid,pcpu,comm | grep \"%s\" | grep -v \"Test\" | grep -v \"defunct\"", names_string);
-	free(names_string);
-
-	srand(time(NULL));
-	// TODO: count should be two variables. Was the number of types of components, now the total count of components.
-	count = getPIDs(pids, weights, cmd_str);
-	while(true) {
-		int total = 0;
-		usleep(2000 * 1000);
-
-		total = getPIDs(pids, weights, cmd_str);
-		if (total < count) {
-			printf("Error, less processes found than named.\n");
-		} else {
-		  // TODO: This program needs work.
-		  int kill_index = rand() % total;
-		  kill(pids[kill_index], SIGKILL);
-		  printf("SIGKILL on %d\n", pids[kill_index]);
-		  fflush(stdout);
-		  /*
-			float kill_index = (float)((rand() / (double)(RAND_MAX)) * 100);
-			float psum = 0.0;
-
-			for (i = 0; i < total; i++) {
-				psum += weights[i];
-				if (psum > kill_index) {
-					fprintf(log_file, "Killing pid %d\n", pids[i]);
-					kill(pids[i], SIGKILL);
-					break;
-				}
-			}
-			
-			fprintf(log_file, "\tInjection done. %f %f\n", psum, kill_index);
-		  */
-		}
-	}
-
-	return 0;
+	fprintf(log_file, "\tInjection done. %f %f\n", psum, kill_index);
+      */
+    }
+  }
+ 
+  return 0;
 }
