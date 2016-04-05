@@ -92,8 +92,8 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
         debug_print("Controller signal unblock error.\n");
       }
 
-      // InitTAS before connectRecvFDS forces memory operations before voter continues.
-      InitTAS(pinned_cpu, priority);
+      // InitTAS now done inside of connectRecvFDS.
+      // InitTAS(pinned_cpu, priority);
 
       // Get own pid, send to voter
       currentPID = getpid();

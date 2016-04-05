@@ -111,6 +111,9 @@ int connectRecvFDS(pid_t pid, struct typed_pipe* pipes, int pipe_count, const ch
     goto connect_recv_FDS_sock_out;
   }
 
+  // Needs to be done here: Piority and pin must be set after new values recieved, and memory must be locked before returning to the voter (on pid return);
+  InitTAS(*pinned_cpu, *priority);
+  
   // Send pid
   if (write(sock_fd, &pid, sizeof(pid_t)) < 0) {
     debug_print("FD_client write for pid failed.\n");

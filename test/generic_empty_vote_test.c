@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
     // No Voter
     rep_argv = malloc(sizeof(char *) * 6);
     rep_argv[0] = controller_name;
-    rep_argv[1] = "80"; // priority
+    rep_argv[1] = "40"; // priority
     rep_argv[2] = "2"; // Pipe Count (ignored)
     asprintf(&rep_argv[3], "%s:%d:%d", "MSG_BUFFER", pipe_in[0], 0);
     asprintf(&rep_argv[4], "%s:%d:%d", "MSG_BUFFER", 0, pipe_out[1]);
@@ -64,7 +64,7 @@ int main(int argc, char** argv) {
     rep_argv[1] = controller_name;
     rep_argv[2] = redundancy_level; // SMR, DMR, or TMR
     rep_argv[3] = "800"; // Timeout
-    rep_argv[4] = "80";  // priority
+    rep_argv[4] = "40";  // priority
     asprintf(&rep_argv[5], "%s:%d:%d:%d", "MSG_BUFFER", pipe_in[0], 0, 1);
     asprintf(&rep_argv[6], "%s:%d:%d:%d", "MSG_BUFFER", 0, pipe_out[1], 1);
     rep_argv[7] = NULL;

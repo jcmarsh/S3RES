@@ -134,7 +134,9 @@ int  collectFromReps(bool set_timer, int expected) {
     FD_ZERO(&select_set);
     for (r_index = 0; r_index < rep_count; r_index++) {
       for (p_index = 0; p_index < out_pipe_count; p_index++) {
-        FD_SET(replicas[r_index].fd_outs[p_index], &select_set);
+	if (replicas[r_index].fd_outs[p_index] != 0) { // FD may have been closed by killAndClean
+	  FD_SET(replicas[r_index].fd_outs[p_index], &select_set);
+	}
       }
     }
 
@@ -213,12 +215,16 @@ void killAndClean(int rep_to_kill) {
   for (p_index = 0; p_index < in_pipe_count; p_index++) {
     // rep and vote sides
     close(replicas[rep_to_kill].fd_ins[p_index]);
+    replicas[rep_to_kill].fd_ins[p_index] = 0;
     close(for_reps[rep_to_kill].fd_ins[p_index]);
+    for_reps[rep_to_kill].fd_ins[p_index] = 0;
   }
   for (p_index = 0; p_index < out_pipe_count; p_index++) {
     // rep and vote sides
     close(replicas[rep_to_kill].fd_outs[p_index]);
+    replicas[rep_to_kill].fd_outs[p_index] = 0;
     close(for_reps[rep_to_kill].fd_outs[p_index]);
+    for_reps[rep_to_kill].fd_outs[p_index] = 0;
   }
 
   // Prevents zombies from accumulating
