@@ -28,15 +28,20 @@ void printUsage(void) {
   printf("If controllers are not specified, assumes: AStar ArtPot Filter Mapper\n");
 }
 
-int getPIDs(int *pids, float *weights, const char *cmd) {
+// Expected that pids, weights, and names all have count elements allocated
+int getPIDs(int count, int *pids, float *weights, char **names, const char *cmd) {
   FILE *pout;
   char line[80];
   int i = 0;
 
   pout = popen(cmd, "r");
   while (fgets(line, 80, pout) != NULL) {
-    sscanf(line, "%d %f", &pids[i], &weights[i]);
+    sscanf(line, "%d %f %s", &pids[i], &weights[i], names[i]);
     i++;
+    if (i > count) {
+      printf("Error, more components than expected.\n");
+      return i;
+    }
   }
 
   pclose(pout);
@@ -70,12 +75,15 @@ int main(int argc, char *argv[]) {
     controller_names = (char **) malloc(sizeof(char*) * controller_count);
     for (i = 0; i < controller_count; i++) {
       controller_names[i] = argv[2+i];
-      // printf("\tcontroller name %d - %s\n", i, controller_names[i]);
     }
   }
 
   int *pids = (int *)malloc(controller_count * 3 * sizeof(int)); // 3 for TMR, assumed max
   float *weights = (float *)malloc(controller_count * 3 * sizeof(float)); // 3 for TMR, assumed max
+  char **names = (char **)malloc(controller_count * 3 * sizeof(char *)); // 3 for TMR, assumed max
+  for (i = 0; i < controller_count * 3; i++) {
+    names[i] = (char *)malloc(sizeof(char *) * 25);
+  }
 
   int name_length = 0;
   for (i = 0; i < controller_count; i++) {
@@ -104,19 +112,19 @@ int main(int argc, char *argv[]) {
   srand(time(NULL));
   
   printf("c_injector kill signal: %d, usleep %d\n\tpid search: %s\n", kill_cmd, SLEEP_USEC, cmd_str);
-  process_count = getPIDs(pids, weights, cmd_str); // # of process at startup.
+  process_count = getPIDs(controller_count * 3, pids, weights, names, cmd_str); // # of process at startup.
   while(true) {
     int total = 0;
     usleep(SLEEP_USEC);
 
-    total = getPIDs(pids, weights, cmd_str);
+    total = getPIDs(process_count, pids, weights, names, cmd_str);
     if (total < process_count) {
       printf("Error, less processes found than named.\n");
     } else {
       // TODO: This program needs work.
       int kill_index = rand() % total;
       kill(pids[kill_index], kill_cmd);
-      printf("Signal %d on %d\n", kill_cmd, pids[kill_index]);
+      printf("Signal %d on %d (%s)\n", kill_cmd, pids[kill_index], names[kill_index]);
       fflush(stdout);
       /*
 	float kill_index = (float)((rand() / (double)(RAND_MAX)) * 100);
