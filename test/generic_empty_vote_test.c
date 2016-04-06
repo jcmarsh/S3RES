@@ -43,7 +43,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  InitTAS(VOTER_PIN, 50);
+  InitTAS(VOTER_PIN, 49);
 
   pipe(pipe_in);
   pipe(pipe_out);

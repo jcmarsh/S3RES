@@ -18,9 +18,9 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "taslimited.h"
+//#include "taslimited.h"
 
-#define SLEEP_USEC 2000 * 1000
+#define SLEEP_USEC 5000 * 1000
 
 void printUsage(void) {
   printf("Usage: ./c_injector [kill command] [controller_name_0 ... controller_name_n]\n");
@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
   int i, j;
   FILE *log_file;
 
-  InitTAS(0, 97); // Super high priority.
+  // InitTAS(0, 49); // Super high priority.
 
   if (argc < 2) {
     printUsage();

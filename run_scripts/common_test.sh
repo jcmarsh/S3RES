@@ -9,11 +9,13 @@ runExperiment () {
     for index in `seq 0 $1`; do
 	echo "**** Iteration $index ****"
 	timeout $3 player baseline.cfg > $2$index.txt &
-	python player_to_rt.py 30
+	python player_to_rt.py 16
 	sleep 5
 	timeout $4 $pint_dir/stage_control/basic $sim_ip &
 	sleep $4
-	sleep 40
+	sleep 20
+	pkill timeout
+	sleep 20
     done
     echo "**** Finished $2 ****"
     echo ""
@@ -26,7 +28,7 @@ runExperimentFaults() {
     for index in `seq 0 $1`; do
 	echo "**** Iteration $index ****"
 	timeout $4 player baseline.cfg > $2$index.txt &
-	python player_to_rt.py 30
+	python player_to_rt.py 16
 	sleep 5
 	timeout $5 $pint_dir/stage_control/basic $sim_ip &
 	sleep 5
@@ -35,7 +37,9 @@ runExperimentFaults() {
 	timeout $6 ./c_injector $3 >> $2injector_$index.txt &
 	sleep $6
 	ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm >> $2injector_$index.txt
-	sleep 40
+	sleep 20
+	pkill timeout
+	sleep 20
     done
     echo "**** Finished $2 ****"
     echo ""

@@ -11,7 +11,7 @@ int main(int argc, const char** argv) {
   printf("Usage: No voter -> ArtPotVoteTest\n");
   printf("       Voter -> ArtPotVoteTest <Voter_Name> <Redundancy_Level>\n");
 
-  InitTAS(VOTER_PIN, 50);
+  InitTAS(VOTER_PIN, 49);
 
   pid_t currentPID = 0;
   char** rep_argv;

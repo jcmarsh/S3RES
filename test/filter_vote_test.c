@@ -24,7 +24,7 @@ int main(int argc, const char** argv) {
     // No Voter
     rep_argv = malloc(sizeof(char *) * 8);
     rep_argv[0] = "Filter";
-    rep_argv[1] = "80"; // priority
+    rep_argv[1] = "40"; // priority
     rep_argv[2] = "4"; // Pipe Count
     asprintf(&rep_argv[3], "%s:%d:%d", "RANGE_POSE_DATA", pipe_in[0], 0);
     asprintf(&rep_argv[4], "%s:%d:%d", "RANGE_POSE_DATA", 0, pipe_out0[1]);
@@ -38,7 +38,7 @@ int main(int argc, const char** argv) {
     rep_argv[1] = "Filter";
     rep_argv[2] = argv[2]; // SMR, DMR, or TMR
     rep_argv[3] = "800"; // Timeout
-    rep_argv[4] = "80";  // priority
+    rep_argv[4] = "40";  // priority
     asprintf(&rep_argv[5], "%s:%d:%d:%d", "RANGE_POSE_DATA", pipe_in[0], 0, 1);
     asprintf(&rep_argv[6], "%s:%d:%d:%d", "RANGE_POSE_DATA", 0, pipe_out0[1], 0);
     asprintf(&rep_argv[7], "%s:%d:%d:%d", "RANGE_POSE_DATA", 0, pipe_out1[1], 0);

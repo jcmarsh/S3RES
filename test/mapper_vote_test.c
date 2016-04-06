@@ -14,7 +14,7 @@ int main(int argc, const char** argv) {
   printf("Usage: No voter -> MapperVoteTest\n");
   printf("       Voter -> MapperVoteTest <Voter_Name> <Redundancy_Level>\n");
 
-  InitTAS(VOTER_PIN, 50);
+  InitTAS(VOTER_PIN, 49);
 
   pid_t currentPID = 0;
   char** rep_argv;
@@ -41,7 +41,7 @@ int main(int argc, const char** argv) {
     rep_argv[1] = "Mapper";
     rep_argv[2] = argv[2];
     rep_argv[3] = "800";
-    rep_argv[4] = "80";
+    rep_argv[4] = "40";
     asprintf(&rep_argv[5], "%s:%d:%d:%d", "RANGE_POSE_DATA", ranger_in[0], 0, 1);
     asprintf(&rep_argv[6], "%s:%d:%d:%d", "MAP_UPDATE", 0, maps_out[1], 1);
     asprintf(&rep_argv[7], "%s:%d:%d:%d", "COMM_ACK", acks_in[0], 0, 0);
