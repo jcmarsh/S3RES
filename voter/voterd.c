@@ -56,6 +56,26 @@ void checkSDC(int pipe_num);
 void processFromRep(int replica_num, int pipe_num);
 void writeBuffer(int fd_out, unsigned char* buffer, int buff_count);
 
+timestamp_t start_time;
+void reportRUsageHandler(int sign, siginfo_t *si, void *unused) {
+  // getrusage isn't in the safe list... so we'll see.
+  timestamp_t current = generate_timestamp();
+  struct rusage usage;
+
+  printf("Report RUsage VoterD - (%d)\n", getpid());
+  printf("\tTime since process init: %lf\n", diff_time(current, start_time, CPU_MHZ));
+
+  if (getrusage(RUSAGE_SELF, &usage) < 0) {
+    perror("Controller getrusage failed");
+  } else {
+    printf("\tUtime:\t%ld Sec %ld uSec\n", usage.ru_utime.tv_sec, usage.ru_utime.tv_usec);
+    printf("\tStime:\t%ld Sec %ld uSec\n", usage.ru_stime.tv_sec, usage.ru_stime.tv_usec);
+
+    printf("\tRSS:\t %ld %ld %ld %ld\n", usage.ru_maxrss, usage.ru_ixrss, usage.ru_idrss, usage.ru_isrss);
+    printf("\tFLT:\t %ld %ld\n", usage.ru_minflt, usage.ru_majflt);
+  }
+}
+
 void restart_prep(int restartee, int restarter) {
   int i;
 
@@ -473,6 +493,18 @@ void processFromRep(int replica_num, int pipe_num) {
 ////////////////////////////////////////////////////////////////////////////////
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
 int initVoterD(void) {
+  // register for rusage signal and take start time.
+  struct sigaction sa;
+  start_time = generate_timestamp();
+
+  sa.sa_flags = SA_SIGINFO;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_sigaction = reportRUsageHandler;
+  if (sigaction(RRUSAGE_SIGNAL, &sa, NULL) == -1) {
+    debug_print("Failed to register VoterM for the report rusage handler.\n");
+    return -1;
+  }
+
   replica_priority = voter_priority - VOTER_PRIO_OFFSET;
 
   // Setup fd server

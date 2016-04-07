@@ -1,9 +1,5 @@
 #include "controller.h"
-#include "taslimited.h"
-
-#ifdef TIME_RESTART_SIGNAL
-#include "system_config.h"
-#endif
+//#include "tas_time.h"
 
 // All extern here must be in the controller code (such as art_pot.c)
 extern void setPipeIndexes(void);
@@ -27,9 +23,32 @@ void testCFEHandler(int signo, siginfo_t *si, void *unused) {
   insertCFE = true;
 }
 
+extern float diff_time(timestamp_t current, timestamp_t last, float cpu_mhz);
+
+timestamp_t start_time;
+void reportRUsageHandler(int sign, siginfo_t *si, void *unused) {
+  // getrusage isn't in the safe list... so we'll see.
+  timestamp_t current = generate_timestamp();
+  struct rusage usage;
+
+  printf("Report RUsage (%d)\n", getpid());
+  printf("\tTime (uSec) since process init: %f\n", diff_time(current, start_time, CPU_MHZ));
+
+  if (getrusage(RUSAGE_SELF, &usage) < 0) {
+    perror("Controller getrusage failed");
+  } else {
+    printf("\tUtime:\t%ld Sec %ld uSec\n", usage.ru_utime.tv_sec, usage.ru_utime.tv_usec);
+    printf("\tStime:\t%ld Sec %ld uSec\n", usage.ru_stime.tv_sec, usage.ru_stime.tv_usec);
+
+    printf("\tRSS:\t %ld %ld %ld %ld\n", usage.ru_maxrss, usage.ru_ixrss, usage.ru_idrss, usage.ru_isrss);
+    printf("\tFLT:\t %ld %ld\n", usage.ru_minflt, usage.ru_majflt);
+  }
+}
+
 // Pipes should already be initialized by parseArgs or connectRecvFDS
 int initController(void) {
   struct sigaction sa;
+  start_time = generate_timestamp();
 
   sa.sa_flags = SA_SIGINFO;
   sigemptyset(&sa.sa_mask);
@@ -52,6 +71,14 @@ int initController(void) {
   sa.sa_sigaction = testCFEHandler;
   if (sigaction(CFE_SIM_SIGNAL, &sa, NULL) == -1) {
     debug_print("Failed to register the simulate sdc handler.\n");
+    return -1;
+  }
+
+  sa.sa_flags = SA_SIGINFO;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_sigaction = reportRUsageHandler;
+  if (sigaction(RRUSAGE_SIGNAL, &sa, NULL) == -1) {
+    debug_print("Failed to register the report rusage handler.\n");
     return -1;
   }
 
@@ -88,6 +115,7 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
       sigaddset(&signal_set, RESTART_SIGNAL);
       sigaddset(&signal_set, SDC_SIM_SIGNAL);
       sigaddset(&signal_set, CFE_SIM_SIGNAL);
+      sigaddset(&signal_set, RRUSAGE_SIGNAL);
       if (sigprocmask(SIG_UNBLOCK, &signal_set, NULL) < 0) {
         debug_print("Controller signal unblock error.\n");
       }

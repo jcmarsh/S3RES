@@ -8,6 +8,7 @@ INCLUDE (UsePlayerPlugin)
 PLAYER_ADD_PLUGIN_DRIVER (translator_driver SOURCES translator_driver.cc ../src/replicas.c ../src/commtypes.c)
 
 target_link_libraries(translator_driver TASLimited)
+include_directories(translator_driver ../tas_lib/inc/)
 
 INSTALL(FILES ./build/libtranslator_driver.so
   DESTINATION ./lib/)

@@ -21,32 +21,32 @@ Voters:
 	cp ../voter/VoterD ./
 
 MapperVoteTest: mapper_vote_test.o $(SRC)
-	gcc -o MapperVoteTest mapper_vote_test.o $(SRC) $(LIB)
+	gcc -o MapperVoteTest mapper_vote_test.o $(SRC) $(INC) $(LIB)
 	cp ../controllers/Mapper ./
 
 FilterVoteTest: filter_vote_test.o $(SRC)
-	gcc -o FilterVoteTest filter_vote_test.o $(SRC) $(LIB)
+	gcc -o FilterVoteTest filter_vote_test.o $(SRC) $(INC) $(LIB)
 	cp ../controllers/Filter ./
 
 ArtPotVoteTest: art_pot_vote_test.o $(SRC)
-	gcc -o ArtPotVoteTest art_pot_vote_test.o $(SRC) $(LIB)
+	gcc -o ArtPotVoteTest art_pot_vote_test.o $(SRC) $(INC) $(LIB)
 	cp ../controllers/ArtPot ./
 
 GEVoteTest: generic_empty_vote_test.o $(SRC)
-	gcc -o GEVoteTest generic_empty_vote_test.o $(SRC) $(LIB)
+	gcc -o GEVoteTest generic_empty_vote_test.o $(SRC) $(INC) $(LIB)
 	#make -C ../controllers GenericSizes
 	cp ../controllers/GenericEmpty* ./
 
 EmptyVoteTest: empty_vote_test.o $(SRC)
-	gcc -o EmptyVoteTest empty_vote_test.o $(SRC) $(LIB)
+	gcc -o EmptyVoteTest empty_vote_test.o $(SRC) $(INC) $(LIB)
 	cp ../controllers/Empty ./
 
 AStarVoteTest: a_star_vote_test.o $(SRC)
-	gcc -o AStarVoteTest a_star_vote_test.o $(SRC) $(LIB)
+	gcc -o AStarVoteTest a_star_vote_test.o $(SRC) $(INC) $(LIB)
 	cp ../controllers/AStar ./
 
 LoadTest: load_test.o $(SRC)
-	gcc -o LoadTest load_test.o $(SRC) -lrt -lTASLimited
+	gcc -o LoadTest load_test.o $(SRC) $(INC) -lrt -lTASLimited
 	cp ../controllers/Load ./
 
 clean:
