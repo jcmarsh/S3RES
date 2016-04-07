@@ -64,6 +64,7 @@ void reportRUsageHandler(int sign, siginfo_t *si, void *unused) {
     printf("\tRSS:\t %ld %ld %ld %ld\n", usage.ru_maxrss, usage.ru_ixrss, usage.ru_idrss, usage.ru_isrss);
     printf("\tFLT:\t %ld %ld\n", usage.ru_minflt, usage.ru_majflt);
   }
+  fflush(stdout);
 }
 
 // sets active_pipe_index (pipe data came in on)
