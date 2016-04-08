@@ -52,7 +52,7 @@ void reportRUsageHandler(int sign, siginfo_t *si, void *unused) {
   timestamp_t current = generate_timestamp();
   struct rusage usage;
 
-  printf("Report RUsage VoterM - (%d)\n", getpid());
+  printf("Report RUsage VoterM(%s) - (%d)\n", controller_name, getpid());
   printf("\tTime since process init: %lf\n", diff_time(current, start_time, CPU_MHZ));
 
   if (getrusage(RUSAGE_SELF, &usage) < 0) {
