@@ -42,7 +42,7 @@ Once built, the libraries will be in a directory `bin-ARCH/`, which can be insta
 
     sudo install bin-arm/diet /usr/local/bin
 
-## Compiling and Running
+## Compiling
 
 PINT currently uses Player / Stage as a simulation environment. One machine will act as the simulator and needs to have Player and Stage installed, while the machines that are acting as the robots only require Player. One machine can be used for everything, which is convenient for testing an development. For experiments dealing with timing, using dedicate machines for each robot is required.
 
@@ -120,6 +120,21 @@ On the BeagleBone Black `libccv` ran out of memory while building. I was able to
     free -m 
     
 If it worked, last like should show available swap: `Swap:          939          0        939`. I still had issues, and ended up commenting out the vgg sample.
+
+## Running
+
+To start the Stage simulator with a single robot on the simulation computer, from `stage/experiments` run:
+
+     player simulator_only.cfg
+
+To run the robot control program on the same machine you would use `single_computer.cfg` instead. The configuration files have some oddities that are artifacts from when they altered for each experimental run, which is no longer the case.
+
+On the computer that will control the robot, first make sure that appropriate `pre_run.sh` script is run one time before starting any tests. It will do things like set cpu scaling, load the pmu module on the BBB, and disable hyper-threading on the quad-core system. Then you will start player with the appropriate config (needs to have the ip address of the simulation computer) to start the benchmarking plugin, set player to have an RT priority, kick off the simulation by connecting a client to player (normally it would control the robot, but instead the benchmarker launches `plumber` which sets everything up depending on `config_plumber.cfg`), and then launch whatever fault injection program you would like. Simple. It looks something like this:
+
+    sudo player baseline.cfg &> ../nmr_usage_runs.txt &
+    sudo python player_to_rt.py 16
+    ./basic 192.168.0.104 &
+    sudo python check_usage.py > nmr_bb_usage_02.txt
 
 ## Directory / Contents
 * `./controllers/` - Components in a robotic control system. Each runs as a process, and communication is done through pipes
