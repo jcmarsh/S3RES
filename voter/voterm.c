@@ -671,7 +671,7 @@ int main(int argc, const char **argv) {
         // sets timeout_occurred and #done
         if (!timeout_occurred) { // All reps responded in time.
           if (checkSDC()) { // checkSDC will have to kill faulty replicas on its own and set fault_index
-            printf("VoterM(%s) SDC detected: %d - <%d>\n", controller_name, fault_index, replicas[fault_index].pid);
+            fprintf(stderr, "VoterM(%s) SDC detected: %d - <%d>\n", controller_name, fault_index, replicas[fault_index].pid);
             // SDC found, recover (SMR will never trip SDC)
             startReplicas(false, fault_index, 1); // restarts fault_index
             sendData((fault_index + (rep_count - 1)) % rep_count);
@@ -681,7 +681,7 @@ int main(int argc, const char **argv) {
         } else { // timeout_occurred
           // Need to make sure killed in case of CFE (for SMR, DMR, and TMR)
           findFaultReplica(); // set fault_index
-          printf("VoterM(%s) CFE or ExecFault detected: %d - <%d>\n", controller_name, fault_index, replicas[fault_index].pid);
+          fprintf(stderr, "VoterM(%s) CFE or ExecFault detected: %d - <%d>\n", controller_name, fault_index, replicas[fault_index].pid);
           killAndClean(fault_index);
           if (1 == rep_count) {
             // With SMR, have to restart the replica from it's exec

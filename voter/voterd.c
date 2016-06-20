@@ -158,7 +158,7 @@ void voterRestartHandler(void) {
         printf("Restart time elapsed usec (%lf)\n", diff_time(end_restart, start_restart, CPU_MHZ));
       #endif // TIME_RESTART_REPLICA
 
-	printf("VoterD(%s) Caught Exec / Control loop error in SMR: %d - <%d>\n", controller_name, 0, replicas[0].pid);
+	fprintf(stderr, "VoterD(%s) Caught Exec / Control loop error in SMR: %d - <%d>\n", controller_name, 0, replicas[0].pid);
       break;
     }
     case DMR: { // Intentional fall-through to TMR
@@ -167,7 +167,7 @@ void voterRestartHandler(void) {
       // The failed rep should be the one behind on the timer pipe
       int restartee = behindRep(replicas, rep_count, timer_stop_index[current_timer]);
       int restarter = (restartee + (rep_count - 1)) % rep_count;
-      printf("VoterD(%s) Caught Exec / Control loop error: %d - <%d>\n", controller_name, restartee, replicas[restartee].pid);
+      fprintf(stderr, "VoterD(%s) Caught Exec / Control loop error: %d - <%d>\n", controller_name, restartee, replicas[restartee].pid);
       restart_prep(restartee, restarter);
       break;
     }
