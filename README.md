@@ -9,6 +9,7 @@ This is likely a temporary repo (thus the terrible name). Meant to simulate Sing
 * Player / Stage
 * dietlibc (Just for Voters, makes them 40% smaller than musl)
 * musl (Needed for Voters, recommended for components)
+* Flex and Bison
 * libccv (for Load component).
 
 Everything can be compiled just fine with glibc, but you will need to edit the Makefiles.
