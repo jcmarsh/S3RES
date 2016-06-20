@@ -131,7 +131,6 @@ void restart_prep(int restartee, int restarter) {
 void voterRestartHandler(void) {
   // Timer went off, so the timer_stop_index is the pipe which is awaiting a rep
   int p_index;
-  debug_print("VoterD(%s) Caught Exec / Control loop error\n", controller_name);
 
   switch (rep_type) {
     case SMR: {
@@ -159,6 +158,7 @@ void voterRestartHandler(void) {
         printf("Restart time elapsed usec (%lf)\n", diff_time(end_restart, start_restart, CPU_MHZ));
       #endif // TIME_RESTART_REPLICA
 
+	printf("VoterD(%s) Caught Exec / Control loop error in SMR: %d - <%d>\n", controller_name, 0, replicas[0].pid);
       break;
     }
     case DMR: { // Intentional fall-through to TMR
@@ -167,7 +167,7 @@ void voterRestartHandler(void) {
       // The failed rep should be the one behind on the timer pipe
       int restartee = behindRep(replicas, rep_count, timer_stop_index[current_timer]);
       int restarter = (restartee + (rep_count - 1)) % rep_count;
-      debug_print("\tPID: %d\n", replicas[restartee].pid);
+      printf("VoterD(%s) Caught Exec / Control loop error: %d - <%d>\n", controller_name, restartee, replicas[restartee].pid);
       restart_prep(restartee, restarter);
       break;
     }
@@ -431,7 +431,7 @@ void checkSDC(int pipe_num) {
           if (compareBuffs(&(replicas[r_index].vot_pipes[pipe_num]), &(replicas[(r_index + 2) % rep_count].vot_pipes[pipe_num]), bytes_avail) != 0) {  
             int restartee = (r_index + 2) % rep_count;
             
-            debug_print("VoterD(%s) Caught SDC: %d\n", controller_name, replicas[restartee].pid);
+            debug_print("VoterD(%s) Caught SDC: %d - <%d>\n", controller_name, restartee, replicas[restartee].pid);
             #ifdef DEBUG_PRINT
               // print all three or just two?
 
