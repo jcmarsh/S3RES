@@ -54,10 +54,12 @@ struct comm_way_res {
 };
 
 struct comm_mov_cmd {
+  int seq_count; // Used for debugging.
   double vel_cmd[2];
 };
 
 struct comm_range_pose_data {
+  int seq_count; // Used for debugging.
   double ranges[RANGER_COUNT];
   double pose[3];
 };
@@ -102,13 +104,13 @@ void commCopyWaypoints(struct comm_way_res* recv_msg, double* waypoints, double*
 
 int commSendWaypointRequest(struct typed_pipe* pipe, int padding);
 
-int commSendMoveCommand(struct typed_pipe* pipe, double vel_0, double vel_1);
+int commSendMoveCommand(struct typed_pipe* pipe, int seq_count, double vel_0, double vel_1);
 
 int commSendMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg);
 int commRecvMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg);
 
-int commSendRanger(struct typed_pipe* pipe, double* ranger_data, double* pose_data);
-void commCopyRanger(struct comm_range_pose_data* recv_msg, double* range_data, double* pose_data);
+int commSendRanger(struct typed_pipe* pipe, int seq_count, double* ranger_data, double* pose_data);
+void commCopyRanger(struct comm_range_pose_data* recv_msg, int* seq_count, double* range_data, double* pose_data);
 
 int commSendAck(struct typed_pipe* pipe, long state_hash, int resend_request);
 

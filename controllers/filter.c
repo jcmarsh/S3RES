@@ -12,6 +12,7 @@
 #define PIPE_COUNT 4 // But sometimes 2, sometimes 3
 
 int pipe_count = PIPE_COUNT;
+int seq_count = -1;
 double ranges[RANGER_COUNT] = {0};
 // range and pose data is sent together...
 double pose[3];
@@ -72,7 +73,7 @@ void command(void) {
 
   // Write out averaged range data (with pose)
   for (i = 1; i < pipe_count; i++) {
-    commSendRanger(&pipes[out_index[i - 1]], ranges, pose);
+    commSendRanger(&pipes[out_index[i - 1]], seq_count, ranges, pose);
   }
 }
 
@@ -99,7 +100,12 @@ void enterLoop(void) {
       if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
         read_ret = read(pipes[data_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
         if (read_ret == sizeof(struct comm_range_pose_data)) {
-          commCopyRanger(&recv_msg, ranges, pose);
+	  int old_seq = seq_count;
+          commCopyRanger(&recv_msg, &seq_count, ranges, pose);
+	  if (old_seq + 1 != seq_count) {
+	    fputs("FILTER SEQ ERROR.\n", stderr);
+	    // fprintf(stderr, "FILTER SEQ ERROR: %d - %d\n", old_seq + 1, seq_count);
+	  }
           // Calculates and sends the new command
           command();
         } else if (read_ret > 0) {

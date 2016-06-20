@@ -48,6 +48,7 @@ double goal[] = {0.0, 0.0, 0.0};
 double next_goal[] = {0.0, 0.0, 0.0};
 
 // Position
+int seq_count = -1;
 double pos[3];
 int ranger_count = 16; // TODO: used what's in commtypes... already included I think
 double ranges[16]; // 16 is the size in commtypes.h
@@ -209,7 +210,7 @@ void command(void) {
   }
 
   // Write move command
-  commSendMoveCommand(&pipes[out_index], vel_cmd[0], vel_cmd[1]);
+  commSendMoveCommand(&pipes[out_index], seq_count, vel_cmd[0], vel_cmd[1]);
 }
 
 void enterLoop(void) {
@@ -254,7 +255,12 @@ void enterLoop(void) {
       if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
         read_ret = read(pipes[data_index].fd_in, &recv_msg_data, sizeof(struct comm_range_pose_data));
         if (read_ret == sizeof(struct comm_range_pose_data)) {
-          commCopyRanger(&recv_msg_data, ranges, pos);
+	  int old_seq = seq_count;
+          commCopyRanger(&recv_msg_data, &seq_count, ranges, pos);
+	  if (old_seq + 1 != seq_count) {
+	    fputs("ART_POT SEQ ERROR.\n", stderr);
+	    // fprintf(stderr, "ART_POT SEQ ERROR: %d - %d\n", old_seq + 1, seq_count);
+	  }
           // Calculates and sends the new command
           command();
         } else if (read_ret > 0) {

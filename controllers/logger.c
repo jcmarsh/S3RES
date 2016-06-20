@@ -18,6 +18,7 @@
 
 int pipe_count = PIPE_COUNT;
 
+int seq_count;
 double ranges[RANGER_COUNT] = {0};
 // range and pose data is sent together...
 double pose[3];
@@ -107,7 +108,7 @@ void command(void) {
       }
     }
 
-    fprintf(log_file, "(%f,\t%f,\t%f,\t%f,\t%f,\t%f)\n", min, velocity, distance, time_this_round, pose[0], pose[1]);
+    fprintf(log_file, "(%f,\t%f,\t%f,\t%f,\t%f,\t%f,\t%d)\n", min, velocity, distance, time_this_round, pose[0], pose[1], seq_count);
   }
   prev_time = current_time;
   prev_x = pose[0];
@@ -142,7 +143,7 @@ void enterLoop(void) {
       if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
         read_ret = read(pipes[data_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
         if (read_ret == sizeof(struct comm_range_pose_data)) {
-          commCopyRanger(&recv_msg, ranges, pose);
+          commCopyRanger(&recv_msg, &seq_count, ranges, pose);
           // Calculates and sends the new command
           command();
         } else if (read_ret > 0) {

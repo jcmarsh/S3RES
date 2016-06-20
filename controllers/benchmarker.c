@@ -24,6 +24,8 @@ struct replica replica;
 struct comm_range_pose_data range_pose_data_msg;
 struct comm_mov_cmd mov_cmd_msg;
 
+int seq_count = -1;
+
 // TAS Stuff
 int priority;
 int pinned_cpu;
@@ -138,11 +140,16 @@ void enterLoop() {
       if (FD_ISSET(trans_pipes[0].fd_in, &select_set)) {
 	retval = read(trans_pipes[0].fd_in, &range_pose_data_msg, sizeof(struct comm_range_pose_data));
 	if (retval == sizeof(struct comm_range_pose_data)) {
+	  if (seq_count + 1 != range_pose_data_msg.seq_count) {
+	    fprintf(stderr, "BENCH SEQ ERROR: %d - %d\n", seq_count + 1, range_pose_data_msg.seq_count);
+	  }
+	  seq_count = range_pose_data_msg.seq_count;
 	  if (waiting_response) {
 	    debug_print("ERROR, sending data but still waiting on previous response.\n");
 #ifdef TIME_FULL_BENCH
 	    timestamp_t toss = generate_timestamp();
 	    printf("Error time elapsed (usec): %lf\n", diff_time(toss, last, CPU_MHZ));
+	    last = toss;
 #endif
 	  } else { // Data is dropped if PINT hasn't yet responded.
 	    waiting_response = true;
@@ -168,6 +175,9 @@ void enterLoop() {
 	// Second part of the cycle: response from replica
 	retval = read(replica.vot_pipes[1].fd_in, &mov_cmd_msg, sizeof(struct comm_mov_cmd));
 	if (retval == sizeof(struct comm_mov_cmd)) {
+	  if (seq_count != mov_cmd_msg.seq_count) {
+	    fprintf(stderr, "ERROR BENCH (MOV_CMD) SEQ: %d - %d\n", seq_count, mov_cmd_msg.seq_count);
+	  }
 	  waiting_response = false;
 
 #ifdef TIME_FULL_BENCH

@@ -43,6 +43,7 @@ int parseArgs(int argc, const char **argv) {
   return 0;
 }
 
+int seq_count = 0;
 void enterLoop(void) {
   int read_ret;
   struct comm_range_pose_data recv_msg;
@@ -67,11 +68,15 @@ void enterLoop(void) {
       if (FD_ISSET(pipes[read_in_index].fd_in, &select_set)) {
         read_ret = read(pipes[read_in_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
         if (read_ret == sizeof(struct comm_range_pose_data)) {
+	  if (seq_count + 1 != recv_msg.seq_count) {
+	    fputs("EMPTY SEQ ERROR\n", stderr);
+	  }
+	  seq_count = recv_msg.seq_count;
           if (insertSDC) {
             insertSDC = false;
-            commSendMoveCommand(&pipes[write_out_index], 0.1, 1.0);
+            commSendMoveCommand(&pipes[write_out_index], seq_count, 0.1, 1.0);
           } else {
-            commSendMoveCommand(&pipes[write_out_index], 0.1, 0.0);
+            commSendMoveCommand(&pipes[write_out_index], seq_count, 0.1, 0.0);
           }
         } else if (read_ret > 0) {
           debug_print("Empty read read_in_index did not match expected size.\n");

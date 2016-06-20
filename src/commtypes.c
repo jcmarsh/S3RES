@@ -170,14 +170,14 @@ void printBuffer(struct typed_pipe* pipe, char *buffer, int buff_count) {
       break;
     case MOV_CMD: ;
       struct comm_mov_cmd *mov_cmd = (struct comm_mov_cmd *) buffer;
-      printf("\tvel_cmd (%f, %f)\n", mov_cmd->vel_cmd[0], mov_cmd->vel_cmd[1]);
+      printf("\tvel_cmd %d: (%f, %f)\n", mov_cmd->seq_count, mov_cmd->vel_cmd[0], mov_cmd->vel_cmd[1]);
       break;
     case RANGE_POSE_DATA: ;
       struct comm_range_pose_data *rp_data = (struct comm_range_pose_data *) buffer;
       for (i = 0; i < RANGER_COUNT; i = i + 4) {
         printf("\tRange reading: %f %f %f %f\n", rp_data->ranges[i], rp_data->ranges[i+1], rp_data->ranges[i+2], rp_data->ranges[i+3]);
       }
-      printf("\tpose (%f, %f) - %f\n", rp_data->pose[0], rp_data->pose[1], rp_data->pose[2]);
+      printf("\tpose %d: (%f, %f) - %f\n", rp_data->seq_count, rp_data->pose[0], rp_data->pose[1], rp_data->pose[2]);
       break;
     case MAP_UPDATE: ;
       int header_ints = 3; // pose x, pose y, and obstacle count
@@ -250,7 +250,7 @@ int commSendWaypointRequest(struct typed_pipe* pipe, int padding) {
 }
 
 
-int commSendMoveCommand(struct typed_pipe* pipe, double vel_0, double vel_1) {
+int commSendMoveCommand(struct typed_pipe* pipe, int seq_count, double vel_0, double vel_1) {
   if (pipe->fd_out == 0 || pipe->type != MOV_CMD) {
     debug_print("commSendMoveCommand Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
     return 0;
@@ -259,6 +259,7 @@ int commSendMoveCommand(struct typed_pipe* pipe, double vel_0, double vel_1) {
   struct comm_mov_cmd msg;
   memset(&msg, 0, sizeof(struct comm_mov_cmd));
 
+  msg.seq_count  = seq_count; // For debugging.
   msg.vel_cmd[0] = vel_0;
   msg.vel_cmd[1] = vel_1;
 
@@ -348,7 +349,7 @@ int commRecvMapUpdate(struct typed_pipe* pipe, struct comm_map_update* msg) {
   return read_ret;
 }
 
-int commSendRanger(struct typed_pipe* pipe, double* ranger_data, double* pose_data) {
+int commSendRanger(struct typed_pipe* pipe, int seq_count, double* ranger_data, double* pose_data) {
   if (pipe->fd_out == 0 || pipe->type != RANGE_POSE_DATA) {
     debug_print("commSendRanger Error: pipe type (%s) does not match type or have a valid fd (%d).\n", MESSAGE_T[pipe->type], pipe->fd_out);
     return 0;
@@ -359,6 +360,7 @@ int commSendRanger(struct typed_pipe* pipe, double* ranger_data, double* pose_da
   struct comm_range_pose_data msg;
   memset(&msg, 0, sizeof(struct comm_range_pose_data));
 
+  msg.seq_count = seq_count;
   for (index = 0; index < RANGER_COUNT; index++) {
     msg.ranges[index] = ranger_data[index];
   }
@@ -393,9 +395,10 @@ int commSendAck(struct typed_pipe* pipe, long state_hash, int resend_request) {
   return write(pipe->fd_out, &msg, sizeof(struct comm_ack));
 }
 
-void commCopyRanger(struct comm_range_pose_data* recv_msg, double* range_data, double* pose_data) {
+void commCopyRanger(struct comm_range_pose_data* recv_msg, int* seq_count, double* range_data, double* pose_data) {
   int index = 0;
 
+  *seq_count = recv_msg->seq_count;
   for (index = 0; index < RANGER_COUNT; index++) {
     range_data[index] = recv_msg->ranges[index];
   }

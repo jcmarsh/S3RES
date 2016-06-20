@@ -62,7 +62,6 @@ private:
   double pose[3];
 
   // Ranger Device info
-  int ranger_countdown;
   Device *ranger;
   player_devaddr_t ranger_addr; // "original:localhost:6666:ranger:0"
 
@@ -182,8 +181,8 @@ int TranslatorDriver::MainSetup() {
   forkReplicas(r_p, 1, 2, argv);
 
   // Need this pipe not to block so that player and the outside world play nice
-  flags = fcntl(rep.vot_pipes[1].fd_in, F_GETFL, 0);
-  fcntl(rep.vot_pipes[1].fd_in, F_SETFL, flags | O_NONBLOCK);
+  //  flags = fcntl(rep.vot_pipes[1].fd_in, F_GETFL, 0);
+  //  fcntl(rep.vot_pipes[1].fd_in, F_SETFL, flags | O_NONBLOCK);
 
   puts("Translator driver ready");
 
@@ -241,7 +240,7 @@ int TranslatorDriver::ProcessMessage(QueuePointer & resp_queue,
 }
 
 void TranslatorDriver::SendWaypoints() {
-  printf("TRANS: SendWaypoints not implemented.\n");
+  puts("TRANS: SendWaypoints not implemented.\n");
   /*
   struct comm_way_res send_msg;
 
@@ -261,21 +260,38 @@ void TranslatorDriver::Main() {
 }
 
 // Called by player for each non-threaded driver.
+int seq_count = 0;
 void TranslatorDriver::DoOneUpdate() {
   int retval;
+  struct timeval select_timeout;
+  fd_set select_set;
   struct comm_mov_cmd recv_msg;
-
-  usleep(100000);
 
   if (!this->InQueue->Empty()) {
     this->ProcessMessages();
   }
 
+  select_timeout.tv_sec = 0;
+  select_timeout.tv_usec = 100000;
+
+  FD_ZERO(&select_set);
+  FD_SET(rep.vot_pipes[1].fd_in, &select_set);
+
   // This read is non-blocking
-  retval = read(rep.vot_pipes[1].fd_in, &recv_msg, sizeof(struct comm_mov_cmd));
+  retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
+
   if (retval > 0) {
-    // TODO: check for errors
-    this->PutCommand(recv_msg.vel_cmd[0], recv_msg.vel_cmd[1]);
+    if (FD_ISSET(rep.vot_pipes[1].fd_in, &select_set)) {
+      retval = read(rep.vot_pipes[1].fd_in, &recv_msg, sizeof(struct comm_mov_cmd));
+      // TODO: check for errors
+      // fprintf(stderr, "TRANS recv seq: %d\n", recv_msg.seq_count);
+      if (seq_count != recv_msg.seq_count) {
+	fputs("TRANS SEQ ERROR.\n", stderr);
+	// fprintf(stderr, "TRANS SEQ ERROR: %d - %d\n", seq_count, recv_msg.seq_count);
+      }
+      seq_count = recv_msg.seq_count + 1;
+      this->PutCommand(recv_msg.vel_cmd[0], recv_msg.vel_cmd[1]);
+    }
   }
 }
 
@@ -363,6 +379,8 @@ void TranslatorDriver::ProcessRanger(player_ranger_data_range_t &data)
   int index = 0;
   struct comm_range_pose_data send_msg;
 
+  // fprintf(stderr, "TRANS sending seq_count %d\n", seq_count);
+  send_msg.seq_count = seq_count;
   for (index = 0; index < 16; index++) {
     send_msg.ranges[index] = data.ranges[index];
   }
