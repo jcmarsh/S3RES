@@ -155,6 +155,7 @@ void updateMap(struct comm_range_pose_data * data) {
   commSendMapUpdate(&pipes[update_index], &send_msg);
 }
 
+int seq_count = -1;
 void enterLoop(void) {
   int read_ret;
   struct comm_range_pose_data recv_msg;
@@ -180,6 +181,11 @@ void enterLoop(void) {
       if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
         read_ret = read(pipes[data_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
         if (read_ret == sizeof(struct comm_range_pose_data)) {
+	  if (seq_count + 1 != recv_msg.seq_count) {
+	    // printf("MAPPER SEQ ERROR: %d - %d\n", seq_count + 1, recv_msg.seq_count);
+	    fputs("MAPPER SEQ ERROR\n", stderr);
+	  }
+	  seq_count = recv_msg.seq_count;
           updateMap(&recv_msg);
         } else if (read_ret > 0) {
           debug_print("Mapper read data_index did not match expected size: %d\n", read_ret);

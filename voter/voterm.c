@@ -269,9 +269,13 @@ bool checkSDC(void) { // returns true if SDC was found
       // Can only detect SDCs
       for (p_index = 0; p_index < out_pipe_count; p_index++) {
         if (replicas[0].buff_counts[p_index] != replicas[1].buff_counts[p_index]) {
-	  debug_print("VoterM(%s) DMR Buff counts off.\n", controller_name);
+	  debug_print("VoterM(%s) DMR Buff counts off on pipe %d: %d - %d\n", controller_name, p_index, replicas[0].buff_counts[p_index], replicas[1].buff_counts[p_index]);
           fault = true;
-          fault_index = 0; // Take a guess, 50 / 50 shot right?
+	  if (replicas[0].buff_counts[p_index] < replicas[1].buff_counts[p_index]) {
+	    fault_index = 0; // Can't be sure which one, but guess one that hasn't responded yet.
+	  } else {
+	    fault_index = 1;
+	  }
         } else if (memcmp(replicas[0].buffers[p_index], replicas[1].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
 	  debug_print("VoterM(%s) DMR Buff contents off.\n", controller_name);
           fault = true;
