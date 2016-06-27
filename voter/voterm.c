@@ -108,8 +108,24 @@ bool recvData(void) {
   if (-1 == active_pipe_index) {
     return false; // Will loop back to start of function
   } else {
-    return true;;
+    return true;
   }
+}
+
+bool checkWaitOnInput(void) {
+  // If input is on a non-timed pipe (ex. comm_ack into mapper), do not wait for data to be returned.
+  int p_index;
+  bool waiting = false;
+  for (p_index = 0; p_index < indexed_pipes; p_index++) {
+    if (active_pipe_index == timer_start_index[p_index]) {
+      waiting = true;
+    }
+  }
+  if (!waiting) {
+    return false; // Not a timed pipe
+  }
+
+  return true;
 }
 
 // sends data to replica in pipe[active_pipe_index]
@@ -124,18 +140,7 @@ bool sendToReps(void) {
     }
   }
 
-  // If input is on a non-timed pipe (ex. comm_ack into mapper), do not wait for data to be returned.
-  bool waiting = false;
-  for (p_index = 0; p_index < indexed_pipes; p_index++) {
-    if (active_pipe_index == timer_start_index[p_index]) {
-      waiting = true;
-    }
-  }
-  if (!waiting) {
-    return false; // Not a timed pipe
-  }
-
-  return true;
+  return checkWaitOnInput();
 }
 
 // returns number of reps that are done. Set timer and wait for expected responses
@@ -147,7 +152,7 @@ int  collectFromReps(bool set_timer, int expected) {
   timeout_occurred = false;
   int rep_done = 0;
 
-  // Timers are once again for ALL replicas, because I don't know how to do per rep with quad core
+  // Timers for ALL replicas with quad core
   watchdog = generate_timestamp();
 
   bool done = false;
@@ -654,6 +659,70 @@ int parseArgs(int argc, const char **argv) {
   return 0;
 }
 
+// returns -1 if no response expected, # of responses otherwise
+int sendCollect() {
+  timeout_occurred = false;
+  int p_index, r_index, retval, done_count = 0;
+  fd_set select_set;
+  struct timeval select_timeout;
+
+  // send data to all replicas
+  bool waiting = checkWaitOnInput();
+  for (r_index = 0; r_index < rep_count; r_index++) {
+    retval = write(replicas[r_index].fd_ins[active_pipe_index], ext_in_buffer, ext_in_bufcnt);
+    if (retval != ext_in_bufcnt) {
+      debug_print("Voter writeBuffer failed.\n");
+    }
+
+    if (waiting) {
+      watchdog = generate_timestamp();
+
+      bool done = false;
+      while (!done) {
+	timestamp_t current = generate_timestamp();
+	long remaining = voting_timeout - diff_time(current, watchdog, CPU_MHZ);
+	if (remaining > 0) {
+	  select_timeout.tv_sec = 0;
+	  select_timeout.tv_usec = remaining;
+	} else { // Timeout
+	  timeout_occurred = true;
+	  fault_index = r_index;
+	  break; // while(!done)
+	}
+
+	FD_ZERO(&select_set);
+	for (p_index = 0; p_index < out_pipe_count; p_index++) {
+	  FD_SET(replicas[r_index].fd_outs[p_index], &select_set);
+	}
+
+	retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
+	for (p_index = 0; p_index < out_pipe_count; p_index++) {
+	  if (FD_ISSET(replicas[r_index].fd_outs[p_index], &select_set)) {
+	    // TODO: Need to deal with different pipes being timed?
+	    replicas[r_index].buff_counts[p_index] = read(replicas[r_index].fd_outs[p_index], replicas[r_index].buffers[p_index], MAX_PIPE_BUFF);
+
+	    // If the non-timed pipe outputs multiple times, only the last will be saved.
+	    if (replicas[r_index].buff_counts[p_index] <= 1) {
+	      debug_print("Voter - read problem on internal pipe - Controller %s, rep %d, pipe %d\n", controller_name, r_index, p_index);
+	    }
+
+	    if (p_index == timer_stop_index[active_pipe_index]) {
+	      done_count++;
+	      done = true; // All timed pipe calls are in. Off to voting.
+	    }
+	  } // if FD_ISSET
+	} // for pipe
+      } // while !done
+    } // if waiting
+  } // for replica
+
+  if (!waiting) {
+    return -1;
+  }
+  
+  return done_count;
+}
+
 int main(int argc, const char **argv) {
   if (parseArgs(argc, argv) < 0) {
     puts("ERROR: failure parsing args.");
@@ -669,7 +738,43 @@ int main(int argc, const char **argv) {
   while(1) {
     // It starts with receiving data. Returns false if nothing received
     if (recvData()) { // sets active_pipe_index (pipe data come in on)
-      // Data received, send to replicas
+#ifdef SINGLE_CORE
+      // The problem here is that sendCollect can easily do the detection itself.
+      int reps_done = sendCollect(); // returns -1 if no response expected, # of responses otherwise
+      if (-1 == reps_done) {
+	// nothing to do, continue on
+      } else if (reps_done == rep_count) {
+	// check SDCs
+	if (checkSDC()) { // checkSDC will have to kill faulty replicas on its own and set fault_index
+	  fprintf(stderr, "VoterM(%s) (SC) SDC detected: %d - <%d>\n", controller_name, fault_index, replicas[fault_index].pid);
+	  // SDC found, recover (SMR will never trip SDC)
+	  startReplicas(false, fault_index, 1); // restarts fault_index
+	  sendData((fault_index + (rep_count - 1)) % rep_count);
+	} else {
+	  sendData(0); // This is the standard, no faults path
+	}
+      } else {
+	// timeout, fault index already set by sendCollect
+	fprintf(stderr, "VoterM(%s) (SC) CFE or ExecFault detected: %d - <%d>\n", controller_name, fault_index, replicas[fault_index].pid);
+	killAndClean(fault_index);
+	if (1 == rep_count) {
+	  // With SMR, have to restart the replica from it's exec
+	  startReplicas(true, 0, 1); // SMR must fork/exec
+	  sendToReps(); // Ignore return (response is expected)
+	  collectFromReps(false, 1);
+	  sendData(0);
+	} else {
+	  // With DMR and TMR fault_index should already be set, and other reps already run.
+
+	  // Now set to recover both DMR and TMR cases
+	  startReplicas(false, fault_index, 1);
+	  sendData((fault_index + (rep_count - 1)) % rep_count); // TODO: who sends the data?
+	}
+      }
+#endif /* SINGLE_CORE */
+
+#ifdef QUAD_CORE
+      // Data received, send to replicas.
       if (sendToReps()) { // returns false if no response is expected. Sends data to replica in pipe[active_pipe_index]
         int reps_done = collectFromReps(true, rep_count); // Set timer and wait for rep_count responses
         // sets timeout_occurred and #done
@@ -692,30 +797,18 @@ int main(int argc, const char **argv) {
             startReplicas(true, 0, 1); // SMR must fork/exec
             sendToReps(); // Ignore return (response is expected)
             collectFromReps(false, 1);
-            sendData((fault_index + (rep_count - 1)) % rep_count);
+            sendData((fault_index + (rep_count - 1)) % rep_count); // TODO: Always 0?
           } else {
             // With DMR and TMR we need to find the fault rep, and see which healthy reps ran
             // Quad core setups should always have had their healthy reps respond
-            if (2 == rep_count) {
-              if (0 == reps_done) {
-                // Wait for healthy replica to run
-                collectFromReps(false, 1);
-              }
-            } else { // 3 == rep_count
-              if (0 == reps_done) {
-                // Neither of the healthy reps ran
-                collectFromReps(false, 2);
-              } else if (1 == reps_done) {
-                // Only one (healthy rep) didn't run
-                collectFromReps(false, 1);
-              }
-            }
             // Now set to recover both DMR and TMR cases
             startReplicas(false, fault_index, 1);
             sendData((fault_index + (rep_count - 1)) % rep_count); // TODO: who sends the data?
           }
         } // if / else for timeout_occurred
       } // if(sendToReps) false (no response expected), restart loop
+#endif /* QUAD_CORE */
+
     } // if(recvData) false (no data received) restart loop
   } // while(1)
 
