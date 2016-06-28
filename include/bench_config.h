@@ -20,6 +20,8 @@
   #define IPC_SIZE 4096
 #endif // TEST_IPC_ROUND
 
+//#define RUSAGE_ENABLE
+
 // From http://stackoverflow.com/a/1644898
 //   Had to change... always compiling is exactly what I don't want.
 //#define DEBUG_PRINT

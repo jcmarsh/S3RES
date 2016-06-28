@@ -46,6 +46,7 @@ unsigned char ext_in_buffer[MAX_PIPE_BUFF];
 unsigned int * ext_out_fds; // should out_pipe_count of these
 char **rep_info_out;
 
+#ifdef RUSAGE_ENABLE
 timestamp_t start_time;
 void reportRUsageHandler(int sign, siginfo_t *si, void *unused) {
   // getrusage isn't in the safe list... so we'll see.
@@ -66,6 +67,7 @@ void reportRUsageHandler(int sign, siginfo_t *si, void *unused) {
   }
   fflush(stdout);
 }
+#endif /* RUSAGE_ENABLE */
 
 // sets active_pipe_index (pipe data came in on)
 int active_pipe_index;
@@ -471,6 +473,7 @@ void startReplicas(bool forking, int rep_index, int rep_start_count) {
 ////////////////////////////////////////////////////////////////////////////////
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
 int initVoterM(void) {
+#ifdef RUSAGE_ENABLE
   // register for rusage signal and take start time.
   struct sigaction sa;
   start_time = generate_timestamp();
@@ -482,6 +485,7 @@ int initVoterM(void) {
     debug_print("Failed to register VoterM for the report rusage handler.\n");
     return -1;
   }
+#endif /* RUSAGE_ENABLE */
 
   // Setup fd server
   // Horrible hack for having different named GenericEmpty controllers for tests
@@ -746,7 +750,13 @@ int main(int argc, const char **argv) {
       } else if (reps_done == rep_count) {
 	// check SDCs
 	if (checkSDC()) { // checkSDC will have to kill faulty replicas on its own and set fault_index
+#ifdef DEBUG_PRINT
 	  fprintf(stderr, "VoterM(%s) (SC) SDC detected: %d - <%d>\n", controller_name, fault_index, replicas[fault_index].pid);
+#else
+	  fputs("VoterM (SC) SDC detected.\t", stderr);
+	  fputs(controller_name, stderr);
+	  fputs("\n", stderr);
+#endif
 	  // SDC found, recover (SMR will never trip SDC)
 	  startReplicas(false, fault_index, 1); // restarts fault_index
 	  sendData((fault_index + (rep_count - 1)) % rep_count);
@@ -755,7 +765,13 @@ int main(int argc, const char **argv) {
 	}
       } else {
 	// timeout, fault index already set by sendCollect
+#ifdef DEBUG_PRINT
 	fprintf(stderr, "VoterM(%s) (SC) CFE or ExecFault detected: %d - <%d>\n", controller_name, fault_index, replicas[fault_index].pid);
+#else
+	fputs("VoterM (SC) CFE or ExecFault detected.\t", stderr);
+	fputs(controller_name, stderr);
+	fputs("\n", stderr);
+#endif
 	killAndClean(fault_index);
 	if (1 == rep_count) {
 	  // With SMR, have to restart the replica from it's exec
@@ -780,7 +796,13 @@ int main(int argc, const char **argv) {
         // sets timeout_occurred and #done
         if (!timeout_occurred) { // All reps responded in time.
           if (checkSDC()) { // checkSDC will have to kill faulty replicas on its own and set fault_index
+#ifdef DEBUG_PRINT
             fprintf(stderr, "VoterM(%s) SDC detected: %d - <%d>\n", controller_name, fault_index, replicas[fault_index].pid);
+#else
+	    fputs("VoterM SDC detected.\t", stderr);
+	    fputs(controller_name, stderr);
+	    fputs("\n", stderr);
+#endif
             // SDC found, recover (SMR will never trip SDC)
             startReplicas(false, fault_index, 1); // restarts fault_index
             sendData((fault_index + (rep_count - 1)) % rep_count);
@@ -790,7 +812,13 @@ int main(int argc, const char **argv) {
         } else { // timeout_occurred
           // Need to make sure killed in case of CFE (for SMR, DMR, and TMR)
           findFaultReplica(); // set fault_index
+#ifdef DEBUG_PRINT
           fprintf(stderr, "VoterM(%s) CFE or ExecFault detected: %d - <%d>\n", controller_name, fault_index, replicas[fault_index].pid);
+#else
+	  fputs("VoterM CFE or ExecFault detected.\t", stderr);
+	  fputs(controller_name, stderr);
+	  fputs("\n", stderr);
+#endif
           killAndClean(fault_index);
           if (1 == rep_count) {
             // With SMR, have to restart the replica from it's exec

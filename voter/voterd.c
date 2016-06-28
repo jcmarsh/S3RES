@@ -56,6 +56,7 @@ void checkSDC(int pipe_num);
 void processFromRep(int replica_num, int pipe_num);
 void writeBuffer(int fd_out, unsigned char* buffer, int buff_count);
 
+#ifdef RUSAGE_ENABLE
 timestamp_t start_time;
 void reportRUsageHandler(int sign, siginfo_t *si, void *unused) {
   // getrusage isn't in the safe list... so we'll see.
@@ -76,6 +77,7 @@ void reportRUsageHandler(int sign, siginfo_t *si, void *unused) {
   }
   fflush(stdout);
 }
+#endif /* RUSAGE_ENABLE */
 
 void restart_prep(int restartee, int restarter) {
   int i;
@@ -494,6 +496,7 @@ void processFromRep(int replica_num, int pipe_num) {
 ////////////////////////////////////////////////////////////////////////////////
 // Set up the device.  Return 0 if things go well, and -1 otherwise.
 int initVoterD(void) {
+#ifdef RUSAGE_ENABLE
   // register for rusage signal and take start time.
   struct sigaction sa;
   start_time = generate_timestamp();
@@ -505,6 +508,7 @@ int initVoterD(void) {
     debug_print("Failed to register VoterM for the report rusage handler.\n");
     return -1;
   }
+#endif /* RUSAGE_ENABLE */
 
   replica_priority = voter_priority - VOTER_PRIO_OFFSET;
 

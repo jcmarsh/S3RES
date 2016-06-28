@@ -25,6 +25,7 @@ void testCFEHandler(int signo, siginfo_t *si, void *unused) {
 
 extern float diff_time(timestamp_t current, timestamp_t last, float cpu_mhz);
 
+#ifdef RUSAGE_ENABLE
 timestamp_t start_time;
 void reportRUsageHandler(int sign, siginfo_t *si, void *unused) {
   // getrusage isn't in the safe list... so we'll see.
@@ -45,11 +46,14 @@ void reportRUsageHandler(int sign, siginfo_t *si, void *unused) {
   }
   fflush(stdout);
 }
+#endif /* RUSAGE_ENABLE */
 
 // Pipes should already be initialized by parseArgs or connectRecvFDS
 int initController(void) {
   struct sigaction sa;
+#ifdef RUSAGE_ENABLE
   start_time = generate_timestamp();
+#endif /* RUSAGE_ENABLE */
 
   sa.sa_flags = SA_SIGINFO;
   sigemptyset(&sa.sa_mask);
@@ -75,6 +79,7 @@ int initController(void) {
     return -1;
   }
 
+#ifdef RUSAGE_ENABLE
   sa.sa_flags = SA_SIGINFO;
   sigemptyset(&sa.sa_mask);
   sa.sa_sigaction = reportRUsageHandler;
@@ -82,6 +87,7 @@ int initController(void) {
     debug_print("Failed to register the report rusage handler.\n");
     return -1;
   }
+#endif /* RUSAGE_ENABLE */
 
   InitTAS(pinned_cpu, priority);
 
@@ -116,7 +122,9 @@ static void restartHandler(int signo, siginfo_t *si, void *unused) {
       sigaddset(&signal_set, RESTART_SIGNAL);
       sigaddset(&signal_set, SDC_SIM_SIGNAL);
       sigaddset(&signal_set, CFE_SIM_SIGNAL);
+#ifdef RUSAGE_ENABLE
       sigaddset(&signal_set, RRUSAGE_SIGNAL);
+#endif /* RUSAGE_ENABLE */
       if (sigprocmask(SIG_UNBLOCK, &signal_set, NULL) < 0) {
         debug_print("Controller signal unblock error.\n");
       }
