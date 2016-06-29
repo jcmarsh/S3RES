@@ -13,7 +13,7 @@ def getPID(name):
 		words = line.split()
 		try:
 			pid = words[0]
-			print line, "<- line | processed ->", pid
+			print line, " - line | processed - ", pid
 		except ValueError:
 			pass
 		return pid
