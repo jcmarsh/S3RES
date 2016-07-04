@@ -165,10 +165,6 @@ void enterLoop(void) {
   fd_set select_set;
  
   while(1) {
-    if (insertCFE) {
-      while (1) { }
-    }
-    
     select_timeout.tv_sec = 1;
     select_timeout.tv_usec = 0;
 
@@ -178,6 +174,9 @@ void enterLoop(void) {
 
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
+      if (insertCFE) {
+	while (1) { }
+      }
       if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
         read_ret = read(pipes[data_index].fd_in, &recv_msg, sizeof(struct comm_range_pose_data));
         if (read_ret == sizeof(struct comm_range_pose_data)) {

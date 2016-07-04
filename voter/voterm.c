@@ -500,8 +500,10 @@ int initVoterM(void) {
   replicas = (struct replicaR *) malloc(sizeof(struct replicaR) * rep_count);
   for_reps = (struct replicaR *) malloc(sizeof(struct replicaR) * rep_count);
   for (index = 0; index < rep_count; index++) {
-    replicas[index].priority = voter_priority - (1 + index);
-    for_reps[index].priority = voter_priority - (1 + index);
+    // replicas[index].priority = voter_priority - (1 + index);
+    replicas[index].priority = voter_priority - 4;
+    // for_reps[index].priority = voter_priority - (1 + index);
+    for_reps[index].priority = voter_priority - 4;
     if (CONTROLLER_PIN == QUAD_PIN_POLICY) {
       replicas[index].pinned_cpu = index + 1; // TODO: don't need both
       for_reps[index].pinned_cpu = index + 1;
@@ -681,6 +683,15 @@ int sendCollect() {
     if (waiting) {
       watchdog = generate_timestamp();
 
+      // Set rep priority to high
+      if (sched_set_policy(replicas[r_index].pid, voter_priority - 1) < 0) {
+	// Will fail when the replica is already dead.
+	debug_print("sched_set_policy failed: %d, %d\n", replicas[r_index].pid,  voter_priority - 1);
+      } else {
+	replicas[r_index].priority = voter_priority - 1;
+	for_reps[r_index].priority = voter_priority - 1;
+      }
+
       bool done = false;
       while (!done) {
 	timestamp_t current = generate_timestamp();
@@ -712,18 +723,29 @@ int sendCollect() {
 
 	    if (p_index == timer_stop_index[active_pipe_index]) {
 	      done_count++;
-	      done = true; // All timed pipe calls are in. Off to voting.
+	      done = true;
 	    }
 	  } // if FD_ISSET
 	} // for pipe
       } // while !done
+
+      // Set rep priority back down
+      if (sched_set_policy(replicas[r_index].pid, voter_priority - 4) < 0) {
+	// Will fail when the replica is already dead.
+	debug_print("sched_set_policy failed: %d, %d\n", replicas[r_index].pid,  voter_priority - 4);
+      } else {
+	replicas[r_index].priority = voter_priority - 4;
+	for_reps[r_index].priority = voter_priority - 4;
+      }
+
+
     } // if waiting
   } // for replica
 
   if (!waiting) {
     return -1;
   }
-  
+
   return done_count;
 }
 

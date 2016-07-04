@@ -256,10 +256,6 @@ void enterLoop(void) {
   fd_set select_set;
 
   while(1) {
-    if (insertCFE) {
-      while (1) { }
-    }
-    
     select_timeout.tv_sec = 1;
     select_timeout.tv_usec = 0;
 
@@ -269,6 +265,9 @@ void enterLoop(void) {
 
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
+      if (insertCFE) {
+	while (1) { }
+      }
       if (FD_ISSET(pipes[updates_index].fd_in, &select_set)) {
         read_ret = commRecvMapUpdate(&pipes[updates_index], &recv_map_update);
         if (read_ret > 0) {
