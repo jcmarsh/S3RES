@@ -163,9 +163,9 @@ int  collectFromReps(bool set_timer, int expected) {
     FD_ZERO(&select_set);
     for (r_index = 0; r_index < rep_count; r_index++) {
       for (p_index = 0; p_index < out_pipe_count; p_index++) {
-	if (replicas[r_index].fd_outs[p_index] != 0) { // FD may have been closed by killAndClean
-	  FD_SET(replicas[r_index].fd_outs[p_index], &select_set);
-	}
+        if (replicas[r_index].fd_outs[p_index] != 0) { // FD may have been closed by killAndClean
+          FD_SET(replicas[r_index].fd_outs[p_index], &select_set);
+        }
       }
     }
 
@@ -276,15 +276,15 @@ bool checkSDC(void) { // returns true if SDC was found
       // Can only detect SDCs
       for (p_index = 0; p_index < out_pipe_count; p_index++) {
         if (replicas[0].buff_counts[p_index] != replicas[1].buff_counts[p_index]) {
-	  debug_print("VoterM(%s) DMR Buff counts off on pipe %d: %d - %d\n", controller_name, p_index, replicas[0].buff_counts[p_index], replicas[1].buff_counts[p_index]);
+          debug_print("VoterM(%s) DMR Buff counts off on pipe %d: %d - %d\n", controller_name, p_index, replicas[0].buff_counts[p_index], replicas[1].buff_counts[p_index]);
           fault = true;
-	  if (replicas[0].buff_counts[p_index] < replicas[1].buff_counts[p_index]) {
-	    fault_index = 0; // Can't be sure which one, but guess one that hasn't responded yet.
-	  } else {
-	    fault_index = 1;
-	  }
+          if (replicas[0].buff_counts[p_index] < replicas[1].buff_counts[p_index]) {
+            fault_index = 0; // Can't be sure which one, but guess one that hasn't responded yet.
+          } else {
+            fault_index = 1;
+          }
         } else if (memcmp(replicas[0].buffers[p_index], replicas[1].buffers[p_index], replicas[0].buff_counts[p_index]) != 0) {
-	  debug_print("VoterM(%s) DMR Buff contents off.\n", controller_name);
+          debug_print("VoterM(%s) DMR Buff contents off.\n", controller_name);
           fault = true;
           fault_index = 0; // Take a guess, 50 / 50 shot right?
         }
@@ -685,60 +685,58 @@ int sendCollect() {
 
       // Set rep priority to high
       if (sched_set_policy(replicas[r_index].pid, voter_priority - 1) < 0) {
-	// Will fail when the replica is already dead.
-	debug_print("sched_set_policy failed: %d, %d\n", replicas[r_index].pid,  voter_priority - 1);
+        // Will fail when the replica is already dead.
+        debug_print("sched_set_policy failed: %d, %d\n", replicas[r_index].pid,  voter_priority - 1);
       } else {
-	replicas[r_index].priority = voter_priority - 1;
-	for_reps[r_index].priority = voter_priority - 1;
+        replicas[r_index].priority = voter_priority - 1;
+        for_reps[r_index].priority = voter_priority - 1;
       }
 
       bool done = false;
       while (!done) {
-	timestamp_t current = generate_timestamp();
-	long remaining = voting_timeout - diff_time(current, watchdog, CPU_MHZ);
-	if (remaining > 0) {
-	  select_timeout.tv_sec = 0;
-	  select_timeout.tv_usec = remaining;
-	} else { // Timeout
-	  timeout_occurred = true;
-	  fault_index = r_index;
-	  break; // while(!done)
-	}
+        timestamp_t current = generate_timestamp();
+        long remaining = voting_timeout - diff_time(current, watchdog, CPU_MHZ);
+        if (remaining > 0) {
+          select_timeout.tv_sec = 0;
+          select_timeout.tv_usec = remaining;
+        } else { // Timeout
+          timeout_occurred = true;
+          fault_index = r_index;
+          break; // while(!done)
+        }
 
-	FD_ZERO(&select_set);
-	for (p_index = 0; p_index < out_pipe_count; p_index++) {
-	  FD_SET(replicas[r_index].fd_outs[p_index], &select_set);
-	}
+        FD_ZERO(&select_set);
+        for (p_index = 0; p_index < out_pipe_count; p_index++) {
+          FD_SET(replicas[r_index].fd_outs[p_index], &select_set);
+        }
 
-	retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
-	for (p_index = 0; p_index < out_pipe_count; p_index++) {
-	  if (FD_ISSET(replicas[r_index].fd_outs[p_index], &select_set)) {
-	    // TODO: Need to deal with different pipes being timed?
-	    replicas[r_index].buff_counts[p_index] = read(replicas[r_index].fd_outs[p_index], replicas[r_index].buffers[p_index], MAX_PIPE_BUFF);
+        retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
+        for (p_index = 0; p_index < out_pipe_count; p_index++) {
+          if (FD_ISSET(replicas[r_index].fd_outs[p_index], &select_set)) {
+            // TODO: Need to deal with different pipes being timed?
+            replicas[r_index].buff_counts[p_index] = read(replicas[r_index].fd_outs[p_index], replicas[r_index].buffers[p_index], MAX_PIPE_BUFF);
 
-	    // If the non-timed pipe outputs multiple times, only the last will be saved.
-	    if (replicas[r_index].buff_counts[p_index] <= 1) {
-	      debug_print("Voter - read problem on internal pipe - Controller %s, rep %d, pipe %d\n", controller_name, r_index, p_index);
-	    }
+            // If the non-timed pipe outputs multiple times, only the last will be saved.
+            if (replicas[r_index].buff_counts[p_index] <= 1) {
+              debug_print("Voter - read problem on internal pipe - Controller %s, rep %d, pipe %d\n", controller_name, r_index, p_index);
+            }
 
-	    if (p_index == timer_stop_index[active_pipe_index]) {
-	      done_count++;
-	      done = true;
-	    }
-	  } // if FD_ISSET
-	} // for pipe
+            if (p_index == timer_stop_index[active_pipe_index]) {
+              done_count++;
+              done = true;
+            }
+          } // if FD_ISSET
+        } // for pipe
       } // while !done
 
       // Set rep priority back down
       if (sched_set_policy(replicas[r_index].pid, voter_priority - 4) < 0) {
-	// Will fail when the replica is already dead.
-	debug_print("sched_set_policy failed: %d, %d\n", replicas[r_index].pid,  voter_priority - 4);
+        // Will fail when the replica is already dead.
+        debug_print("sched_set_policy failed: %d, %d\n", replicas[r_index].pid,  voter_priority - 4);
       } else {
-	replicas[r_index].priority = voter_priority - 4;
-	for_reps[r_index].priority = voter_priority - 4;
+        replicas[r_index].priority = voter_priority - 4;
+        for_reps[r_index].priority = voter_priority - 4;
       }
-
-
     } // if waiting
   } // for replica
 
@@ -768,46 +766,46 @@ int main(int argc, const char **argv) {
       // The problem here is that sendCollect can easily do the detection itself.
       int reps_done = sendCollect(); // returns -1 if no response expected, # of responses otherwise
       if (-1 == reps_done) {
-	// nothing to do, continue on
+        // nothing to do, continue on
       } else if (reps_done == rep_count) {
-	// check SDCs
-	if (checkSDC()) { // checkSDC will have to kill faulty replicas on its own and set fault_index
+        // check SDCs
+        if (checkSDC()) { // checkSDC will have to kill faulty replicas on its own and set fault_index
 #ifdef DEBUG_PRINT
-	  fprintf(stderr, "VoterM(%s) (SC) SDC detected: %d - <%d>\n", controller_name, fault_index, replicas[fault_index].pid);
+          fprintf(stderr, "VoterM(%s) (SC) SDC detected: %d - <%d>\n", controller_name, fault_index, replicas[fault_index].pid);
 #else
-	  fputs("VoterM (SC) SDC detected.\t", stderr);
-	  fputs(controller_name, stderr);
-	  fputs("\n", stderr);
+          fputs("VoterM (SC) SDC detected.\t", stderr);
+          fputs(controller_name, stderr);
+          fputs("\n", stderr);
 #endif
-	  // SDC found, recover (SMR will never trip SDC)
-	  startReplicas(false, fault_index, 1); // restarts fault_index
-	  sendData((fault_index + (rep_count - 1)) % rep_count);
-	} else {
-	  sendData(0); // This is the standard, no faults path
-	}
+          // SDC found, recover (SMR will never trip SDC)
+          startReplicas(false, fault_index, 1); // restarts fault_index
+          sendData((fault_index + (rep_count - 1)) % rep_count);
+        } else {
+          sendData(0); // This is the standard, no faults path
+        }
       } else {
-	// timeout, fault index already set by sendCollect
+        // timeout, fault index already set by sendCollect
 #ifdef DEBUG_PRINT
-	fprintf(stderr, "VoterM(%s) (SC) CFE or ExecFault detected: %d - <%d>\n", controller_name, fault_index, replicas[fault_index].pid);
+        fprintf(stderr, "VoterM(%s) (SC) CFE or ExecFault detected: %d - <%d>\n", controller_name, fault_index, replicas[fault_index].pid);
 #else
-	fputs("VoterM (SC) CFE or ExecFault detected.\t", stderr);
-	fputs(controller_name, stderr);
-	fputs("\n", stderr);
+        fputs("VoterM (SC) CFE or ExecFault detected.\t", stderr);
+        fputs(controller_name, stderr);
+        fputs("\n", stderr);
 #endif
-	killAndClean(fault_index);
-	if (1 == rep_count) {
-	  // With SMR, have to restart the replica from it's exec
-	  startReplicas(true, 0, 1); // SMR must fork/exec
-	  sendToReps(); // Ignore return (response is expected)
-	  collectFromReps(false, 1);
-	  sendData(0);
-	} else {
-	  // With DMR and TMR fault_index should already be set, and other reps already run.
+        killAndClean(fault_index);
+        if (1 == rep_count) {
+          // With SMR, have to restart the replica from it's exec
+          startReplicas(true, 0, 1); // SMR must fork/exec
+          sendToReps(); // Ignore return (response is expected)
+          collectFromReps(false, 1);
+          sendData(0);
+        } else {
+          // With DMR and TMR fault_index should already be set, and other reps already run.
 
-	  // Now set to recover both DMR and TMR cases
-	  startReplicas(false, fault_index, 1);
-	  sendData((fault_index + (rep_count - 1)) % rep_count); // TODO: who sends the data?
-	}
+          // Now set to recover both DMR and TMR cases
+          startReplicas(false, fault_index, 1);
+          sendData((fault_index + (rep_count - 1)) % rep_count); // TODO: who sends the data?
+        }
       }
 #endif /* SINGLE_CORE */
 
@@ -821,9 +819,9 @@ int main(int argc, const char **argv) {
 #ifdef DEBUG_PRINT
             fprintf(stderr, "VoterM(%s) SDC detected: %d - <%d>\n", controller_name, fault_index, replicas[fault_index].pid);
 #else
-	    fputs("VoterM SDC detected.\t", stderr);
-	    fputs(controller_name, stderr);
-	    fputs("\n", stderr);
+            fputs("VoterM SDC detected.\t", stderr);
+            fputs(controller_name, stderr);
+            fputs("\n", stderr);
 #endif
             // SDC found, recover (SMR will never trip SDC)
             startReplicas(false, fault_index, 1); // restarts fault_index
@@ -837,9 +835,9 @@ int main(int argc, const char **argv) {
 #ifdef DEBUG_PRINT
           fprintf(stderr, "VoterM(%s) CFE or ExecFault detected: %d - <%d>\n", controller_name, fault_index, replicas[fault_index].pid);
 #else
-	  fputs("VoterM CFE or ExecFault detected.\t", stderr);
-	  fputs(controller_name, stderr);
-	  fputs("\n", stderr);
+          fputs("VoterM CFE or ExecFault detected.\t", stderr);
+          fputs(controller_name, stderr);
+          fputs("\n", stderr);
 #endif
           killAndClean(fault_index);
           if (1 == rep_count) {
