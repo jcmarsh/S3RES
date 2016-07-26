@@ -7,7 +7,7 @@ all: vote
 vote: Controllers Voters AStarVoteTest MapperVoteTest FilterVoteTest EmptyVoteTest ArtPotVoteTest GEVoteTest
 
 %.o: %.c
-	gcc -c -o $@ $< $(INC)
+	gcc -Werror -c -o $@ $< $(INC)
 
 Controllers:
 	make -C ../controllers

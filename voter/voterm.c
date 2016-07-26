@@ -105,6 +105,8 @@ bool recvData(void) {
         }
       }
     }
+  } else if (-1 == retval) {
+    fputs("Voterm failed select in recvData.\n", stderr);
   }
 
   if (-1 == active_pipe_index) {

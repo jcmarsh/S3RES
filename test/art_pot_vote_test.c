@@ -38,9 +38,9 @@ int main(int argc, const char** argv) {
   } else {
     // With Voter
     rep_argv = malloc(sizeof(char *) * 10);
-    rep_argv[0] = argv[1];
+    rep_argv[0] = (char *) argv[1];
     rep_argv[1] = "ArtPot";
-    rep_argv[2] = argv[2];
+    rep_argv[2] = (char *) argv[2];
     rep_argv[3] = "2000"; // Timeout
     rep_argv[4] = "80";  // priority
     asprintf(&rep_argv[5], "%s:%d:%d:%d", "RANGE_POSE_DATA", ranger_in[0], 0, 1);
@@ -66,11 +66,14 @@ int main(int argc, const char** argv) {
   struct comm_way_req way_req;
   struct comm_way_res way_res;
 
+  int seq = -1;
   int loops = 100;
   timestamp_t last;
   while (loops--) {
     // Create and send some ranger data
     struct comm_range_pose_data sim_range_data;
+    seq++;
+    sim_range_data.seq_count = seq;
     sim_range_data.pose[0] = -7.0;
     sim_range_data.pose[1] = -7.0;
     sim_range_data.pose[2] = 1.0;
@@ -106,7 +109,7 @@ int main(int argc, const char** argv) {
     if (retval > 0) {
       if (FD_ISSET(way_out[0], &select_set)) {
         read(way_out[0], &way_req, sizeof(way_req));
-        // printf("Got waypoint req\n");
+        printf("Got waypoint req\n");
         way_res.point[0] = 8.0;
         way_res.point[1] = 8.0;
         way_res.point[2] = 0.0;

@@ -37,9 +37,9 @@ int main(int argc, const char** argv) {
   } else {
     // With Voter
     rep_argv = malloc(sizeof(char *) * 9);
-    rep_argv[0] = argv[1];
+    rep_argv[0] = (char *) argv[1];
     rep_argv[1] = "Mapper";
-    rep_argv[2] = argv[2];
+    rep_argv[2] = (char *) argv[2];
     rep_argv[3] = "800";
     rep_argv[4] = "40";
     asprintf(&rep_argv[5], "%s:%d:%d:%d", "RANGE_POSE_DATA", ranger_in[0], 0, 1);
