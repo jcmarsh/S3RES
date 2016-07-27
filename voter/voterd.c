@@ -399,6 +399,7 @@ void checkSDC(int pipe_num) {
 	debug_print("\tPipe_num %d, Bytes available %d, buff_counts: %d, %d\n", pipe_num, bytes_avail, replicas[0].vot_pipes[pipe_num].buff_count, replicas[1].vot_pipes[pipe_num].buff_count);
 
             #ifdef DEBUG_PRINT
+	      /*
               // Create typed pipes for meta data
               struct typed_pipe print_pipesA[pipe_count];
               struct typed_pipe print_pipesB[pipe_count];
@@ -417,6 +418,7 @@ void checkSDC(int pipe_num) {
 
               free(buffer_A);
               free(buffer_B);
+	      */
             #endif /* DEBUG_PRINT */
 
 
@@ -435,7 +437,8 @@ void checkSDC(int pipe_num) {
             
             debug_print("VoterD(%s) Caught SDC: %d - <%d>\n", controller_name, restartee, replicas[restartee].pid);
             #ifdef DEBUG_PRINT
-              // print all three or just two?
+	      /*
+	      // print all three or just two?
 
               // Create typed pipes for meta data
               struct typed_pipe print_pipesA[pipe_count];
@@ -455,6 +458,7 @@ void checkSDC(int pipe_num) {
 
               free(buffer_A);
               free(buffer_B);
+	      */
             #endif /* DEBUG_PRINT */
             restart_prep(restartee, r_index);
           } else {

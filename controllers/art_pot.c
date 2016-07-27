@@ -247,7 +247,7 @@ void enterLoop(void) {
           } else if (read_ret < 0) {
             debug_print("ArtPot - read way_res_index problems.\n");
           } else {
-            debug_print("ArtPot read_ret == 0 on way_res_index.\n");
+            // debug_print("ArtPot read_ret == 0 on way_res_index.\n");
           } 
         }
       }
@@ -267,7 +267,7 @@ void enterLoop(void) {
         } else if (read_ret < 0) {
           debug_print("ArtPot - read data_index problems.\n");
         } else {
-          debug_print("ArtPot read_ret == 0 on data_index.\n");
+          // debug_print("ArtPot read_ret == 0 on data_index.\n");
         }
       }
     }

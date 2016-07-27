@@ -112,7 +112,7 @@ void enterLoop(void) {
         } else if (read_ret < 0) {
           debug_print("Filter - read data_index problems.\n");
         } else {
-          debug_print("Filter read_ret == 0 on data_index.\n");
+          // debug_print("Filter read_ret == 0 on data_index.\n");
         }
       }
     }

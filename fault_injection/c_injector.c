@@ -112,7 +112,7 @@ int main(int argc, char *argv[]) {
 
   srand(time(NULL));
   
-  printf("c_injector kill signal: %d, usleep %d\n\tpid search: %s\n", kill_cmd, SLEEP_USEC, cmd_str);
+  fprintf(stderr, "c_injector kill signal: %d, usleep %d\n\tpid search: %s\n", kill_cmd, SLEEP_USEC, cmd_str);
   process_count = getPIDs(controller_count * 3, pids, weights, names, cmd_str); // # of process at startup.
   while(true) {
     int total = 0;
@@ -120,12 +120,12 @@ int main(int argc, char *argv[]) {
 
     total = getPIDs(process_count, pids, weights, names, cmd_str);
     if (total < process_count) {
-      printf("Error, less processes found than named.\n");
+      fprintf(stderr, "Error, less processes found than named.\n");
     } else {
       // TODO: This program needs work.
       int kill_index = rand() % total;
       kill(pids[kill_index], kill_cmd);
-      printf("Signal %d on %d (%s)\n", kill_cmd, pids[kill_index], names[kill_index]);
+      fprintf(stderr, "Signal %d on %d (%s)\n", kill_cmd, pids[kill_index], names[kill_index]);
       fflush(stdout);
       /*
 	float kill_index = (float)((rand() / (double)(RAND_MAX)) * 100);

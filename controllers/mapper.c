@@ -206,7 +206,7 @@ void enterLoop(void) {
         } else if (read_ret < 0) {
           debug_print("Mapper - read ack_index problems.\n");
         } else {
-          debug_print("Mapper read_ret == 0 on ack_index.\n");
+          // debug_print("Mapper read_ret == 0 on ack_index.\n");
         }
       }
     }
