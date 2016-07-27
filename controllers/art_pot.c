@@ -234,7 +234,7 @@ void enterLoop(void) {
     int retval = select(FD_SETSIZE, &select_set, NULL, NULL, &select_timeout);
     if (retval > 0) {
       if (insertCFE) {
-	while (1) { }
+        while (1) { }
       }
       if (PIPE_COUNT == pipe_count) {
         if (FD_ISSET(pipes[way_res_index].fd_in, &select_set)) {
@@ -254,12 +254,12 @@ void enterLoop(void) {
       if (FD_ISSET(pipes[data_index].fd_in, &select_set)) {
         read_ret = read(pipes[data_index].fd_in, &recv_msg_data, sizeof(struct comm_range_pose_data));
         if (read_ret == sizeof(struct comm_range_pose_data)) {
-	  int old_seq = seq_count;
+          int old_seq = seq_count;
           commCopyRanger(&recv_msg_data, &seq_count, ranges, pos);
-	  if (old_seq + 1 != seq_count) {
-	    fputs("ART_POT SEQ ERROR.\n", stderr);
-	    // fprintf(stderr, "ART_POT SEQ ERROR: %d - %d\n", old_seq + 1, seq_count);
-	  }
+          if (old_seq + 1 != seq_count) {
+            fputs("ART_POT SEQ ERROR.\n", stderr);
+            // fprintf(stderr, "ART_POT SEQ ERROR: %d - %d\n", old_seq + 1, seq_count);
+          }
           // Calculates and sends the new command
           command();
         } else if (read_ret > 0) {

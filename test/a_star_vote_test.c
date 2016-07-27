@@ -34,9 +34,9 @@ int main(int argc, const char** argv) {
   } else {
     // With Voter
     rep_argv = malloc(sizeof(char *) * 10);
-    rep_argv[0] = argv[1]; // VoterM or Voterd
+    rep_argv[0] = (char *) argv[1]; // VoterM or Voterd
     rep_argv[1] = "AStar";
-    rep_argv[2] = argv[2]; // SMR, DMR, or TMR
+    rep_argv[2] = (char *) argv[2]; // SMR, DMR, or TMR
     rep_argv[3] = "80000"; // Timeout
     rep_argv[4] = "30";  // priority
     asprintf(&rep_argv[5], "%s:%d:%d:%d", "MAP_UPDATE", map_in[0], 0, 1);

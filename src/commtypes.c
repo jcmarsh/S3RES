@@ -369,7 +369,7 @@ int commSendRanger(struct typed_pipe* pipe, int seq_count, double* ranger_data, 
   }
 
   int write_ret = write(pipe->fd_out, &msg, sizeof(struct comm_range_pose_data));
-  if (write_ret < sizeof(struct comm_range_pose_data)) {
+  if (write_ret != sizeof(struct comm_range_pose_data)) {
     if (write_ret < 0) {
       debug_print("commSendRanger failed.\n");
     } else {
