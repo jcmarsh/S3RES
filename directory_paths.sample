@@ -1,0 +1,3 @@
+TOP_LVL=/home/debian/research
+PLAYERC=$(TOP_LVL)/player
+INSTALL_DIR=$(TOP_LVL)/stage/experiments

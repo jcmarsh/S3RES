@@ -1,0 +1,77 @@
+include ../directory_paths
+
+SRC=../src/commtypes.c ../src/fd_client.c ../src/controller.c
+DEP=../include/*.h ../tas_lib/inc/*.h
+INC=-I../include/ -I../tas_lib/inc/
+LIB=-L/usr/local/lib -lrt -lTASLimited -pthread
+COMPILE=/usr/local/musl/bin/musl-gcc -Werror -static
+#COMPILE=gcc -O3 -Werror -static
+FLAGS=-O3 -Werror -static
+#FLAGS=-g -O0 -Werror -static
+
+all: ArtPot AStar BenchMarker Empty GenericEmpty Filter Logger Mapper Load
+
+%.o: %.c
+	$(COMPILE) -c -o $@ $< -I../include/ -I../tas_lib/inc/
+
+ArtPot: art_pot.o $(SRC) $(DEP)
+	$(COMPILE) -o ArtPot art_pot.o $(SRC) $(INC) $(LIB) -lm
+
+AStar: a_star.o mapping.c $(SRC) $(DEP) ./inc/*.h
+	$(COMPILE) -o AStar a_star.o mapping.c $(SRC) $(INC) $(LIB) -lm
+
+BenchMarker: benchmarker.o ../src/commtypes.c ../src/replicas.c ../voter/vote_buff.c $(DEP)
+	$(COMPILE) -o BenchMarker benchmarker.o ../src/commtypes.c ../src/fd_server.c ../src/replicas.c ../voter/vote_buff.c $(INC) $(LIB)
+
+Empty: empty.o $(SRC) $(DEP)
+	$(COMPILE) -o Empty empty.o $(SRC) $(INC) $(LIB)
+
+Filter: filter.o $(SRC) $(DEP)
+	$(COMPILE) -o Filter filter.o $(SRC) $(INC) $(LIB)
+
+Logger: logger.o $(SRC) $(DEP)
+	$(COMPILE) -o Logger logger.o $(SRC) $(INC) $(LIB) -lm
+
+Mapper: mapper.o mapping.c $(SRC) $(DEP) ./inc/*.h
+	$(COMPILE) -o Mapper mapper.o mapping.c $(SRC) $(INC) $(LIB) -lm
+
+Load: load.c $(SRC) $(DEP)
+	gcc -c $(FLAGS) -o load.o load.c -I../include/ -I../tas_lib/inc/
+	gcc -O3 -Werror -L"~/research/ccv/lib" -I"~/research/ccv/lib" -I"/usr/include" -o Load load.o $(SRC) $(INC) $(LIB) -lccv `cat ~/research/ccv/lib/.deps`
+
+GenericEmpty: generic_empty.o $(SRC) $(DEP)
+	$(COMPILE) -o GenericEmpty generic_empty.o $(SRC) $(INC) $(LIB)
+
+GenericSizes: generic_empty.c $(SRC) $(DEP)
+	$(COMPILE) -o GenericEmpty_00204K generic_empty.c -D FILLER_SIZE=0 $(SRC) $(INC) $(LIB)
+	$(COMPILE) -o GenericEmpty_00256K generic_empty.c -D FILLER_SIZE=52*1024 $(SRC) $(INC) $(LIB)
+	$(COMPILE) -o GenericEmpty_00512K generic_empty.c -D FILLER_SIZE=52*1024+252*1024 $(SRC) $(INC) $(LIB)
+	$(COMPILE) -o GenericEmpty_01024K generic_empty.c -D FILLER_SIZE=52*1024+766*1024 $(SRC) $(INC) $(LIB)
+	$(COMPILE) -o GenericEmpty_02048K generic_empty.c -D FILLER_SIZE=52*1024+1790*1024 $(SRC) $(INC) $(LIB)
+	$(COMPILE) -o GenericEmpty_04096K generic_empty.c -D FILLER_SIZE=52*1024+3838*1024 $(SRC) $(INC) $(LIB)
+	$(COMPILE) -o GenericEmpty_08192K generic_empty.c -D FILLER_SIZE=52*1024+7934*1024 $(SRC) $(INC) $(LIB)
+	$(COMPILE) -o GenericEmpty_16384K generic_empty.c -D FILLER_SIZE=52*1024+16126*1024 $(SRC) $(INC) $(LIB)
+	$(COMPILE) -o GenericEmpty_32768K generic_empty.c -D FILLER_SIZE=52*1024+32508*1024 $(SRC) $(INC) $(LIB)
+
+copy:
+	cp ArtPot $(INSTALL_DIR)
+	cp AStar $(INSTALL_DIR)
+	cp BenchMarker $(INSTALL_DIR)
+	cp Empty $(INSTALL_DIR)
+	cp GenericEmpty $(INSTALL_DIR)
+	cp Filter $(INSTALL_DIR)
+	cp Logger $(INSTALL_DIR)
+	cp Mapper $(INSTALL_DIR)
+	cp Load $(INSTALL_DIR)
+
+clean:
+	rm -f *.o
+	rm -f ArtPot
+	rm -f AStar
+	rm -f BenchMarker
+	rm -f Empty
+	rm -f GenericEmpty*
+	rm -f Filter
+	rm -f Logger
+	rm -f Mapper
+	rm -f Load
