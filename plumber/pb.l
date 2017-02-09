@@ -7,9 +7,10 @@
 %%
 [ \t\r]
 "Bench"			{ yylval.str = "Bench"; return BENCH; }
-"SMR"			{ yylval.rep_type = SMR; return P_SMR; }
-"DMR"			{ yylval.rep_type = DMR; return P_DMR; }
-"TMR"			{ yylval.rep_type = TMR; return P_TMR; }
+"SMR"			{ yylval.rep_type = SMR; return RT_SMR; }
+"DMR"			{ yylval.rep_type = DMR; return RT_DMR; }
+"TMR"			{ yylval.rep_type = TMR; return RT_TMR; }
+"ALL"			{ yylval.rep_type = ALL; return RT_ALL; }
 "--"			{ return START_PIPE; }
 "->"			{ return END_PIPE; }
 "("				{ return START_VOTE; }

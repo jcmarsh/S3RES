@@ -57,3 +57,5 @@ The rest of the lines describe the communication between the components. The lin
 The component declarations are now more complicated. `map := VoterR(Mapper)TMR, 1600 60` specifies that the `Mapper` component will be launched and replicated by the voter with the executable `VoterR`. The replication strategy will be triple modular redundancy (TMR), the timeout is 1600 microseconds, and the priority is 60. `VoterR` is intended for real-time components, and `VoterD` for non real-time components.
 
 The parenthesis in the communication section are used by the Voters to delineate channels that are timed. For example, the `Filter` component starts a timer (for `400` microseconds) when data is received from `Bench`. This timer is reset when `Filter` sends output to `ArtPot`. However, output to `Mapper` does not reset the timer. This feature is likely in flux. Thus far it seems necessary, but confusing.
+
+TODO: Add load component to example. Include all replication types (SMR, DMR, TMR, and ALL).
