@@ -9,8 +9,6 @@ replication_t reptypeToEnum(char* type) {
     return DMR;
   } else if (strcmp(type, "TMR") == 0) {
     return TMR;
-  } else if (strcmp(type, "ALL") == 0) {
-    return ALL;
   } else {
     return REP_TYPE_ERROR;
   }
@@ -25,8 +23,6 @@ int reptypeToCount(replication_t type) {
     return 2;
   case TMR:
     return 3;
-  case ALL:
-    return 4;
   default:
     return 0;
   }

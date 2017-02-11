@@ -17,7 +17,6 @@ install: regular
 	make -C ./voter copy
 	make -C ./plumber copy
 	make -C ./fault_injection copy
-	make -C ./stage_control copy
 
 clean:
 	make -C ./controllers clean

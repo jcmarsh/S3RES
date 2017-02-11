@@ -20,10 +20,9 @@ struct typed_pipe cmd_out;
 }
 
 %token <str> BENCH
-%token <rep_type> RT_SMR
-%token <rep_type> RT_DMR
-%token <rep_type> RT_TMR
-%token <rep_type> RT_ALL
+%token <rep_type> P_SMR
+%token <rep_type> P_DMR
+%token <rep_type> P_TMR
 %token START_PIPE
 %token END_PIPE
 %token START_VOTE
@@ -62,10 +61,9 @@ rep_comp
   ;
 
 rep_strat
-  : RT_SMR { $$ = $1; }
-  | RT_DMR { $$ = $1; }
-  | RT_TMR { $$ = $1; }
-  | RT_ALL { $$ = $1; }
+  : P_SMR { $$ = $1; }
+  | P_DMR { $$ = $1; }
+  | P_TMR { $$ = $1; }
   ;
 
 relationship
